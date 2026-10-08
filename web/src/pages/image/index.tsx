@@ -325,7 +325,16 @@ export default function ImagePage() {
             const image = result[0];
             if (!image) throw new Error(t("imageWorkbench.missingResult"));
             const stored = await uploadImage(image.dataUrl);
-            const nextImage: GeneratedImage = { id: image.id, dataUrl: stored.url, ...(stored.storageKey ? { storageKey: stored.storageKey } : {}), durationMs: performance.now() - itemStartedAt, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
+            const nextImage: GeneratedImage = {
+                id: image.id,
+                dataUrl: stored.url,
+                ...(stored.storageKey ? { storageKey: stored.storageKey } : {}),
+                durationMs: performance.now() - itemStartedAt,
+                width: stored.width,
+                height: stored.height,
+                bytes: stored.bytes,
+                mimeType: stored.mimeType,
+            };
             setResults((value) => updateResultAt(value, index, { status: "success", image: nextImage }));
             return nextImage;
         } catch (error) {
@@ -802,7 +811,7 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
         createdAt: log.createdAt || Date.now(),
         title: log.title || log.model || i18n.t("workbench.untitled"),
         prompt: log.prompt || log.title || "",
-        time: log.time || new Date().toLocaleString(i18n.resolvedLanguage, { hour12: false }),
+        time: log.time || new Date().toLocaleString("zh-CN", { hour12: false }),
         model: log.model || config.imageModel || "",
         config,
         references,
@@ -886,7 +895,7 @@ function buildLog({
         createdAt: Date.now(),
         title: prompt.slice(0, 12) || i18n.t("workbench.untitled"),
         prompt,
-        time: new Date().toLocaleString(i18n.resolvedLanguage, { hour12: false }),
+        time: new Date().toLocaleString("zh-CN", { hour12: false }),
         model,
         config: logConfig,
         references,

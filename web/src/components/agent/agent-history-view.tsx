@@ -31,7 +31,7 @@ export function AgentHistoryView({
     onResumeThread: (threadId: string) => void;
     onDeleteThreads: (threadIds: string[]) => void;
 }) {
-    const { i18n, t } = useTranslation();
+    const { t } = useTranslation();
     const [selectedIds, setSelectedIds] = useState(() => new Set<string>());
     const selectedThreads = threads.filter((thread) => selectedIds.has(thread.id));
     const allSelected = Boolean(threads.length) && selectedThreads.length === threads.length;
@@ -55,8 +55,23 @@ export function AgentHistoryView({
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-sm" style={{ color: theme.node.muted }}>
-                        {threads.length ? <Checkbox checked={allSelected} indeterminate={Boolean(selectedThreads.length) && !allSelected} disabled={loading || busy} onChange={() => setSelectedIds(allSelected ? new Set() : new Set(threads.map((thread) => thread.id)))} /> : null}
-                        <span>{selectedThreads.length ? t("agent.history.selected", { count: selectedThreads.length }) : threads.length ? t("agent.history.count", { count: threads.length }) : connected ? t("agent.history.empty") : t("agent.status.disconnected")}</span>
+                        {threads.length ? (
+                            <Checkbox
+                                checked={allSelected}
+                                indeterminate={Boolean(selectedThreads.length) && !allSelected}
+                                disabled={loading || busy}
+                                onChange={() => setSelectedIds(allSelected ? new Set() : new Set(threads.map((thread) => thread.id)))}
+                            />
+                        ) : null}
+                        <span>
+                            {selectedThreads.length
+                                ? t("agent.history.selected", { count: selectedThreads.length })
+                                : threads.length
+                                  ? t("agent.history.count", { count: threads.length })
+                                  : connected
+                                    ? t("agent.history.empty")
+                                    : t("agent.status.disconnected")}
+                        </span>
                     </div>
                     <div className="flex items-center gap-2">
                         {selectedThreads.length ? (
@@ -112,7 +127,7 @@ export function AgentHistoryView({
                                         </div>
                                         <div className="truncate text-[11px] leading-4 opacity-65">{thread.preview || thread.id}</div>
                                     </div>
-                                    <span className="shrink-0 text-[10px] opacity-55">{formatThreadTime(thread.updatedAt || thread.createdAt, i18n.language)}</span>
+                                    <span className="shrink-0 text-[10px] opacity-55">{formatThreadTime(thread.updatedAt || thread.createdAt)}</span>
                                 </div>
                             </div>
                         );
@@ -128,7 +143,7 @@ export function AgentHistoryView({
     );
 }
 
-function formatThreadTime(value: number | undefined, locale: string) {
+function formatThreadTime(value: number | undefined) {
     if (!value) return "";
-    return new Date(value * 1000).toLocaleString(locale);
+    return new Date(value * 1000).toLocaleString("zh-CN");
 }

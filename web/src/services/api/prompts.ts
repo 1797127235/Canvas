@@ -220,7 +220,7 @@ function isActiveOption(value: string) {
     return value && value !== ALL_PROMPTS_OPTION && value !== "all";
 }
 
-export function formatPromptDate(value: string, locale?: string) {
+export function formatPromptDate(value: string) {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat(locale, { year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+    return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }

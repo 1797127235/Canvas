@@ -1,7 +1,7 @@
 import axios, { type AxiosRequestConfig } from "axios";
 
 import i18n from "@/i18n";
-import { buildApiUrl, withLocalProxy, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
+import { buildApiUrl, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 
 type RequestOptions = { signal?: AbortSignal };
 
@@ -40,7 +40,7 @@ function pluginHeaders(extra?: Record<string, string>, hasJsonBody = false): Rec
 }
 
 function pluginUrl(config: AiConfig, path: string) {
-    if (/^https?:/i.test(path)) return withLocalProxy(path);
+    if (/^https?:/i.test(path)) return path;
     return buildApiUrl(config.baseUrl, path.startsWith("/") ? path : `/${path}`);
 }
 
@@ -225,10 +225,10 @@ export type PluginTemplate = { label: string; script: string };
 
 export function getPluginTemplates(): Record<ModelCapability, PluginTemplate[]> {
     return {
-    image: [
-        {
-            label: i18n.t("modelPlugin.templates.openai"),
-            script: `/**
+        image: [
+            {
+                label: i18n.t("modelPlugin.templates.openai"),
+                script: `/**
  * OpenAI image generation and editing.
  * Text-to-image uses POST /v1/images/generations (JSON) when images is empty.
  * Image editing uses POST /v1/images/edits (multipart) when images has data URLs.
@@ -320,10 +320,10 @@ return await generateImage({
   apiKey,
   request,
 });`,
-        },
-        {
-            label: i18n.t("modelPlugin.templates.gemini"),
-            script: `/**
+            },
+            {
+                label: i18n.t("modelPlugin.templates.gemini"),
+                script: `/**
  * Gemini image generation via models/{model}:generateContent.
  * Reference images go into parts.inline_data. size maps to aspectRatio; quality maps to imageSize.
  * @param {string} prompt
@@ -432,12 +432,12 @@ return await generateImage({
   apiKey,
   request,
 });`,
-        },
-    ],
-    video: [
-        {
-            label: i18n.t("modelPlugin.templates.openai"),
-            script: `/**
+            },
+        ],
+        video: [
+            {
+                label: i18n.t("modelPlugin.templates.openai"),
+                script: `/**
  * OpenAI-compatible video: POST /v1/videos (multipart), then poll GET /v1/videos/{id}.
  * Do not set Content-Type on FormData; the browser adds the boundary.
  * @param {string} prompt
@@ -555,10 +555,10 @@ return await generateVideo({
   request,
   poll,
 });`,
-        },
-        {
-            label: i18n.t("modelPlugin.templates.gemini"),
-            script: `/**
+            },
+            {
+                label: i18n.t("modelPlugin.templates.gemini"),
+                script: `/**
  * Gemini Veo video: POST models/{model}:predictLongRunning, then poll the operation.
  * First/last-frame mode: images[0] -> image, images[1] -> lastFrame.
  * Reference mode: all images -> referenceImages.
@@ -715,12 +715,12 @@ return await generateVideo({
   request,
   poll,
 });`,
-        },
-    ],
-    audio: [
-        {
-            label: i18n.t("modelPlugin.templates.openai"),
-            script: `/**
+            },
+        ],
+        audio: [
+            {
+                label: i18n.t("modelPlugin.templates.openai"),
+                script: `/**
  * OpenAI speech: POST /v1/audio/speech.
  * @param {string} prompt - text to speak
  * @param {object} params
@@ -774,10 +774,10 @@ return await generateAudio({
   apiKey,
   request,
 });`,
-        },
-        {
-            label: i18n.t("modelPlugin.templates.gemini"),
-            script: `/**
+            },
+            {
+                label: i18n.t("modelPlugin.templates.gemini"),
+                script: `/**
  * Gemini TTS: POST models/{model}:generateContent with AUDIO modality.
  * Audio bytes are returned in inlineData.data (base64 PCM).
  * @param {string} prompt - text to speak
@@ -843,12 +843,12 @@ return await generateAudio({
   apiKey,
   request,
 });`,
-        },
-    ],
-    text: [
-        {
-            label: i18n.t("modelPlugin.templates.openai"),
-            script: `/**
+            },
+        ],
+        text: [
+            {
+                label: i18n.t("modelPlugin.templates.openai"),
+                script: `/**
  * OpenAI text: POST /v1/responses.
  * @param {{role: string, content: string}[]} messages - includes the system message when present
  * @param {string} model
@@ -902,10 +902,10 @@ return await generateText({
   request,
   onDelta,
 });`,
-        },
-        {
-            label: i18n.t("modelPlugin.templates.gemini"),
-            script: `/**
+            },
+            {
+                label: i18n.t("modelPlugin.templates.gemini"),
+                script: `/**
  * Gemini text: POST models/{model}:generateContent.
  * System messages are skipped in contents; systemPrompt goes to systemInstruction.
  * @param {{role: string, content: string}[]} messages
@@ -968,8 +968,8 @@ return await generateText({
   request,
   onDelta,
 });`,
-        },
-    ],
+            },
+        ],
     };
 }
 

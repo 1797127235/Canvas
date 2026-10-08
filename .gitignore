@@ -3,6 +3,7 @@ out/
 node_modules/
 .env*
 !.env.example
+web/public/local-channels.json
 data/
 *.log
 *.tsbuildinfo

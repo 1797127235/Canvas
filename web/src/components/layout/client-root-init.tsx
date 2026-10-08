@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { App } from "antd";
 import { useTranslation } from "react-i18next";
 
-import { useConfigStore } from "@/stores/use-config-store";
+import { useConfigStore, type LocalChannelEntry } from "@/stores/use-config-store";
 import { usePromptSourceScheduler } from "@/hooks/use-prompt-source-scheduler";
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
@@ -11,9 +11,23 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const { t } = useTranslation();
     const handledConfigParams = useRef(false);
     const importChannelCredentials = useConfigStore((state) => state.importChannelCredentials);
+    const applyLocalChannels = useConfigStore((state) => state.applyLocalChannels);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
 
     usePromptSourceScheduler();
+
+    useEffect(() => {
+        let cancelled = false;
+        void fetch("/local-channels.json")
+            .then((response) => (response.ok ? response.json() : null))
+            .then((payload: { channels?: LocalChannelEntry[] } | null) => {
+                if (!cancelled && payload?.channels?.length) applyLocalChannels(payload.channels);
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, [applyLocalChannels]);
 
     useEffect(() => {
         if (handledConfigParams.current) return;
