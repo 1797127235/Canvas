@@ -20,8 +20,8 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         let cancelled = false;
         void fetch("/local-channels.json")
             .then((response) => (response.ok ? response.json() : null))
-            .then((payload: { channels?: LocalChannelEntry[] } | null) => {
-                if (!cancelled && payload?.channels?.length) applyLocalChannels(payload.channels);
+            .then((payload: { channels?: LocalChannelEntry[]; removeModels?: string[] } | null) => {
+                if (!cancelled && payload?.channels?.length) applyLocalChannels(payload.channels, payload.removeModels);
             })
             .catch(() => undefined);
         return () => {

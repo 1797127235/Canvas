@@ -80,7 +80,6 @@ export const defaultConfig: AiConfig = {
             apiFormat: "openai",
             models: [
                 { name: "gpt-image-2", capability: "image" },
-                { name: "grok-imagine-video", capability: "video" },
                 { name: "gpt-5.5", capability: "text" },
                 { name: "gpt-4o-mini-tts", capability: "audio" },
             ],
@@ -88,7 +87,7 @@ export const defaultConfig: AiConfig = {
     ],
     model: "default::gpt-image-2",
     imageModel: "default::gpt-image-2",
-    videoModel: "default::grok-imagine-video",
+    videoModel: "",
     textModel: "default::gpt-5.5",
     audioModel: "default::gpt-4o-mini-tts",
     audioVoice: "alloy",
@@ -102,7 +101,7 @@ export const defaultConfig: AiConfig = {
     videoMode: "frames",
     systemPrompt: "",
     reasoningEffort: "auto",
-    models: ["default::gpt-image-2", "default::grok-imagine-video", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
+    models: ["default::gpt-image-2", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
     quality: "auto",
     size: "1:1",
     background: "",
@@ -124,7 +123,7 @@ type ConfigStore = {
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
     importChannelCredentials: (input: { baseUrl?: string | null; apiKey?: string | null }) => ChannelCredentialsImportResult;
-    applyLocalChannels: (entries: LocalChannelEntry[]) => void;
+    applyLocalChannels: (entries: LocalChannelEntry[], removeModels?: string[]) => void;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
     openConfigDialog: (shouldPromptContinue?: boolean, tab?: ConfigTabKey) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
@@ -208,9 +207,9 @@ export const useConfigStore = create<ConfigStore>()(
                 if (result.config !== currentConfig) set({ config: result.config });
                 return { status: result.status, channelName: result.channelName };
             },
-            applyLocalChannels: (entries) => {
+            applyLocalChannels: (entries, removeModels) => {
                 const currentConfig = get().config;
-                const next = applyLocalChannelEntries(currentConfig, entries);
+                const next = applyLocalChannelEntries(currentConfig, entries, removeModels);
                 if (next !== currentConfig) set({ config: next });
             },
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
@@ -319,16 +318,22 @@ export function upsertChannelCredentials(config: AiConfig, input: { baseUrl?: st
     return { status: "created", channelName: channel.name, config: { ...config, channels: [...config.channels, channel] } };
 }
 
-export function applyLocalChannelEntries(config: AiConfig, entries: LocalChannelEntry[]) {
-    let next = config;
+export function applyLocalChannelEntries(config: AiConfig, entries: LocalChannelEntry[], removeModels: string[] = []) {
+    const removed = new Set(removeModels);
+    const channels = config.channels.flatMap((channel) => {
+        const models = channel.models.filter((model) => !removed.has(model.name));
+        if (models.length === channel.models.length) return [channel];
+        return models.length ? [{ ...channel, models }] : [];
+    });
+    let next = channels.length === config.channels.length && channels.every((channel, index) => channel === config.channels[index]) ? config : { ...config, channels };
     const preferred: Array<{ capability: ModelCapability; name: string }> = [
         { capability: "image", name: "grok-imagine-image" },
-        { capability: "video", name: "grok-imagine-video-1.5" },
+        { capability: "video", name: "minimax-h3" },
     ];
     for (const entry of entries) {
         const baseUrl = entry.baseUrl?.trim() || "";
         const apiKey = entry.apiKey?.trim() || "";
-        const models = normalizeChannelModels(entry.models?.filter((model): model is ChannelModel => Boolean(model?.name?.trim() && model.capability)));
+        const models = normalizeChannelModels(entry.models?.filter((model): model is ChannelModel => Boolean(model?.name?.trim() && model.capability && !removed.has(model.name))));
         if (!isHttpBaseUrl(baseUrl) || !apiKey || !models.length) continue;
         const index = next.channels.findIndex((channel) => channel.apiKey.trim() === apiKey && normalizedBaseUrlKey(channel.baseUrl) === normalizedBaseUrlKey(baseUrl));
         if (index < 0) {
@@ -348,11 +353,15 @@ export function applyLocalChannelEntries(config: AiConfig, entries: LocalChannel
     const fallback = (capability: ModelCapability, name: string, current: string) => {
         if (models.includes(current)) return current;
         const channel = next.channels.find((item) => item.models.some((model) => model.name === name && model.capability === capability));
-        return channel ? encodeChannelModel(channel.id, name) : current;
+        if (channel) return encodeChannelModel(channel.id, name);
+        const first = next.channels.find((item) => item.models.some((model) => model.capability === capability));
+        const model = first?.models.find((item) => item.capability === capability);
+        return first && model ? encodeChannelModel(first.id, model.name) : "";
     };
     return {
         ...next,
         models,
+        model: models.includes(next.model) ? next.model : fallback("image", preferred[0].name, next.imageModel),
         imageModel: fallback("image", preferred[0].name, next.imageModel),
         videoModel: fallback("video", preferred[1].name, next.videoModel),
     };
