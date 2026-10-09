@@ -10,12 +10,12 @@ import { getMDXComponents } from '@/components/mdx';
 const messages = {
   en: {
     title: 'Infinite Canvas Documentation',
-    description: 'Features, canvas guides, deployment, development, business, and support',
+    description: 'Features, canvas guides, deployment, development, and support',
     index: 'index.md',
   },
   'zh-CN': {
     title: '无限画布文档',
-    description: '功能说明、操作手册、部署方式、开发文档、商务合作与赞助支持',
+    description: '功能说明、操作手册、部署方式与开发文档',
     index: 'index.zh-CN.md',
   },
 };

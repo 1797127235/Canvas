@@ -23,7 +23,7 @@
 
 - 前端使用 Vite、React、React Router、TypeScript、Ant Design、Tailwind、Zustand。
 - 编写 Ant Design 相关代码时，参考 https://ant.design/llms-full.txt 理解组件 API、示例和设计规范，并优先结合项目当前 antd 版本与既有写法。
-- 外部服务请求统一放在 `web/src/services/api/`，由浏览器前端直连，不假设存在项目后端。
+- 外部服务请求统一放在 `web/src/services/api/`。AI 渠道请求保持浏览器直连用户配置的接口；用户体系等自建后端上线后，服务端接口调用同样封装在该目录下。
 - 全局或跨页面状态优先放在 `web/src/stores/`。
 - 已经放在全局 store 或全局 hook 中的状态/动作，组件需要时直接使用对应 store/hook，不要为了“纯组件”层层透传 props；避免一个组件传递过多参数。
 - 全局组件、全局常量、全局配置等全局性质的内容不要作为 props 或参数层层传递；哪里需要就在哪里直接从对应全局入口获取。
@@ -32,9 +32,9 @@
 - 画布页面放在 `web/src/pages/canvas/`，画布组件放在 `web/src/components/canvas/`，画布状态放在 `web/src/stores/canvas/`，画布工具函数放在 `web/src/lib/canvas/`。
 - 页面按目录组织，例如 `web/src/pages/image/index.tsx`；页面里只有一个主业务组件时直接写在对应页面入口中，不要单独拆 `Manager` 组件再传一堆 props。
 - 不要新增只做简单转发的组件，例如只 `return <X>{children}</X>` 或只换个名字透传 props；直接在使用处使用真实组件或把逻辑写进当前文件。
-- 页面私有 hook 放在对应页面目录下，例如 `admin/assets/use-admin-assets.ts`；只有多个页面真实复用的 hook 才放到外层 `hooks/`。
-- 管理后台页面私有组件放到各自页面目录的 `components/` 下，例如 `admin/assets/components/`、`admin/prompts/components/`；不要为了单页面使用放到 `admin/components/` 共享目录。
-- 管理后台主题、背景、卡片阴影、表格配色等统一在 `web/src/lib/app-theme.ts`、`AppProviders` 或必要的全局 CSS 作用域中配置；页面私有组件不要自己写 `dark ? ...` 主题分支。
+- 页面私有 hook 放在对应页面目录下，例如 `web/src/pages/canvas/hooks/`；只有多个页面真实复用的 hook 才放到外层 `web/src/hooks/`。
+- 页面私有组件放到各自页面目录的 `components/` 下，例如 `web/src/pages/prompts/components/`；不要为了单页面使用放到全局共享目录。
+- 页面主题、背景、卡片阴影、表格配色等统一在 `web/src/lib/app-theme.ts`、`AppProviders` 或必要的全局 CSS 作用域中配置；页面组件不要自己写 `dark ? ...` 主题分支。
 - Ant Design 的 Dropdown、Menu、Select、Cascader、TreeSelect 等弹层背景、悬停态和选中态颜色统一通过 `web/src/lib/app-theme.ts` 的全局 Alias Token 与组件 Token 配置；不要在业务组件内为单个弹层覆盖颜色。
 - 组件优先使用函数组件和现有 hooks，不新增大型状态管理方案。
 - UI 图标优先使用 `lucide-react` 或项目已经使用的 Ant Design 图标。
@@ -89,8 +89,10 @@
 
 ## 项目注意事项
 
+- 本仓库是上游无限画布的二次开发分支，当前主线是用户体系和模板库；新功能优先围绕这两个方向，不要顺手扩展无关能力。
+- 上游专属内容已刻意移除：赞助素材与链接、GA4/百度统计、上游发布用 GitHub Actions、Render/Vercel 部署配置、商务与赞助文档。不要恢复或重新引入这些内容。
 - 新增或调整超时、重试次数、大小限制、并发上限等会改变实际行为的边界值前，必须先向用户说明适用环节、默认值和失败后的处理方式，并取得确认；不要把经验值当成纯内部实现静默加入。
-- 当前画布项目和“我的素材”主要保存在浏览器本地，不要在文档中误写成已支持云同步。
+- 当前画布项目和“我的素材”主要保存在浏览器本地，不要在文档中误写成已支持云同步；云同步属于用户体系规划，实现前文档不得声称已支持。
 - 当前 AI API Key 存在浏览器本地，并由前端直接请求 OpenAI 兼容接口；涉及安全说明时要写清楚。
 - Docker 静态资源路径目前仍是待办项，文档中不要过度承诺生产部署已经完全验证。
 - Agent 对话消息必须同时按 `threadId`、`turnId` 和 `itemId` 归属；实时事件只用于补充未物化的 turn，历史快照成为权威后不得重复合并同一条消息。

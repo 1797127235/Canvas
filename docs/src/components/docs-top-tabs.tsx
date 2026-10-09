@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn';
 import { localizePath, type Locale } from '@/lib/i18n';
 import { SidebarTabsDropdown } from 'fumadocs-ui/components/sidebar/tabs/dropdown';
 import type { LayoutTab } from 'fumadocs-ui/layouts/shared';
-import { BookOpen, Code2, Handshake, HeartHandshake, ListChecks, MousePointer2, type LucideIcon } from 'lucide-react';
+import { BookOpen, Code2, HeartHandshake, ListChecks, MousePointer2, type LucideIcon } from 'lucide-react';
 
 type DocsSection = {
   title: Record<Locale, string>;
@@ -18,12 +18,11 @@ type DocsSection = {
 };
 
 const tabs: DocsSection[] = [
-  { title: { en: 'Overview', 'zh-CN': '项目介绍' }, description: { en: 'Start here and explore features', 'zh-CN': '快速开始与功能介绍' }, href: '/docs/overview/quick-start', prefix: '/docs/overview', pages: ['quick-start', 'codex-app-plugin', 'features', 'render', 'docker', 'third-party-prompt-repositories'], icon: BookOpen },
+  { title: { en: 'Overview', 'zh-CN': '项目介绍' }, description: { en: 'Start here and explore features', 'zh-CN': '快速开始与功能介绍' }, href: '/docs/overview/quick-start', prefix: '/docs/overview', pages: ['quick-start', 'codex-app-plugin', 'features', 'docker', 'third-party-prompt-repositories'], icon: BookOpen },
   { title: { en: 'Canvas Guide', 'zh-CN': '操作手册' }, description: { en: 'Canvas nodes and shortcuts', 'zh-CN': '画布节点与快捷键' }, href: '/docs/canvas/canvas-node-manual', prefix: '/docs/canvas', pages: ['canvas-node-manual', 'canvas-shortcuts'], icon: MousePointer2 },
   { title: { en: 'Development', 'zh-CN': '开发文档' }, description: { en: 'Local development and internals', 'zh-CN': '本地开发与内部结构' }, href: '/docs/development/local-development', prefix: '/docs/development', pages: ['local-development', 'local-codex-canvas', 'canvas-data-structure'], icon: Code2 },
-  { title: { en: 'Progress', 'zh-CN': '项目进度' }, description: { en: 'Changelog, plans, and testing', 'zh-CN': '变更、计划与待测试项' }, href: '/docs/progress/changelog', prefix: '/docs/progress', pages: ['changelog', 'todo', 'pending-test', 'local-agent-integration-plan', 'prompt-chip-input-plan'], icon: ListChecks },
-  { title: { en: 'Business', 'zh-CN': '商务合作' }, description: { en: 'Cooperation and licensing', 'zh-CN': '合作方式与开源许可' }, href: '/docs/business/business', prefix: '/docs/business', pages: ['business', 'license'], icon: Handshake },
-  { title: { en: 'Support', 'zh-CN': '赞助支持' }, description: { en: 'Sponsorship and security', 'zh-CN': '赞助项目与安全说明' }, href: '/docs/support/sponsor', prefix: '/docs/support', pages: ['sponsor', 'security'], icon: HeartHandshake },
+  { title: { en: 'Progress', 'zh-CN': '项目进度' }, description: { en: 'Changelog, plans, and testing', 'zh-CN': '变更、计划与待测试项' }, href: '/docs/progress/changelog', prefix: '/docs/progress', pages: ['changelog', 'todo', 'pending-test'], icon: ListChecks },
+  { title: { en: 'Support', 'zh-CN': '安全支持' }, description: { en: 'Security reports', 'zh-CN': '漏洞提交与安全说明' }, href: '/docs/support/security', prefix: '/docs/support', pages: ['security'], icon: HeartHandshake },
 ];
 
 export function DocsSidebarTabs() {

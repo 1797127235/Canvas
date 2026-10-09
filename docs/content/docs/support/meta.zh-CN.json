@@ -3,7 +3,6 @@
   "root": true,
   "defaultOpen": true,
   "pages": [
-    "security",
-    "sponsor"
+    "security"
   ]
 }
