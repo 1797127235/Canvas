@@ -159,6 +159,16 @@ export function previewUrlFor(storageKey?: string) {
     return storageKey ? previewUrls.get(storageKey) : undefined;
 }
 
+// 模板预览等场景把不在本地 IndexedDB 的媒体 URL 直接注册进内存映射，不落盘；url 由调用方负责 revoke。
+export function registerMediaUrl(storageKey: string, url: string) {
+    objectUrls.set(storageKey, url);
+    const previous = previewUrls.get(storageKey);
+    if (previous && previous !== url) URL.revokeObjectURL(previous);
+    previewUrls.set(storageKey, url);
+    previewRevision += 1;
+    previewListeners.forEach((listener) => listener());
+}
+
 // 缩略图在后台补，生成完成后再让用到它的界面重渲染一次。
 export function subscribeImagePreviews(listener: () => void) {
     previewListeners.add(listener);
