@@ -37,7 +37,21 @@ export async function resolveMediaUrl(storageKey?: string, fallback = "") {
 }
 
 export async function getMediaBlob(storageKey: string) {
+    const remoteId = storageKey.startsWith("remote:") ? storageKey.slice("remote:".length) : "";
+    if (remoteId) return requestAccountMedia(remoteId);
     return store.getItem<Blob>(storageKey);
+}
+
+function requestAccountMedia(id: string) {
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return Promise.reject(new Error("媒体标识无效"));
+    return new Promise<Blob>((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open("GET", `/api/media/${encodeURIComponent(id)}`);
+        request.responseType = "blob";
+        request.onload = () => (request.status >= 200 && request.status < 300 ? resolve(request.response) : reject(new Error("媒体读取失败")));
+        request.onerror = () => reject(new Error("媒体读取失败"));
+        request.send();
+    });
 }
 
 export async function setMediaBlob(storageKey: string, blob: Blob) {
