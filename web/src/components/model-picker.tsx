@@ -6,6 +6,7 @@ import i18n from "@/i18n";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { modelOptionLabel, modelOptionName, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
+import type { PublicModel } from "@/services/api/catalog";
 
 type ModelPickerProps = {
     config: AiConfig;
@@ -16,13 +17,15 @@ type ModelPickerProps = {
     fullWidth?: boolean;
     placeholder?: string;
     onMissingConfig?: () => void;
+    serverModels?: PublicModel[];
 };
 
-export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder, onMissingConfig }: ModelPickerProps) {
+export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder, onMissingConfig, serverModels }: ModelPickerProps) {
     const { t } = useTranslation();
     const pickerId = useId();
     const [open, setOpen] = useState(false);
-    const options = useMemo(() => Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability)].filter((model): model is string => Boolean(model)))), [capability, config, value]);
+    const serverOptions = useMemo(() => (serverModels || []).filter((model) => !capability || model.capability === capability), [capability, serverModels]);
+    const options = useMemo(() => serverModels ? serverOptions.map((model) => model.id) : Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability)].filter((model): model is string => Boolean(model)))), [capability, config, serverModels, serverOptions, value]);
     const current = value || "";
     const pickerPlaceholder = placeholder || t("settingsPanels.model.select");
 
@@ -39,7 +42,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
             open={open}
             value={current}
             onOpenChange={(nextOpen) => {
-                if (nextOpen && !options.length && config.channelMode === "local") onMissingConfig?.();
+                if (nextOpen && !options.length && !serverModels && config.channelMode === "local") onMissingConfig?.();
                 if (nextOpen) window.dispatchEvent(new CustomEvent("model-picker-open", { detail: pickerId }));
                 setOpen(nextOpen);
             }}
@@ -57,7 +60,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
                 title={current ? modelOptionLabel(config, current) : pickerPlaceholder}
             >
                 <ModelIcon model={current} />
-                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current ? modelOptionLabel(config, current) : pickerPlaceholder}</span>
+                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current ? serverOptions.find((item) => item.id === current)?.name || modelOptionLabel(config, current) : pickerPlaceholder}</span>
             </SelectTrigger>
             <SelectContent
                 data-canvas-no-zoom
@@ -70,14 +73,17 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
                 onMouseDown={(event) => event.stopPropagation()}
             >
                 {options.length ? (
-                    options.map((model) => (
-                        <SelectItem key={model} value={model} textValue={modelOptionLabel(config, model)}>
-                            <ModelLabel config={config} model={model} />
-                        </SelectItem>
-                    ))
+                        options.map((model) => {
+                            const serverModel = serverOptions.find((item) => item.id === model);
+                            return (
+                                <SelectItem key={model} value={model} textValue={serverModel?.name || modelOptionLabel(config, model)}>
+                                    {serverModel ? <span className="truncate">{serverModel.name}</span> : <ModelLabel config={config} model={model} />}
+                                </SelectItem>
+                            );
+                        })
                 ) : (
                     <SelectItem value="__empty__" disabled>
-                        {emptyModelLabel(config, capability)}
+                        {serverModels ? "暂无可用模型" : emptyModelLabel(config, capability)}
                     </SelectItem>
                 )}
             </SelectContent>
