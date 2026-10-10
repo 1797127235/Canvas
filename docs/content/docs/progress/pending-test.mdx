@@ -7,6 +7,11 @@ description: Implemented changes that still need manual verification
 
 The current release needs manual verification in these areas:
 
+- 本地开发免登录：Vite 开发模式默认不查询身份服务、不显示登录/注册入口，画布、素材、图像/视频工作台、模板克隆、Agent、插件/快捷键及原本地渠道配置应在未启动身份后端时正常使用。`web/.env.local` 设置 `VITE_AUTH_BYPASS=false` 并重启后应恢复路由与操作入口的登录限制；生产构建和预览即使设置 `VITE_AUTH_BYPASS=true` 也不能开启豁免。该开发例外不是已登录会话，真实身份仍需服务端校验。
+- 身份本地验收：注册、登录、退出、固定 7 天 HttpOnly 会话、5 次密码失败锁定 15 分钟及 PostgreSQL 固定窗口限流已实现。修复锁定到期后错误计数、正确登录并发解除锁定、迟到刷新响应覆盖登录/退出、退出失败提示、异步异常出口与会话字段契约；新增可信身份 middleware 和启动时过期清理。后端 54/54、前端 14/14 全部测试和两端类型检查通过；独立 Chrome profile 已验证表单规则、注册、重复邮箱、错误密码、登录、刷新、双标签页退出、网络错误、退出失败、锁定/到期解锁及会话过期，无未捕获页面异常。未执行构建或生产部署，等待用户最终确认。
+- 身份中间阶段边界：关闭开发豁免后，游客触发模板克隆/保存素材需登录；登录后返回原模板预览且不自动操作，未接入账号存储前仍不写入旧本地数据。已登录访问私人页面显示待开放状态，不挂载旧本地列表和编辑器，Agent/旧配置仅免登录开发模式开放。浏览器已验证模板返回、无自动克隆和私人页面占位；本地数据不迁移、不删除。
+- 本地代理：Vite `/api` 默认转发至 `http://127.0.0.1:4100`，可设置 `VITE_API_PROXY_TARGET`；保留来源头，服务端 `APP_ORIGIN` 必须匹配实际浏览器地址。AI 渠道请求仍是原本地浏览器直连，不是账号级服务端代发。
+
 - Agent status removal: the canvas top bar no longer shows the external Agent connection indicator (such as "Codex not connected") next to the title; the Agent button on the right still opens the panel, and connecting a local Agent keeps chat and other features working.
 - Workflow templates: the Template Library Workflow kind lists built-in workflow templates with cover, author, and tags; keyword and tag filters apply to them too. For templates with a result video, hovering a card lazily loads and plays the video muted in a loop, and leaving the card stops playback back to the cover. Clicking a card opens a modal preview titled with the template name and a "clone to edit materials, copy, and node params" hint, with Clone & edit at the top right. The preview fits all nodes, pans and zooms, renders images and plays the bundled video, and hovering nodes never reveals titles (prompts), download buttons, connection dots, or any other tools. Clone & edit closes the modal, writes the bundled media into local storage, and opens a new canvas where the prompts, params, connections, and media all work and can be regenerated, while the template itself stays unchanged.
 

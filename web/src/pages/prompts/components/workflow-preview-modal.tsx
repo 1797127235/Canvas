@@ -7,8 +7,10 @@ import { useTranslation } from "react-i18next";
 import { CanvasNode } from "@/components/canvas/canvas-node";
 import { ConnectionPath } from "@/components/canvas/canvas-connections";
 import { InfiniteCanvas } from "@/components/canvas/infinite-canvas";
+import { bypassLocalAuth, canAccessLocalFeatures } from "@/lib/auth-access";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
+import { useUserStore } from "@/stores/use-user-store";
 import { registerMediaUrl } from "@/services/image-storage";
 import { cloneWorkflowTemplate, loadTemplateMedia, type WorkflowTemplate } from "@/services/api/templates";
 import { CanvasNodeType, type CanvasNodeData, type ViewportTransform } from "@/types/canvas";
@@ -23,6 +25,7 @@ export function WorkflowPreviewModal({ template, onClose }: { template: Workflow
     const [media, setMedia] = useState<Map<string, string>>(new Map());
     const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, k: 1 });
     const [cloning, setCloning] = useState(false);
+    const userStatus = useUserStore((state) => state.status);
 
     useEffect(() => {
         if (!template) return;
@@ -95,6 +98,14 @@ export function WorkflowPreviewModal({ template, onClose }: { template: Workflow
 
     const handleClone = async () => {
         if (!template || cloning) return;
+        if (!canAccessLocalFeatures(userStatus)) {
+            navigate(`/login?redirect=${encodeURIComponent(`/prompts?template=${encodeURIComponent(template.id)}`)}`);
+            return;
+        }
+        if (!bypassLocalAuth) {
+            message.info("账号画布存储尚未开放");
+            return;
+        }
         setCloning(true);
         try {
             const id = await cloneWorkflowTemplate(template);

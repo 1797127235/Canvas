@@ -3,6 +3,10 @@ import { type ReactNode, type UIEvent, useEffect, useMemo, useState } from "reac
 import { App, Button, Empty, Input, Spin, Tag } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
+import { bypassLocalAuth } from "@/lib/auth-access";
+import { useUserStore } from "@/stores/use-user-store";
 
 import { PromptCard } from "@/components/prompts/prompt-card";
 import { usePromptList } from "@/components/prompts/use-prompt-list";
@@ -18,6 +22,9 @@ import { fetchWorkflowTemplates, type WorkflowTemplate } from "@/services/api/te
 export default function PromptsPage() {
     const { message } = App.useApp();
     const { t } = useTranslation();
+    const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const templateId = searchParams.get("template");
     const [titleKeyword, setTitleKeyword] = useState("");
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [selectedKind, setSelectedKind] = useState("prompt");
@@ -51,8 +58,30 @@ export default function PromptsPage() {
     };
 
     const savePromptAsset = (item: Prompt) => {
+        if (!bypassLocalAuth) {
+            if (useUserStore.getState().status !== "authenticated") navigate(`/login?redirect=${encodeURIComponent("/prompts")}`);
+            else message.info("账号素材存储尚未开放");
+            return;
+        }
         addAsset({ kind: "text", title: item.title, coverUrl: item.coverUrl, tags: item.tags, source: item.category, data: { content: item.prompt }, metadata: { source: "prompt-library", promptId: item.id, githubUrl: item.githubUrl } });
         message.success(t("common.addedToAssets"));
+    };
+
+    useEffect(() => {
+        const template = templates.find((item) => item.id === templateId);
+        if (template) {
+            setSelectedKind("canvas");
+            setPreviewTemplate(template);
+        }
+    }, [templateId, templates]);
+
+    const closePreview = () => {
+        setPreviewTemplate(null);
+        if (templateId) {
+            const next = new URLSearchParams(searchParams);
+            next.delete("template");
+            setSearchParams(next, { replace: true });
+        }
     };
 
     const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
@@ -138,7 +167,7 @@ export default function PromptsPage() {
             </main>
 
             <PromptDetailDialog prompt={selectedPrompt} onClose={() => setSelectedPrompt(null)} onCopy={(prompt) => copyText(prompt, t("common.promptCopied"))} onSaveAsset={savePromptAsset} />
-            <WorkflowPreviewModal template={previewTemplate} onClose={() => setPreviewTemplate(null)} />
+            <WorkflowPreviewModal template={previewTemplate} onClose={closePreview} />
         </div>
     );
 }

@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
 
 import { LocalAgentPanel } from "./local-agent-panel";
+import { bypassLocalAuth } from "@/lib/auth-access";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { CANVAS_AGENT_PANEL_MOTION_MS, useAgentStore } from "@/stores/use-agent-store";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -38,7 +39,7 @@ export function AgentPanel() {
         window.addEventListener("pointerup", onUp);
     };
 
-    if (!panelMounted) return null;
+    if (!bypassLocalAuth || !panelMounted) return null;
 
     return (
         <motion.div

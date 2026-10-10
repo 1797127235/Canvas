@@ -17,6 +17,29 @@ bun run dev
 
 Open `http://localhost:3000`, then enter your `Base URL`, `API Key`, and model names in Settings. Prompt sources are also accessed directly by the browser.
 
+## 身份接口联调
+
+本地 Vite 默认免登录，继续使用浏览器本地画布、素材、渠道配置及 Agent。它不伪造账号，也不放开后端鉴权。
+
+联调时在 `web/.env.local` 设置并重启 Vite：
+
+```dotenv
+VITE_AUTH_BYPASS=false
+VITE_API_PROXY_TARGET=http://127.0.0.1:4100
+```
+
+按 `server/.env.example` 在本机填写配置，数据库必须独立于其他项目；先显式应用 `server/sql/001-identity.sql` 与 `002-identity-rate-limits.sql`。服务不会自动建表。`APP_ORIGIN` 必须等于实际浏览器来源，例如 `http://localhost:3001`，与 `127.0.0.1` 不等价。
+
+```bash
+cd server
+bun install --frozen-lockfile --ignore-scripts
+node --env-file=.env --import tsx src/index.ts
+```
+
+环境文件和秘密不要提交。启动会清理过期会话及限流窗口，不删除账号；当前未设置定期清理周期。正常身份模式先验收 `/register`、`/login` 与会话，私人业务在服务端账号存储接入前暂不开放，原 IndexedDB 不迁移、不删除。
+
+全量后端测试只能连接独立 `TEST_DATABASE_URL`，数据库名必须以 `_test` 结尾，且不能与 `DATABASE_URL` 指向同一库。测试会清理该库记录，不能指向用户正在手动测试的数据库。
+
 ## Start the documentation site
 
 ```bash

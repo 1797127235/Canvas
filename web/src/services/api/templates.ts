@@ -1,7 +1,9 @@
 import { setMediaBlob } from "@/services/file-storage";
 import { setImageBlob } from "@/services/image-storage";
+import { bypassLocalAuth, canAccessLocalFeatures } from "@/lib/auth-access";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
+import { useUserStore } from "@/stores/use-user-store";
 import type { CanvasConnection, CanvasNodeData, ViewportTransform } from "@/types/canvas";
 
 // 内置工作流模板：索引和画布数据在 /templates/templates.json，媒体按 files 里的路径单独拉取。
@@ -52,6 +54,8 @@ export async function loadTemplateMedia(template: WorkflowTemplate) {
 // 克隆模板：媒体按原 storageKey 写进本地 IndexedDB（和画布导入同构，打开时 hydrate 自动恢复内容），
 // 画布项目用新 id 插入列表，返回新画布 id。
 export async function cloneWorkflowTemplate(template: WorkflowTemplate) {
+    if (!canAccessLocalFeatures(useUserStore.getState().status)) throw new Error("AUTH_REQUIRED");
+    if (!bypassLocalAuth) throw new Error("WORKSPACE_NOT_READY");
     await Promise.all(
         template.files.map(async (file) => {
             const response = await fetch(file.path);
@@ -59,6 +63,7 @@ export async function cloneWorkflowTemplate(template: WorkflowTemplate) {
             const blob = await response.blob();
             const typed = blob.type ? blob : blob.slice(0, blob.size, file.mimeType);
             await (file.storageKey.startsWith("image:") ? setImageBlob(file.storageKey, typed) : setMediaBlob(file.storageKey, typed));
+            return file.storageKey;
         }),
     );
     return useCanvasStore.getState().importProject({ ...template.project, title: template.title });
