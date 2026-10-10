@@ -1,9 +1,7 @@
 {
     "upstream": { "baseUrl": "http://openai2api.com:3000/v1" },
     "models": [
-        { "id": "openai-image", "name": "GPT Image 2", "upstreamModel": "gpt-image-2", "adapter": "openai-images", "capability": "image", "enabled": true },
-        { "id": "grok-image", "name": "Grok Imagine Image", "upstreamModel": "grok-imagine-image", "adapter": "openai-images", "capability": "image", "enabled": true },
-        { "id": "openai-text", "name": "GPT 5.5", "upstreamModel": "gpt-5.5", "adapter": "openai-chat", "capability": "text", "enabled": true },
-        { "id": "grok-video", "name": "Grok Imagine Video", "upstreamModel": "grok-imagine-video", "adapter": "openai-videos", "capability": "video", "enabled": true }
+        { "id": "openai-image-2-5", "name": "GPT Image 2.5", "upstreamModel": "gpt-image-2.5", "adapter": "openai-images", "capability": "image", "enabled": true },
+        { "id": "minimax-h3", "name": "MiniMax H3", "upstreamModel": "MiniMax-H3", "adapter": "openai-videos", "capability": "video", "enabled": true }
     ]
 }
