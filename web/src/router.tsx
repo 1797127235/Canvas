@@ -16,7 +16,7 @@ import RegisterPage from "@/pages/register";
 import VideoPage from "@/pages/video";
 
 function Protected({ children }: { children: ReactNode }) {
-    return <AuthGuard localData>{children}</AuthGuard>;
+    return <AuthGuard>{children}</AuthGuard>;
 }
 
 export const router = createBrowserRouter([

@@ -1,7 +1,5 @@
-import express, { type ErrorRequestHandler, type RequestHandler, type Router } from "express";
+import express, { type ErrorRequestHandler, type Request, type RequestHandler, type Response, type Router } from "express";
 import helmet from "helmet";
-
-const IDENTITY_BODY_LIMIT = "4kb";
 
 type AppOptions = {
     appOrigin: string;
@@ -15,9 +13,9 @@ export function createApp(options: AppOptions) {
     app.use(noStore);
     app.use(rejectUnsupportedEncoding);
     app.use(rejectCrossOriginStateChanges(options.appOrigin));
-    app.use(express.json({ limit: IDENTITY_BODY_LIMIT, type: "application/json" }));
+    app.use(express.json({ limit: "10mb", type: "application/json", verify: rejectLargeIdentityBody }));
     app.use((request, response, next) => {
-        if (request.path.startsWith("/api/") && ["POST", "PUT", "PATCH"].includes(request.method) && !request.is("application/json")) {
+        if (request.path.startsWith("/api/") && !request.path.startsWith("/api/media") && ["POST", "PUT", "PATCH"].includes(request.method) && !request.is("application/json")) {
             return response.status(415).json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "请求必须使用 JSON" } });
         }
         return next();
@@ -56,6 +54,17 @@ function rejectCrossOriginStateChanges(appOrigin: string): RequestHandler {
         return next();
     };
 }
+
+const rejectLargeIdentityBody = (request: Request, _response: Response, buffer: Buffer) => {
+    if (request.path.startsWith("/api/users") || request.path.startsWith("/api/sessions")) {
+        if (buffer.length > 4096) {
+            const error = new Error("identity body too large") as Error & { type: string; status: number };
+            error.type = "entity.too.large";
+            error.status = 413;
+            throw error;
+        }
+    }
+};
 
 function isBodyParserError(error: unknown): error is Error & { type: string } {
     return error instanceof Error && "type" in error && typeof error.type === "string";

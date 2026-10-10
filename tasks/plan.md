@@ -6,7 +6,7 @@
 
 交付邮箱密码注册、登录、当前会话查询、退出以及游客与登录用户的前端访问入口。游客继续使用现有内置模板只读预览，私人业务数据由后续模块按账号持久化。
 
-本计划仅覆盖 identity，不能把它的完成等同于多用户项目完成。正式任务清单已写入 `tasks/todo.md`，已批准；产品待办仍记在 `docs/content/docs/progress/todo.mdx`。
+本文主体覆盖 identity，不能把它的完成等同于多用户项目完成。正式任务清单已写入 `tasks/todo.md`，identity 部分已批准；下一模块 catalog 的待审阅计划附在文末，保留 identity 尚未完成的生产关卡。产品待办仍记在 `docs/content/docs/progress/todo.mdx`。
 
 ## 当前实现证据
 
@@ -260,3 +260,34 @@ SQL 超时设置只作用于身份数据库访问，未来长时间生成任务�
 - [Bun 生命周期脚本文档](https://bun.sh/docs/pm/lifecycle)：初次禁止脚本执行，显式可信名单。
 - [node-postgres 事务文档](https://node-postgres.com/features/transactions)：事务必须使用同一个 client，不能用独立 pool.query 混合事务。
 - [node-argon2 文档](https://github.com/ranisalt/node-argon2)：Argon2id、密码校验、Node 运行时和本机二进制依赖。
+
+## catalog 技术计划（待审阅）
+
+依据：[SPEC-catalog.md](../SPEC-catalog.md)。本节是同一多用户项目的下一模块，不替换 identity 计划或未完成关卡。
+
+### 顺序与模块边界
+
+1. 建立内置 adapter 定义、配置文件 zod schema 与只读快照，先验证固定上游、唯一 ID、禁用过滤、能力匹配及路径编码。adapter 是固定协议路由定义，不发送请求，不加入脚本执行器。
+2. 添加 `CATALOG_CONFIG_PATH` 启动加载与 `GET /api/models` 公开投影，沿用现有 Express 路由和错误出口。未设置路径只提供空目录；指定配置无效则失败，不更改当前 identity 启动所需变量。
+3. 添加浏览器同源 API 服务与响应边界校验；暂不改变旧配置 store，不为了目录提前开放私人页面。credentials 和 generation 完成后再使用目录作为账号模型来源。
+4. 目录专用配置/HTTP/API 测试和隔离 HTTP 冒烟，记录实际执行结果，后续验收前不写成正式功能。
+
+依赖为 schema/adapter → 快照与解析 → HTTP/启动 → 浏览器 API；协议范围确定后浏览器服务和后端路由可独立准备，共享接口必须先确定。本模块不改数据库和依赖，不访问真实上游，不设置轮询、请求超时、重试或目录数量限制。
+
+### 文件安排
+
+- 后端：`server/src/catalog/{adapters,config,catalog,routes}.ts`，复用 `server/src/config.ts` / `index.ts` 接入。
+- 配置示例：`server/config/catalog.example.json`、`server/.env.example`，空模型列表、不含秘密。
+- 前端：`web/src/services/api/catalog.ts`，无 store 持久化和新页面。
+- 验证：`server/tests/catalog*.test.ts`、`web/tests/catalog.test.ts`；目录测试不依赖数据库。
+
+协议能力必须明确声明，公开结果严格只有 id/name/capability，resolveModel 只解析启用且能力匹配的 ID。内部快照不允许调用方改写。无配置与配置错误分别处理，禁止加载错误时回退至本地模型。
+
+### 验证关卡及风险
+
+- A：文件校验、禁用与能力解析、路径越界测试通过，再接入启动。
+- B：API 输出无内部字段，空目录正确，配置失败拒绝启动；再接入浏览器服务。
+- C：目录测试与独立 HTTP 冒烟有证据，原 identity 行为保留；将实际变更加入 Pending Tests。
+- 实际供应商并不必然支持名为 OpenAI 兼容的全部图像/视频字段；generation 阶段需要其文档和真实联调。目录阶段不承诺调用已经适配完成。
+- 修改目录需重启；多实例部署同一文件；不增加配置热更新的一致性问题。
+- 用户确认本规格、计划、任务与协议范围后实施；测试/类型检查须获得验证授权，构建、部署、数据库操作及真实上游请求不在本阶段授权范围内。

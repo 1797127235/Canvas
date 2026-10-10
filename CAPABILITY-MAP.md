@@ -21,7 +21,8 @@
 ## 模块规格索引
 
 - `identity`：[SPEC-identity.md](./SPEC-identity.md)，已批准；[技术计划](./tasks/plan.md) 已批准；[任务清单](./tasks/todo.md) 已批准；identity 本地注册、登录、会话、限流及入口边界已实现；后端 54/54、前端 14/14 测试、两端类型检查及独立浏览器主要流程通过。等待用户最终确认，生产运行参数/代理/定期清理仍待批准；正常身份模式不开放未隔离的旧私人业务，本地 Vite 默认免登录为用户批准的开发例外，不代表业务模块已实现。
-- 其余模块尚未编写规格。
+- `catalog`：[SPEC-catalog.md](./SPEC-catalog.md) 已有草案并完成首个服务端纵向切片：OpenAI-compatible 固定 adapter、`GET /api/models` 和公开投影已接入；真实模型配置仍需部署验收。
+- `credentials`、`media`、`workspace`、`generation` 已完成首个服务端纵向切片：API Key 加密保存/掩码、工作区用户隔离与版本冲突、MinIO 媒体接口和受保护生成代理已接入；MinIO、固定加密 Key、真实上游和完整前端生成迁移仍需配置及验收。
 
 ## 模块
 

@@ -1,0 +1,8 @@
+{
+    "upstream": { "baseUrl": "https://api.openai.com/v1" },
+    "models": [
+        { "id": "openai-image", "name": "GPT Image", "upstreamModel": "gpt-image-2", "adapter": "openai-images", "capability": "image", "enabled": true },
+        { "id": "openai-text", "name": "GPT Text", "upstreamModel": "gpt-5.5", "adapter": "openai-chat", "capability": "text", "enabled": true },
+        { "id": "openai-audio", "name": "GPT Speech", "upstreamModel": "gpt-4o-mini-tts", "adapter": "openai-speech", "capability": "audio", "enabled": true }
+    ]
+}

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
 import { nanoid } from "nanoid";
+import { bypassLocalAuth } from "@/lib/auth-access";
 import { localForageStorage } from "@/lib/localforage-storage";
 import { cleanupUnusedImages, ensureImagePreview, previewUrlFor, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { cleanupUnusedMedia, resolveMediaUrl } from "@/services/file-storage";
@@ -46,9 +47,15 @@ const ASSET_STORE_KEY = "infinite-canvas:asset_store";
 
 const assetStorage: PersistStorage<AssetStore> = {
     getItem: async (name) => {
+        if (!bypassLocalAuth) return null;
         const value = await localForageStorage.getItem(name);
         if (!value) return null;
-        const parsed = JSON.parse(value) as StorageValue<AssetStore>;
+        let parsed: StorageValue<AssetStore>;
+        try {
+            parsed = JSON.parse(value) as StorageValue<AssetStore>;
+        } catch {
+            return null;
+        }
         parsed.state.assets = await Promise.all(
             parsed.state.assets.map(async (asset) => {
                 if (asset.kind === "video" && asset.data.storageKey) return { ...asset, data: { ...asset.data, url: await resolveMediaUrl(asset.data.storageKey, asset.data.url) } };
@@ -68,8 +75,8 @@ const assetStorage: PersistStorage<AssetStore> = {
         );
         return parsed;
     },
-    setItem: (name, value) => localForageStorage.setItem(name, JSON.stringify(value)),
-    removeItem: (name) => localForageStorage.removeItem(name),
+    setItem: (name, value) => (bypassLocalAuth ? localForageStorage.setItem(name, JSON.stringify(value)) : Promise.resolve()),
+    removeItem: (name) => (bypassLocalAuth ? localForageStorage.removeItem(name) : Promise.resolve()),
 };
 
 export const useAssetStore = create<AssetStore>()(

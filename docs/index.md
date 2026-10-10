@@ -18,6 +18,7 @@
 - [Identity Spec](../SPEC-identity.md): approved requirements, contracts and local acceptance evidence.
 - [Identity Plan](../tasks/plan.md): approved technical plan, staged access policy and outstanding production decisions.
 - [Identity Tasks](../tasks/todo.md): local backend 54/54 and frontend 14/14 tests, both typechecks and isolated browser primary flows pass; user sign-off and production parameters remain pending. Unisolated local business features are available only under the development bypass.
+- [Catalog Spec](../SPEC-catalog.md): draft server-controlled model catalog and adapter contracts; plan/tasks appended to the existing multi-user tracker, awaiting review and not implemented.
 
 ## Development and Data
 

@@ -1,5 +1,7 @@
 import localforage from "localforage";
 import { nanoid } from "nanoid";
+import { bypassLocalAuth } from "@/lib/auth-access";
+import { accountMediaUrl, uploadAccountMedia } from "@/services/api/media";
 
 export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
 
@@ -8,6 +10,11 @@ const objectUrls = new Map<string, string>();
 
 export async function uploadMediaFile(input: string | Blob, prefix = "file"): Promise<UploadedFile> {
     const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
+    if (!bypassLocalAuth) {
+        const remote = await uploadAccountMedia(blob);
+        const meta = blob.type.startsWith("video/") ? await readVideoMeta(remote.url) : blob.type.startsWith("audio/") ? await readAudioMeta(remote.url) : {};
+        return { url: remote.url, storageKey: remote.storageKey, bytes: remote.bytes, mimeType: remote.mimeType, ...meta };
+    }
     const storageKey = `${prefix}:${nanoid()}`;
     await store.setItem(storageKey, blob);
     const url = URL.createObjectURL(blob);
@@ -18,6 +25,8 @@ export async function uploadMediaFile(input: string | Blob, prefix = "file"): Pr
 
 export async function resolveMediaUrl(storageKey?: string, fallback = "") {
     if (!storageKey) return fallback;
+    const remote = accountMediaUrl(storageKey);
+    if (remote) return remote;
     const cached = objectUrls.get(storageKey);
     if (cached) return cached;
     const blob = await store.getItem<Blob>(storageKey);

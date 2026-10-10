@@ -3,6 +3,7 @@ import { persist, type PersistStorage, type StorageValue } from "zustand/middlew
 
 import { nanoid } from "nanoid";
 import i18n from "@/i18n";
+import { bypassLocalAuth } from "@/lib/auth-access";
 import { localForageStorage } from "@/lib/localforage-storage";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 import type { CanvasAssistantSession, CanvasConnection, CanvasNodeData, ViewportTransform } from "@/types/canvas";
@@ -30,6 +31,7 @@ type CanvasStore = {
     renameProject: (id: string, title: string) => void;
     deleteProjects: (ids: string[]) => void;
     updateProject: (id: string, patch: Partial<Pick<CanvasProject, "nodes" | "connections" | "chatSessions" | "activeChatId" | "backgroundMode" | "showImageInfo" | "viewport">>) => void;
+    replaceProjects: (projects: CanvasProject[]) => void;
 };
 
 const initialViewport: ViewportTransform = { x: 0, y: 0, k: 1 };
@@ -40,6 +42,7 @@ let queuedPersistState: PersistedCanvasState | null = null;
 
 const canvasStorage: PersistStorage<CanvasStore> = {
     getItem: async (name) => {
+        if (!bypassLocalAuth) return null;
         const value = await localForageStorage.getItem(name);
         if (!value) return null;
         try {
@@ -51,6 +54,7 @@ const canvasStorage: PersistStorage<CanvasStore> = {
         }
     },
     setItem: (name, value) => {
+        if (!bypassLocalAuth) return;
         const nextState = value.state as PersistedCanvasState;
         if (queuedPersistState && queuedPersistState.projects === nextState.projects) return;
         queuedPersistState = nextState;
@@ -60,7 +64,7 @@ const canvasStorage: PersistStorage<CanvasStore> = {
             void localForageStorage.setItem(name, JSON.stringify(value));
         }, 400);
     },
-    removeItem: (name) => localForageStorage.removeItem(name),
+    removeItem: (name) => (bypassLocalAuth ? localForageStorage.removeItem(name) : Promise.resolve()),
 };
 
 export const useCanvasStore = create<CanvasStore>()(
@@ -120,6 +124,7 @@ export const useCanvasStore = create<CanvasStore>()(
                 set((state) => ({
                     projects: state.projects.map((project) => (project.id === id ? { ...project, ...patch, updatedAt: new Date().toISOString() } : project)),
                 })),
+            replaceProjects: (projects) => set({ projects }),
         }),
         {
             name: CANVAS_STORE_KEY,

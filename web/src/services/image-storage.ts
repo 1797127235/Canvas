@@ -3,6 +3,8 @@ import localforage from "localforage";
 import { nanoid } from "nanoid";
 import i18n from "@/i18n";
 import { createImageThumbnail } from "@/lib/image-thumbnail";
+import { bypassLocalAuth } from "@/lib/auth-access";
+import { uploadAccountMedia, accountMediaUrl } from "@/services/api/media";
 
 export type UploadedImage = {
     url: string;
@@ -49,6 +51,12 @@ export async function uploadImage(input: string | Blob, options?: ImageReadOptio
 }
 
 async function storeImage(blob: Blob, options?: ImageReadOptions): Promise<UploadedImage> {
+    if (!bypassLocalAuth) {
+        const remote = await uploadAccountMedia(blob);
+        const meta = await loadImageMeta(remote.url, options);
+        if (!meta) throw new Error(i18n.t("common.imageReadFailed"));
+        return { ...remote, width: meta.width, height: meta.height };
+    }
     const storageKey = `image:${nanoid()}`;
     const url = URL.createObjectURL(blob);
     try {
@@ -141,6 +149,8 @@ function throwIfAborted(signal?: AbortSignal) {
 
 export async function resolveImageUrl(storageKey?: string, fallback = "") {
     if (!storageKey) return fallback;
+    const remote = accountMediaUrl(storageKey);
+    if (remote) return remote;
     const cached = objectUrls.get(storageKey);
     if (cached) return cached;
     const blob = await store.getItem<Blob>(storageKey);

@@ -38,3 +38,34 @@
 - 修改边界值、引入新依赖、提交、部署与发布仍需授权。
 - 新会话和资源授权必须使用数据库当前有效会话；请求通过授权后已开始执行的操作不因后续退出倒退取消。
 - 定期清理失败不会延长会话，也不能放行限流；当前仅启动时清理，不承诺过期数据物理删除时效。
+
+## 下一模块：catalog（已实现首个纵向切片，完整生成适配仍待验收）
+
+依据：`SPEC-catalog.md` 及 `tasks/plan.md` 文末。与 identity 同属多用户能力图；本轮已实现 catalog、credentials、workspace、media、generation 的首个服务端纵向切片，保留生产待办，不把未配置的 MinIO/真实上游写成完成。
+
+- [x] CAT-T1：内置协议与配置校验（依赖：无）。已实现 OpenAI-compatible 固定 adapter、单上游配置校验和启用模型投影。
+  - 验收：固定路由/能力明确，未知 adapter/字段、重复 ID、非法上游拒绝；任务 ID/模型名不能越出固定路径。
+  - 文件：`server/src/catalog/adapters.ts`、`config.ts`、`server/tests/catalog-config.test.ts`、`catalog-adapters.test.ts`。
+  - 验证：`cd server && node --import tsx --test tests/catalog-config.test.ts tests/catalog-adapters.test.ts`。
+- [x] CAT-T2：只读快照、公开投影与解析（依赖：T1）。空目录和 JSON 配置已支持，禁用模型不公开、不解析。
+  - 验收：禁用不公开/不解析，能力匹配，无内部字段暴露，返回结果被修改不影响快照；未设置配置为空，指定无效配置失败且错误脱敏。
+  - 文件：`server/src/catalog/catalog.ts`、`server/tests/catalog.test.ts`、`server/config/catalog.example.json`。
+  - 验证：`cd server && node --import tsx --test tests/catalog.test.ts`。
+- [x] 关卡 A：T1/T2 验证有证据后再接入实际启动，不静默引入上游网络调用。服务端 typecheck 通过，目录无配置时返回空列表。
+- [x] CAT-T3：目录 HTTP 路由（依赖：T2）。GET /api/models 已接入，冒烟返回 200 和空目录。
+  - 验收：GET /api/models 返回全部启用公开模型，空目录为 200；错误契约、禁缓存与现有 app 一致。
+  - 文件：`server/src/catalog/routes.ts`、`server/tests/catalog-http.test.ts`。
+  - 验证：`cd server && node --import tsx --test tests/catalog-http.test.ts`。
+- [x] CAT-T4：启动配置接入（依赖：T3）。启动已接入 catalog、credentials、workspace、media、generation；新增 SQL 已应用至隔离开发库。
+  - 验收：未配置路径仍可启动 identity，指定非法目录拒绝启动，样例不含 Key/启用虚假模型。
+  - 文件：`server/src/config.ts`、`index.ts`、`server/.env.example`、`server/tests/config.test.ts`。
+  - 验证：目录测试、配置测试；身份 HTTP 独立冒烟，不清理手动测试账号。
+- [x] CAT-T5：前端目录 API 服务（依赖：T3）。前端已加入账号配置面板、目录服务和 API Key 掩码管理。
+  - 验收：校验公开响应、空列表/网络/HTTP 错误，不回退旧本地渠道，不持久化服务端调用配置。
+  - 文件：`web/src/services/api/catalog.ts`、`web/tests/catalog.test.ts`。
+  - 验证：`cd web && bun test tests/catalog.test.ts`。
+- [x] 关卡 B：目录测试、授权后的两端类型检查和独立 HTTP 冒烟；不执行构建或真实计费请求。后端/前端 typecheck 通过，前端 14/14 通过；Key、工作区版本冲突、目录和未配置媒体 HTTP 冒烟通过。
+- [ ] CAT-T6：文档收尾（依赖：T4/T5）。当前文档已记录纵向切片，仍需补真实模型目录和 MinIO 部署验收。
+  - 验收：记录实际完成、未执行验证及后续 generation 边界；更新能力图/文档索引/TODO/Pending Tests/CHANGELOG，不把草案列成已实现功能。
+
+批准 catalog 之前仅编写本节与规格，不勾选实施任务。无新依赖、数据库变更、数量/超时/重试/并发边界。
