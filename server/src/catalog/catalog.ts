@@ -14,8 +14,7 @@ export async function loadCatalog(path?: string, production = false): Promise<Ca
     try {
         const input = schema.parse(JSON.parse(await readFile(path, "utf8")));
         const url = new URL(input.upstream.baseUrl);
-        const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-        if (url.username || url.password || url.search || url.hash || (url.protocol !== "https:" && !(url.protocol === "http:" && local && !production))) throw new Error();
+        if (url.username || url.password || url.search || url.hash || (production && url.protocol !== "https:") || (!production && !["http:", "https:"].includes(url.protocol))) throw new Error();
         if (new Set(input.models.map(model => model.id)).size !== input.models.length) throw new Error();
         return { baseUrl: url.toString().replace(/\/$/, ""), models: input.models };
     } catch {
