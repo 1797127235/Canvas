@@ -4,7 +4,7 @@
 
 ## Objective
 
-让多用户业务从服务端获取唯一上游服务的可用模型和明确能力，并让后续 generation 通过模型 ID 取得可信调用配置。用户只能选择模型，不能提交上游地址、协议、脚本或实际模型名来改变服务端调用目标。不提供管理后台，不读取用户 API Key，不请求上游发现模型。
+让多用户业务从服务端获取可用模型和明确能力，并让后续 generation 通过模型 ID 取得可信调用配置。用户只能选择模型，不能提交上游地址、协议、脚本或实际模型名来改变服务端调用目标。不提供管理后台，不读取用户 API Key，不请求上游发现模型。
 
 先交付目录、校验和模块契约，避免将配置文件存在误当作生成功能已可用。credentials、media、workspace 和 generation 各自按能力图推进。
 
@@ -32,28 +32,31 @@
 
 ```json
 {
-  "upstream": { "baseUrl": "https://api.example.com/v1" },
-  "models": []
+  "models": [
+    {
+      "id": "image-example",
+      "name": "Image Example",
+      "upstreamModel": "gpt-image-2.5",
+      "adapter": "openai-images",
+      "capability": "image",
+      "enabled": false,
+      "baseUrl": "https://api.example.com/v1",
+      "apiKey": "replace-with-your-key"
+    }
+  ]
 }
 ```
 
-示例只演示结构，`api.example.com` 不是有效生产上游；配置示例不直接启用模型。实际模型记录：
+实际代码按 `server/config/catalog.example.json` 为准；示例只演示结构，`api.example.com` 不是有效生产上游，且示例模型为禁用状态，不直接启用模型。
 
-```typescript
-type ConfiguredModel = {
-    id: string;
-    name: string;
-    upstreamModel: string;
-    adapter: AdapterId;
-    enabled: boolean;
-};
-```
-
-- 一个文件只有一个 upstream。所有模型调用都使用这一 baseUrl；它是明确的 API 根路径，包含 `/v1` 或 `/v1beta` 等必要前缀，程序不猜测、不重复补前缀。
-- 正式环境上游要求 HTTPS；开发可配置 loopback HTTP mock。URL 不得包含用户名、密码、query 或 fragment。上游不会从请求参数、模型名或用户 Key 推导。
-- 模型 ID、展示名称、实际模型名为非空字符串；ID 全目录唯一，保留配置顺序。一个实际模型可用不同 ID 显式配置不同适配器。
+- 每个模型自带 `baseUrl` 与 `apiKey`，与模型一一对应；同一上游可服务多个模型，也允许不同模型走不同上游。开发阶段用这种形式同时接入多个上游并随时换 Key 联调，正式环境的 Key 归属见「待确认」第 2 项。
+- `baseUrl` 是明确的 API 根路径，包含 `/v1` 或 `/v1beta` 等必要前缀，程序不猜测、不重复补前缀。
+- 正式环境上游要求 HTTPS；开发可配置 loopback HTTP mock。URL 不得包含用户名、密码、query 或 fragment。上游不会从请求参数或模型名推导。
+- 模型 ID、展示名称、实际模型名为非空字符串；ID 全目录唯一，保留配置顺序。`baseUrl` 与 `apiKey` 去除首尾空白后不得为空。
 - `enabled` 必填。只有 true 的记录进入公开目录和 generation 的可用解析；禁用与不存在对调用方统一不可用。
-- 验证未知字段与未知 adapter，禁止 script、每模型 baseUrl、headers 或 endpoint 等任意执行/路由配置。
+- `adapter` 必须与 `capability` 匹配，且 capability 由配置显式声明；不猜名称，不接受脚本插件或任意请求路径。
+- 验证未知字段与未知 adapter，禁止 script、headers 或 endpoint 等任意执行/路由配置。
+- 配置文件含上游密钥，必须放在版本库之外（已在 `.gitignore` 中忽略 `server/config/catalog.json`），仓库只提交 `catalog.example.json`。
 - 配置启动时读入不可变快照，修改后重启。无文件监听、热更新或配置写入 API；多个实例须部署同一配置。
 - 校验错误只报告字段位置，不输出完整配置、环境值或文件内容；任何错误都不能使原有旧本地渠道成为回退上游。
 
@@ -65,13 +68,15 @@ type ConfiguredModel = {
 | openai-images | image | POST images/generations；参考图片场景 POST images/edits |
 | openai-speech | audio | POST audio/speech |
 | openai-videos | video | POST videos；查询 videos/:id；读取 videos/:id/content |
-| gemini-content-text | text | POST models/:model:generateContent |
-| gemini-content-image | image | POST models/:model:generateContent |
-| gemini-video | video | POST models/:model:predictLongRunning；查询 operations/:id |
+| minimax-videos | video | POST videos（JSON：model/prompt/duration/resolution/ratio/image）；查询与读取同上 |
+
+已移除的提案项 `gemini-content-text`、`gemini-content-image`、`gemini-video` 不再保留，等真实上游确认后再按需新增。
 
 catalog 交付固定路由选择与安全路径编码，内部返回适配器定义和可信模型映射。不得将模型名、上游返回的任务 ID 当作绝对 URL 或未经编码的路径插入；不允许自动跟随上游返回的任意路径调用。
 
-catalog 不持有 Key，不发送计费请求、不下载媒体、不实现轮询或解析生成结果。请求参数、认证头、媒体校验、响应解析及真实上游联调属于 generation；后者必须依据实际上游文档实现，不可因 adapter 名称就宣称服务支持所有兼容接口。尤其原视频代码中的 image[]、generate_audio、watermark 等不是统一标准保证，不在本模块擅自照搬。
+catalog 持有每个模型的 Key，用于 generation 发送认证头；catalog 本身不发送计费请求、不下载媒体、不实现轮询或解析生成结果。请求参数、认证头、媒体校验、响应解析及真实上游联调属于 generation；后者必须依据实际上游文档实现，不可因 adapter 名称就宣称服务支持所有兼容接口。尤其原视频代码中的 generate_audio、watermark 等不是统一标准保证，不在本模块擅自照搬。
+
+`minimax-videos` 当前只发送 JSON 字段 `model`、`prompt`、`duration`（4–15 秒）、`resolution`（固定 `768P`）与 `ratio`，比例由客户端传来的像素尺寸或比例串就近归类到 `1:1`/`3:4`/`4:3`/`16:9`/`9:16`/`21:9`，无法识别时回落 `16:9`。
 
 若实际唯一上游只支持 OpenAI 兼容协议，可在实施前缩减适配器范围；禁止为尚未确定的供应商扩展大量兼容分支。
 
@@ -93,8 +98,9 @@ type PublicModel = { id: string; name: string; capability: ModelCapability };
 
 - `loadCatalog(path, nodeEnv)`：未配置返回空目录，指定配置无效则抛脱敏配置错误。
 - `listModels()`：返回公开模型数据副本，外部修改不能影响快照。
-- `resolveModel(id, expectedCapability)`：只有启用且能力一致时返回可信 `{ baseUrl, upstreamModel, adapter }`；其他输入返回明确不可用结果，不回退默认模型。
+- `resolveModel(id, expectedCapability)`：只有启用且能力一致时返回可信 `{ baseUrl, upstreamModel, adapter, apiKey }`；其他输入返回明确不可用结果，不回退默认模型。
 - generation 接口只接收用户选中的 ID，再调用 resolveModel；不能信任浏览器传来的 name/capability/baseUrl/adapter。
+- 视频任务的查询与内容读取按任务表里保存的 `model_id` 反查模型，不使用 `baseUrl`，避免同一上游下多个模型取错 Key。
 - 本模块没有生成接口。生成鉴权、用户 Key 和请求执行属于后续模块；正常身份模式私人业务仍不开放。
 
 ## Code Style
@@ -118,7 +124,7 @@ cd web && bun run typecheck
 
 仅在获得验证授权时执行。目录测试无数据库，不运行会清库的 identity 全量测试。按项目规则不自动执行构建；HTTP 验收使用独立 loopback server，不替换用户测试进程。
 
-测试覆盖：文件缺失、非法 JSON、未知字段/adapter、重复 ID、非法上游地址、空目录、禁用过滤、能力匹配、错误脱敏、快照不被外部修改、路由路径编码、防止任务 ID 越出固定路由、公开输出无内部字段、浏览器 API 失败/非法返回不回退旧模型。
+测试覆盖：文件缺失、非法 JSON、未知字段/adapter、adapter 与 capability 不匹配、重复 ID、非法上游地址、key 首尾空白处理与空白 key 拒绝、空目录、禁用过滤、能力匹配、错误脱敏、快照不被外部修改、路由路径编码、防止任务 ID 越出固定路由、公开输出无内部字段、浏览器 API 失败/非法返回不回退旧模型、视频像素尺寸到 ratio 的映射、同上游多模型的任务查询取对 Key。
 
 ## Boundaries
 
@@ -139,5 +145,7 @@ cd web && bun run typecheck
 ## 待确认
 
 1. 上述 JSON 配置、公开目录和显式适配器范围是否批准；若实际唯一上游只用一种协议，可减少 adapter。
-2. 真实上游的 API 根地址和模型列表待部署/联调配置，不从旧浏览器中收集秘密，也不要求现在提供 Key。
-3. 本阶段不新增运行边界；identity 未确认的生产参数继续留在原任务中，不阻断无外部调用的目录开发。
+2. **正式环境的 Key 归属仍待定**：当前把 `baseUrl` 和 `apiKey` 写在每个模型上，是开发阶段为了同时连接图片与视频两个不同上游的便利安排，也方便随时换 Key 联调。这不影响已批准的服务端代发方向（浏览器仍不直连、不提交上游地址或真模型名）。但正式上线前需确定 Key 的归属：可以选择继续用服务端配置多组 Key（则同步修改 `CAPABILITY-MAP.md` 前提 2，并确定 `credentials` 模块的去留），也可以回到“单一 upstream + 用户自己的 Key”。当前实现两者都能兼容：`credentials` 仍在运行，只是 generation 不再读取它。
+3. 真实上游的 API 根地址和模型列表待部署/联调配置，不从旧浏览器中收集秘密，也不要求现在提供 Key。
+4. `minimax-videos` 的上游边界：当前固定发送 `resolution: "768P"`，并把时长限制在 4–15 秒，与前端面板可选的 480p/720p/1080p 及最长 30 秒不一致（该行为沿用已验证的开发直连路径）。需要确认上游实际支持的分辨率与时长上限后再决定是收敛 UI 还是补齐参数。
+5. 本阶段不新增运行边界；identity 未确认的生产参数继续留在原任务中，不阻断无外部调用的目录开发。

@@ -22,7 +22,7 @@
 
 - `identity`：[SPEC-identity.md](./SPEC-identity.md)，已批准；[技术计划](./tasks/plan.md) 已批准；[任务清单](./tasks/todo.md) 已批准；identity 本地注册、登录、会话、限流及入口边界已实现；后端 54/54、前端 14/14 测试、两端类型检查及独立浏览器主要流程通过。用户已确认注册、登录、锁定和双标签页退出主流程通过。生产运行参数/代理/定期清理仍待批准；正常身份模式不开放未隔离的旧私人业务，本地 Vite 默认免登录为用户批准的开发例外，不代表业务模块已实现。
 - `catalog`：[SPEC-catalog.md](./SPEC-catalog.md) 已有草案并完成首个服务端纵向切片：OpenAI-compatible 固定 adapter、`GET /api/models` 和公开投影已接入；真实模型配置仍需部署验收。
-- `credentials`、`media`、`workspace`、`generation` 已完成首个服务端纵向切片：API Key 加密保存/掩码、工作区用户隔离与版本冲突、MinIO 媒体接口和受保护生成代理已接入。登录后图片与视频生成已改走服务端目录和账号 API Key；文本和音频仍走本地渠道。MinIO、固定加密 Key 和真实上游仍需配置及验收。
+- `credentials`、`media`、`workspace`、`generation` 已完成首个服务端纵向切片：API Key 加密保存/掩码、工作区用户隔离与版本冲突、MinIO 媒体接口和受保护生成代理已接入。登录后图片与视频生成已改走服务端目录代发（服务端目录现在每个模型自带 baseUrl 和 Key，开发阶段用于同时接入多个上游，正式环境 Key 归属见 `SPEC-catalog.md` 待确认第 2 项）；文本和音频仍走本地渠道。MinIO 和真实上游仍需配置及验收。
 
 ## 模块
 
@@ -42,7 +42,7 @@ Build order: identity、catalog → credentials、media → workspace → genera
 - 游客可浏览现有内置模板和只读示例画布，允许缩放、平移和媒体预览，不开放游客本地编辑；创建、克隆、编辑、保存、上传、生成和配置 API Key 等真实操作需跳转登录。个人画布、素材和生成记录必须登录后访问，服务端同样校验权限，不向游客返回私人数据。此入口不扩展为本期之外的公开模板库。
 - identity 提供当前用户 ID。其他模块只按该 ID 隔离数据，不解析密码或 Cookie。
 - catalog 提供已启用模型的 ID、显示名称、能力和服务端适配。它不读取用户 Key。
-- credentials 只管理当前用户的一个 API Key，不保存 Base URL 或模型名称。
+- credentials 只管理当前用户的一个 API Key，不保存 Base URL 或模型名称。开发期间 Key 写在服务端目录里，generation 尚未读取账号 Key，正式归属见 `SPEC-catalog.md` 待确认第 2 项。
 - media 管理对象和容量。workspace 决定画布、素材和生成记录是否引用这些对象。
 - generation 校验模型并代发请求，结果写入 media 和 workspace。画布编辑与自动保存属于 workspace。
 - 公开模板库和本地 Canvas Agent 不属于以上任何模块。

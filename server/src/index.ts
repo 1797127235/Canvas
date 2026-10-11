@@ -37,7 +37,7 @@ async function start() {
         apiRouter.use(createCredentialRouter(database.pool, { encryptionKey: config.credentialsEncryptionKey }));
         apiRouter.use(createWorkspaceRouter(database.pool));
         apiRouter.use(createMediaRouter(database.pool, minio));
-        apiRouter.use(createGenerationRouter(database.pool, { catalog, encryptionKey: config.credentialsEncryptionKey }));
+        apiRouter.use(createGenerationRouter(database.pool, { catalog }));
         const server = createApp({ appOrigin: config.appOrigin, apiRouter }).listen(config.port, config.host);
         let closing = false;
         const close = () => {

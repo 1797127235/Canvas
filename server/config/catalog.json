@@ -1,7 +1,0 @@
-{
-    "upstream": { "baseUrl": "http://openai2api.com:3000/v1" },
-    "models": [
-        { "id": "openai-image-2-5", "name": "GPT Image 2.5", "upstreamModel": "gpt-image-2.5", "adapter": "openai-images", "capability": "image", "enabled": true },
-        { "id": "minimax-h3", "name": "MiniMax H3", "upstreamModel": "MiniMax-H3", "adapter": "openai-videos", "capability": "video", "enabled": true }
-    ]
-}

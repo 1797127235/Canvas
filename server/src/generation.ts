@@ -6,8 +6,6 @@ import type { Pool } from "pg";
 import { z } from "zod";
 
 import { requireUser } from "./identity/auth-middleware.js";
-import { logError } from "./log.js";
-import { decryptCredential } from "./credential-crypto.js";
 import { resolveModel, type Catalog } from "./catalog/catalog.js";
 
 const imageData = z.string().regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/);
@@ -29,30 +27,35 @@ const inputSchema = z.discriminatedUnion("capability", [
 ]);
 const taskIdSchema = z.string().uuid();
 const taskResponseSchema = z.object({ id: z.string().min(1), status: z.string().optional() });
-type GenerationOptions = { catalog: Catalog; encryptionKey?: string };
+type GenerationOptions = { catalog: Catalog };
 type UpstreamResponse = { status: number; contentType: string; body: Buffer };
 
 export function createGenerationRouter(database: Pool, options: GenerationOptions) {
     const router = Router();
     // Restrict authentication middleware to these routes, not every subsequent API router.
     router.post("/generations", requireUser(database), async (request, response) => {
-        if (!options.encryptionKey) return unavailable(response);
         const parsed = inputSchema.safeParse(request.body);
         if (!parsed.success) return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "生成参数无效" } });
         const model = resolveModel(options.catalog, parsed.data.modelId, parsed.data.capability);
         if (!model) return response.status(404).json({ error: { code: "MODEL_NOT_FOUND", message: "模型不可用" } });
-        const apiKey = await currentKey(database, response.locals.user.id, options.encryptionKey);
-        if (!apiKey) return keyRequired(response);
         const input = parsed.data.input;
         const isVideo = parsed.data.capability === "video";
         const isEdit = !isVideo && Boolean(input.images?.length);
         const path = isVideo ? "videos" : isEdit ? "images/edits" : "images/generations";
-        const baseUrl = options.catalog.baseUrl;
-        const url = upstreamTarget(baseUrl, path);
+        const url = upstreamTarget(model.baseUrl, path);
         if (!url) return unavailable(response);
         let body: Buffer;
         let contentType: string;
-        if (isVideo || isEdit) {
+        if (isVideo && model.adapter === "minimax-videos") {
+            const video = input as z.infer<typeof videoInput>;
+            body = Buffer.from(JSON.stringify({
+                model: model.upstreamModel, prompt: video.prompt,
+                duration: Math.min(MINIMAX_SECONDS_MAX, Math.max(MINIMAX_SECONDS_MIN, Number(video.seconds) || 6)),
+                resolution: MINIMAX_RESOLUTION, ratio: minimaxRatio(video.size),
+                ...(video.images?.[0] ? { image: video.images[0] } : {}),
+            }));
+            contentType = "application/json";
+        } else if (isVideo || isEdit) {
             const form = new FormData();
             form.set("model", model.upstreamModel);
             for (const [key, value] of Object.entries(input)) {
@@ -79,7 +82,7 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
             body = Buffer.from(JSON.stringify({ ...params, model: model.upstreamModel }));
             contentType = "application/json";
         }
-        const upstream = await requestUpstream(url, apiKey, body, contentType);
+        const upstream = await requestUpstream(url, model.apiKey, body, contentType);
         if (upstream.status < 200 || upstream.status >= 300) return upstreamFailure(response, upstream.status);
         if (isVideo) {
             const task = parseTaskResponse(upstream.body);
@@ -87,7 +90,7 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
             const id = randomUUID();
             await database.query(
                 "INSERT INTO user_generation_tasks (id, user_id, upstream_id, base_url, model_id) VALUES ($1, $2, $3, $4, $5)",
-                [id, response.locals.user.id, task.id, baseUrl, model.id],
+                [id, response.locals.user.id, task.id, model.baseUrl, model.id],
             );
             return response.status(201).json({ id, status: task.status || "queued" });
         }
@@ -99,24 +102,45 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
 }
 
 async function readTask(request: Request, response: Response, database: Pool, options: GenerationOptions, content: boolean) {
-    if (!options.encryptionKey) return unavailable(response);
     const parsed = taskIdSchema.safeParse(request.params.id);
     if (!parsed.success) return taskNotFound(response);
-    const task = await database.query<{ upstream_id: string; base_url: string }>(
-        "SELECT upstream_id, base_url FROM user_generation_tasks WHERE id = $1 AND user_id = $2", [parsed.data, response.locals.user.id],
+    const task = await database.query<{ upstream_id: string; model_id: string }>(
+        "SELECT upstream_id, model_id FROM user_generation_tasks WHERE id = $1 AND user_id = $2", [parsed.data, response.locals.user.id],
     );
     const row = task.rows[0];
     if (!row) return taskNotFound(response);
-    const apiKey = await currentKey(database, response.locals.user.id, options.encryptionKey);
-    if (!apiKey) return keyRequired(response);
-    // Only the configured upstream can receive a key; reject tasks from a removed provider.
-    if (row.base_url !== options.catalog.baseUrl) return unavailable(response);
+    // Resolve by model id, not by base URL: several models may share one upstream host with different keys.
+    const model = resolveModel(options.catalog, row.model_id, "video");
+    if (!model) return unavailable(response);
     const path = `videos/${encodeURIComponent(row.upstream_id)}${content ? "/content" : ""}`;
-    const target = upstreamTarget(row.base_url, path);
+    const target = upstreamTarget(model.baseUrl, path);
     if (!target) return unavailable(response);
-    const upstream = await requestUpstream(target, apiKey);
+    const upstream = await requestUpstream(target, model.apiKey);
     if (upstream.status < 200 || upstream.status >= 300) return upstreamFailure(response, upstream.status);
     return response.status(200).type(content ? "video/mp4" : "application/json").send(upstream.body);
+}
+
+// MiniMax accepts a fixed ratio set and a fixed output resolution; the client sends pixel sizes.
+const MINIMAX_RESOLUTION = "768P";
+const MINIMAX_SECONDS_MIN = 4;
+const MINIMAX_SECONDS_MAX = 15;
+const minimaxRatios = [
+    { value: "1:1", width: 1, height: 1 }, { value: "3:4", width: 3, height: 4 }, { value: "4:3", width: 4, height: 3 },
+    { value: "16:9", width: 16, height: 9 }, { value: "9:16", width: 9, height: 16 }, { value: "21:9", width: 21, height: 9 },
+] as const;
+
+function minimaxRatio(size?: string) {
+    const target = aspectRatioOf(size);
+    if (!target) return "16:9";
+    return minimaxRatios.reduce((best, item) => Math.abs(item.width / item.height - target) < Math.abs(best.width / best.height - target) ? item : best).value;
+}
+
+// Accepts both the pixel sizes the client sends ("720x1280") and plain ratios ("9:16").
+function aspectRatioOf(size?: string) {
+    const value = (size || "").trim();
+    const match = /^(\d+)[x:](\d+)$/.exec(value);
+    const ratio = match ? Number(match[1]) / Number(match[2]) : NaN;
+    return Number.isFinite(ratio) && ratio > 0 ? ratio : null;
 }
 
 function upstreamTarget(baseUrl: string, path: string) {
@@ -147,19 +171,7 @@ function parseTaskResponse(body: Buffer) {
     }
 }
 
-async function currentKey(database: Pool, userId: string, secret: string) {
-    const credential = await database.query<{ encrypted_api_key: Buffer }>("SELECT encrypted_api_key FROM user_credentials WHERE user_id = $1", [userId]);
-    if (!credential.rows[0]) return null;
-    try {
-        return decryptCredential(credential.rows[0].encrypted_api_key, secret);
-    } catch (error) {
-        logError("credentials", error);
-        return null;
-    }
-}
-
 function unavailable(response: Response) { return response.status(503).json({ error: { code: "GENERATION_NOT_CONFIGURED", message: "生成服务尚未配置" } }); }
-function keyRequired(response: Response) { return response.status(422).json({ error: { code: "API_KEY_REQUIRED", message: "请先配置 API Key" } }); }
 function taskNotFound(response: Response) { return response.status(404).json({ error: { code: "GENERATION_NOT_FOUND", message: "生成任务不存在" } }); }
 function upstreamFailure(response: Response, status: number) {
     const unauthorized = status === 401 || status === 403;
