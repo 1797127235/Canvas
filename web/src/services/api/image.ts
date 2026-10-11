@@ -3,11 +3,14 @@ import axios from "axios";
 import i18n from "@/i18n";
 import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
 import { normalizePluginImages, runModelPlugin } from "./model-plugin";
+import { bypassLocalAuth } from "@/lib/auth-access";
+import { requestServerImageGeneration } from "./generation";
+import { useCatalogStore, catalogModel } from "@/stores/use-catalog-store";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
-import { imageSizePresets, inferMediaScale } from "@/lib/media-size";
+import { computeMediaSize, imageSizePresets, inferMediaRatio, inferMediaScale } from "@/lib/media-size";
 import type { ReferenceImage } from "@/types/image";
 
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
@@ -664,7 +667,31 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
     return images;
 }
 
+function accountImageSize(quality: string, size: string) {
+    const value = size.trim();
+    if (!value || value.toLowerCase() === "auto") return undefined;
+    const ratio = inferMediaRatio(value, "");
+    const preset = ratio ? computeMediaSize(inferMediaScale(value, quality), ratio) : "";
+    return preset && preset !== "auto" ? preset : undefined;
+}
+
+async function requestAccountImages(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
+    await useCatalogStore.getState().load();
+    const model = catalogModel("image", config.model || config.imageModel);
+    if (!model) throw new Error("暂无可用图片模型");
+    const quality = normalizeQuality(config.quality);
+    const size = accountImageSize(config.quality, config.size);
+    const background = normalizeBackground(config.background);
+    const images = await Promise.all(references.map((image) => imageToDataUrl(image, options)));
+    return requestServerImageGeneration(model.id, {
+        prompt, n: Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1))),
+        ...(quality ? { quality } : {}), ...(size ? { size } : {}), ...(background ? { background } : {}),
+        output_format: IMAGE_OUTPUT_FORMAT, ...(images.length ? { images } : {}),
+    }, options?.signal);
+}
+
 export async function requestGeneration(config: AiConfig, prompt: string, options?: RequestOptions) {
+    if (!bypassLocalAuth) return requestAccountImages(config, prompt, [], options);
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const script = resolveModelScript(config, config.model || config.imageModel);
@@ -725,6 +752,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
 }
 
 export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
+    if (!bypassLocalAuth) return requestAccountImages(config, buildImageReferencePromptText(prompt, references), references, options);
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = buildImageReferencePromptText(prompt, references);

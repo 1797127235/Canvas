@@ -1,10 +1,24 @@
-import { Copy, FileText, FolderPlus } from "lucide-react";
+import { Copy, FileText, FolderPlus, ImageIcon, Video } from "lucide-react";
 import { Button, Modal, Space, Tag } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { formatPromptDate, type Prompt } from "@/services/api/prompts";
 
-export function PromptDetailDialog({ prompt, onClose, onCopy, onSaveAsset }: { prompt: Prompt | null; onClose: () => void; onCopy: (prompt: string) => void; onSaveAsset?: (prompt: Prompt) => void }) {
+export function PromptDetailDialog({
+    prompt,
+    onClose,
+    onCopy,
+    onSaveAsset,
+    onUseForImage,
+    onUseForVideo,
+}: {
+    prompt: Prompt | null;
+    onClose: () => void;
+    onCopy: (prompt: string) => void;
+    onSaveAsset?: (prompt: Prompt) => void;
+    onUseForImage?: (prompt: Prompt) => void;
+    onUseForVideo?: (prompt: Prompt) => void;
+}) {
     const { t } = useTranslation();
 
     return (
@@ -51,7 +65,17 @@ export function PromptDetailDialog({ prompt, onClose, onCopy, onSaveAsset }: { p
                     </div>
                     <div className="shrink-0 pt-4">
                         <Space wrap>
-                            <Button type="primary" icon={<Copy className="size-4" />} onClick={() => onCopy(prompt.prompt)}>
+                            {onUseForImage ? (
+                                <Button type="primary" icon={<ImageIcon className="size-4" />} onClick={() => onUseForImage(prompt)}>
+                                    {t("prompts.useForImage")}
+                                </Button>
+                            ) : null}
+                            {onUseForVideo ? (
+                                <Button icon={<Video className="size-4" />} onClick={() => onUseForVideo(prompt)}>
+                                    {t("prompts.useForVideo")}
+                                </Button>
+                            ) : null}
+                            <Button icon={<Copy className="size-4" />} onClick={() => onCopy(prompt.prompt)}>
                                 {t("common.copyPrompt")}
                             </Button>
                             {onSaveAsset ? (

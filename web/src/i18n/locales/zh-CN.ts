@@ -173,6 +173,8 @@ export default {
         loadFailed: "获取提示词失败",
         sourceMissing: "提示词来源不存在",
         use: "使用此提示词",
+        useForImage: "用于生图",
+        useForVideo: "用于生视频",
         empty: "没有找到匹配的提示词",
         loading: "加载中...",
         loadMore: "继续向下滚动加载更多",

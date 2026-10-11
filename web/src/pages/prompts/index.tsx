@@ -1,11 +1,12 @@
-import { FolderPlus, Search } from "lucide-react";
-import { type ReactNode, type UIEvent, useEffect, useMemo, useState } from "react";
-import { App, Button, Empty, Input, Spin, Tag } from "antd";
+import { Search } from "lucide-react";
+import { type UIEvent, useEffect, useMemo, useState } from "react";
+import { App, Empty, Input, Spin, Tag } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { bypassLocalAuth } from "@/lib/auth-access";
+import { stageWorkbenchPrompt } from "@/lib/workbench-prompt";
 import { useUserStore } from "@/stores/use-user-store";
 
 import { PromptCard } from "@/components/prompts/prompt-card";
@@ -55,6 +56,11 @@ export default function PromptsPage() {
     const toggleTag = (tag: string) => {
         if (tag === ALL_PROMPTS_OPTION) return setSelectedTags([]);
         setSelectedTags((items) => (items.includes(tag) ? items.filter((item) => item !== tag) : [...items, tag]));
+    };
+
+    const openWorkbench = (path: "/image" | "/video", prompt: string) => {
+        stageWorkbenchPrompt(prompt);
+        navigate(path);
     };
 
     const savePromptAsset = (item: Prompt) => {
@@ -142,17 +148,7 @@ export default function PromptsPage() {
                                             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("prompts.canvasEmpty")} className="py-16" />
                                         )
                                     ) : (
-                                        <PromptGrid
-                                            items={visibleItems}
-                                            onOpen={setSelectedPrompt}
-                                            renderActions={(item) => (
-                                                <Button type="text" size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => savePromptAsset(item)}>
-                                                    {t("common.addToAssets")}
-                                                </Button>
-                                            )}
-                                            onCopy={(item) => copyText(item.prompt, t("common.promptCopied"))}
-                                            emptyText={t("prompts.empty")}
-                                        />
+                                        <PromptGrid items={visibleItems} onOpen={setSelectedPrompt} emptyText={t("prompts.empty")} />
                                     )}
                                 </div>
                             ) : null}
@@ -166,7 +162,14 @@ export default function PromptsPage() {
                 </div>
             </main>
 
-            <PromptDetailDialog prompt={selectedPrompt} onClose={() => setSelectedPrompt(null)} onCopy={(prompt) => copyText(prompt, t("common.promptCopied"))} onSaveAsset={savePromptAsset} />
+            <PromptDetailDialog
+                prompt={selectedPrompt}
+                onClose={() => setSelectedPrompt(null)}
+                onCopy={(prompt) => copyText(prompt, t("common.promptCopied"))}
+                onSaveAsset={savePromptAsset}
+                onUseForImage={(prompt) => openWorkbench("/image", prompt.prompt)}
+                onUseForVideo={(prompt) => openWorkbench("/video", prompt.prompt)}
+            />
             <WorkflowPreviewModal template={previewTemplate} onClose={closePreview} />
         </div>
     );
@@ -188,12 +191,12 @@ function PromptFilter({ label, options, selected, onChange }: { label: string; o
     );
 }
 
-function PromptGrid({ items, onOpen, onCopy, renderActions, emptyText }: { items: Prompt[]; onOpen: (item: Prompt) => void; onCopy: (item: Prompt) => void; renderActions: (item: Prompt) => ReactNode; emptyText: string }) {
+function PromptGrid({ items, onOpen, emptyText }: { items: Prompt[]; onOpen: (item: Prompt) => void; emptyText: string }) {
     return (
         <div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {items.map((item) => (
-                    <PromptCard key={`${item.sourceId}:${item.id}`} item={item} onOpen={() => onOpen(item)} onCopy={() => onCopy(item)} extraAction={renderActions(item)} />
+                    <PromptCard key={`${item.sourceId}:${item.id}`} item={item} onOpen={() => onOpen(item)} />
                 ))}
             </div>
             {items.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyText} className="py-16" /> : null}

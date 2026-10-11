@@ -9,6 +9,7 @@ import { createSession, serializeSessionCookie } from "./session.js";
 import { normalizeEmail, passwordSchema } from "./schemas.js";
 import { hashPassword } from "./passwords.js";
 import { consumeRateLimit } from "./rate-limit.js";
+import { logError } from "../log.js";
 
 const registerInput = z.object({
     email: z.string().min(1),
@@ -40,6 +41,7 @@ async function register(request: Request, response: Response, dependencies: Regi
             response.setHeader("Retry-After", String(Math.max(1, Math.ceil(error.msBeforeNext / 1000))));
             return response.status(429).json({ error: { code: "RATE_LIMITED", message: "请求过于频繁，请稍后重试" } });
         }
+        logError("register", error, { method: request.method, path: request.path });
         return response.status(500).json({ error: { code: "INTERNAL_ERROR", message: "服务暂时不可用" } });
     }
 
@@ -59,6 +61,7 @@ async function register(request: Request, response: Response, dependencies: Regi
         });
     } catch (error) {
         if (isUniqueViolation(error)) return response.status(409).json({ error: { code: "EMAIL_EXISTS", message: "该邮箱已注册，请登录" } });
+        logError("register", error, { method: request.method, path: request.path });
         return response.status(500).json({ error: { code: "INTERNAL_ERROR", message: "服务暂时不可用" } });
     }
 }

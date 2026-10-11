@@ -8,6 +8,7 @@ import { createSession, serializeSessionCookie } from "./session.js";
 import { normalizeEmail, passwordSchema } from "./schemas.js";
 import { verifyPassword, verifyUnknownAccount } from "./passwords.js";
 import { consumeRateLimit } from "./rate-limit.js";
+import { logError } from "../log.js";
 
 const loginInput = z.object({ email: z.string().min(1), password: passwordSchema });
 const emailSchema = z.string().email();
@@ -39,6 +40,7 @@ async function login(request: Request, response: Response, dependencies: LoginDe
             response.setHeader("Retry-After", String(Math.max(1, Math.ceil(error.msBeforeNext / 1000))));
             return response.status(429).json({ error: { code: "RATE_LIMITED", message: "请求过于频繁，请稍后重试" } });
         }
+        logError("login", error, { method: request.method, path: request.path });
         return response.status(500).json({ error: { code: "INTERNAL_ERROR", message: "服务暂时不可用" } });
     }
 

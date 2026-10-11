@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { Client } from "minio";
 
 import { createApp } from "./app.js";
@@ -14,19 +15,21 @@ import { createCredentialRouter } from "./credentials.js";
 import { createWorkspaceRouter } from "./workspace.js";
 import { createMediaRouter } from "./media.js";
 import { createGenerationRouter } from "./generation.js";
+import { logError } from "./log.js";
 
 async function start() {
     const config = readConfig(process.env);
     const database = createDatabase(config);
     try {
         // 启动时验证数据库/schema 并清理过期记录；认证拒绝过期凭证不依赖清理。
+        await database.pool.query(await readFile(new URL("../sql/004-generation-tasks.sql", import.meta.url), "utf8"));
         await clearExpiredIdentityData(database.pool);
         const secret = config.rateLimitSecret;
         const dependencies = { database: database.pool, rateLimitSecret: secret, secureCookie: config.nodeEnv === "production" };
         const catalog = await loadCatalog(config.catalogConfigPath, config.nodeEnv === "production");
         const minio = config.minioEndpoint && config.minioPort && config.minioAccessKey && config.minioSecretKey && config.minioBucket
             ? { client: new Client({ endPoint: config.minioEndpoint, port: config.minioPort, useSSL: config.nodeEnv === "production", accessKey: config.minioAccessKey, secretKey: config.minioSecretKey }), bucket: config.minioBucket }
-            : {};
+            : { directory: new URL("../data/media", import.meta.url).pathname };
         const apiRouter = createSessionRouter(database.pool, dependencies.secureCookie);
         apiRouter.use(createRegisterRouter({ ...dependencies, limiter: createRateLimiter(database.pool, "register", secret) }));
         apiRouter.use(createLoginRouter({ ...dependencies, limiter: createRateLimiter(database.pool, "login", secret) }));
@@ -41,13 +44,13 @@ async function start() {
             if (closing) return;
             closing = true;
             server.close(() => {
-                void database.close().catch(() => { console.error("Database shutdown failed"); process.exitCode = 1; });
+                void database.close().catch((error: unknown) => { logError("shutdown", error); process.exitCode = 1; });
             });
         };
         process.once("SIGINT", close);
         process.once("SIGTERM", close);
-        server.on("error", () => {
-            console.error("Server failed to listen");
+        server.on("error", (error) => {
+            logError("listen", error);
             process.exitCode = 1;
             close();
         });
@@ -57,7 +60,7 @@ async function start() {
     }
 }
 
-void start().catch(() => {
-    console.error("Server startup failed: check configuration and database");
+void start().catch((error: unknown) => {
+    logError("startup", error);
     process.exitCode = 1;
 });

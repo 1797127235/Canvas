@@ -8,7 +8,8 @@ import { bypassLocalAuth } from "@/lib/auth-access";
 export default function ConfigPage() {
     const { t } = useTranslation();
 
-    if (bypassLocalAuth) {
+    // Development keeps the local provider page. The account-key page stays off until providers can be split.
+    if (import.meta.env.DEV || bypassLocalAuth) {
         return (
             <main className="h-full overflow-y-auto bg-background">
                 <div className="mx-auto max-w-6xl px-6 py-6">

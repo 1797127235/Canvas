@@ -1,5 +1,5 @@
-import { setMediaBlob } from "@/services/file-storage";
-import { setImageBlob } from "@/services/image-storage";
+import { setMediaBlob, uploadMediaFile } from "@/services/file-storage";
+import { setImageBlob, uploadImage } from "@/services/image-storage";
 import { bypassLocalAuth, canAccessLocalFeatures } from "@/lib/auth-access";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
@@ -55,16 +55,49 @@ export async function loadTemplateMedia(template: WorkflowTemplate) {
 // 画布项目用新 id 插入列表，返回新画布 id。
 export async function cloneWorkflowTemplate(template: WorkflowTemplate) {
     if (!canAccessLocalFeatures(useUserStore.getState().status)) throw new Error("AUTH_REQUIRED");
-    if (!bypassLocalAuth) throw new Error("WORKSPACE_NOT_READY");
-    await Promise.all(
-        template.files.map(async (file) => {
-            const response = await fetch(file.path);
-            if (!response.ok) throw new Error(`template media request failed: ${file.path}`);
-            const blob = await response.blob();
-            const typed = blob.type ? blob : blob.slice(0, blob.size, file.mimeType);
+    const replacements = new Map<string, { storageKey: string; url: string }>();
+    for (const file of template.files) {
+        const response = await fetch(templateMediaPath(file.path));
+        if (!response.ok) throw new Error(`template media request failed: ${file.path}`);
+        const blob = await response.blob();
+        const typed = blob.type ? blob : blob.slice(0, blob.size, file.mimeType);
+        if (bypassLocalAuth) {
             await (file.storageKey.startsWith("image:") ? setImageBlob(file.storageKey, typed) : setMediaBlob(file.storageKey, typed));
-            return file.storageKey;
-        }),
-    );
-    return useCanvasStore.getState().importProject({ ...template.project, title: template.title });
+            continue;
+        }
+        const uploaded = file.storageKey.startsWith("image:") ? await uploadImage(typed) : await uploadMediaFile(typed, file.storageKey.split(":")[0]);
+        if (!uploaded.storageKey) throw new Error("template media upload failed");
+        replacements.set(file.storageKey, { storageKey: uploaded.storageKey, url: uploaded.url });
+    }
+    const project = structuredClone(template.project);
+    if (replacements.size) rewriteMediaReferences(project, replacements);
+    return useCanvasStore.getState().importProject({ ...project, title: template.title });
+}
+
+function templateMediaPath(path: string) {
+    let url: URL;
+    try {
+        url = new URL(path, window.location.origin);
+    } catch {
+        throw new Error("template media path invalid");
+    }
+    if (url.origin !== window.location.origin || !url.pathname.startsWith("/templates/")) throw new Error("template media path invalid");
+    return `${url.pathname}${url.search}`;
+}
+
+function rewriteMediaReferences(value: unknown, replacements: Map<string, { storageKey: string; url: string }>) {
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+        value.forEach((item) => rewriteMediaReferences(item, replacements));
+        return;
+    }
+    const record = value as Record<string, unknown>;
+    const replacement = typeof record.storageKey === "string" ? replacements.get(record.storageKey) : undefined;
+    if (replacement) {
+        record.storageKey = replacement.storageKey;
+        if (typeof record.content === "string") record.content = replacement.url;
+        if (typeof record.dataUrl === "string") record.dataUrl = replacement.url;
+        if (typeof record.url === "string") record.url = replacement.url;
+    }
+    Object.values(record).forEach((item) => rewriteMediaReferences(item, replacements));
 }

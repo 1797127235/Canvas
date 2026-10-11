@@ -17,7 +17,7 @@ export function PromptCard({
 }: {
     item: Prompt;
     onOpen: () => void;
-    onCopy: () => void;
+    onCopy?: () => void;
     actionLabel?: string;
     actionIcon?: ReactNode;
     actionType?: "text" | "primary";
@@ -68,11 +68,13 @@ export function PromptCard({
                     ) : null}
                 </div>
             </button>
-            {!compact ? (
+            {!compact && (onCopy || extraAction) ? (
                 <div className="mt-auto flex items-center gap-2 px-4 pb-4">
-                    <Button block={actionType === "primary"} type={actionType} size="small" icon={actionIcon} onClick={onCopy}>
-                        {actionLabel || t("common.copy")}
-                    </Button>
+                    {onCopy ? (
+                        <Button block={actionType === "primary"} type={actionType} size="small" icon={actionIcon} onClick={onCopy}>
+                            {actionLabel || t("common.copy")}
+                        </Button>
+                    ) : null}
                     {extraAction}
                 </div>
             ) : null}

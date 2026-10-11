@@ -4,6 +4,8 @@ import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
+import { bypassLocalAuth } from "@/lib/auth-access";
+import { catalogModel, useCatalogStore } from "@/stores/use-catalog-store";
 
 export type ApiCallFormat = "openai" | "gemini";
 export type ModelCapability = "image" | "video" | "text" | "audio";
@@ -156,6 +158,7 @@ function findChannelModel(config: AiConfig, value: string): { channel: ModelChan
 }
 
 export function modelCapabilityOf(config: AiConfig, value: string): ModelCapability | undefined {
+    if (!bypassLocalAuth) return useCatalogStore.getState().models.find((model) => model.id === value)?.capability;
     return findChannelModel(config, value)?.model.capability;
 }
 
@@ -165,6 +168,7 @@ export function modelMatchesCapability(config: AiConfig, value: string, capabili
 }
 
 export function resolveModelForCapability(config: AiConfig, currentModel: string | undefined, capability: ModelCapability) {
+    if (!bypassLocalAuth) return catalogModel(capability, currentModel)?.id || "";
     const defaultModel = capability === "image" ? config.imageModel : capability === "video" ? config.videoModel : capability === "audio" ? config.audioModel : config.textModel;
     const fallbackModel = capability === "image" ? defaultConfig.imageModel : capability === "video" ? defaultConfig.videoModel : capability === "audio" ? defaultConfig.audioModel : defaultConfig.textModel;
     if (currentModel && modelMatchesCapability(config, currentModel, capability)) return currentModel;
@@ -173,6 +177,7 @@ export function resolveModelForCapability(config: AiConfig, currentModel: string
 }
 
 export function selectableModelsByCapability(config: AiConfig, capability?: ModelCapability) {
+    if (!bypassLocalAuth) return useCatalogStore.getState().models.filter((model) => !capability || model.capability === capability).map((model) => model.id);
     if (!capability) return config.models;
     return config.channels.flatMap((channel) => channel.models.filter((model) => model.capability === capability).map((model) => encodeChannelModel(channel.id, model.name)));
 }
@@ -183,6 +188,7 @@ export function resolveModelScript(config: AiConfig, value: string) {
 }
 
 function isAiConfigReady(config: AiConfig, model: string) {
+    if (!bypassLocalAuth) return useCatalogStore.getState().models.some((item) => item.id === model);
     const channel = resolveModelChannel(config, model);
     return Boolean(model.trim() && channel.baseUrl.trim() && channel.apiKey.trim());
 }
@@ -259,7 +265,18 @@ export const useConfigStore = create<ConfigStore>()(
 
 export function useEffectiveConfig() {
     const config = useConfigStore((state) => state.config);
-    return useMemo(() => ({ ...config, channelMode: "local" as const }), [config]);
+    const models = useCatalogStore((state) => state.models);
+    return useMemo((): AiConfig => bypassLocalAuth ? config : {
+        ...config, channelMode: "remote",
+        models: [...models.map((model) => model.id), ...config.models],
+        // Development image generation keeps the local provider selection.
+        model: import.meta.env.DEV ? config.imageModel : catalogModel("image", config.imageModel)?.id || "",
+        imageModel: import.meta.env.DEV ? config.imageModel : catalogModel("image", config.imageModel)?.id || "",
+        videoModel: import.meta.env.DEV ? "minimax-h3" : catalogModel("video", config.videoModel)?.id || "",
+        // Text and audio have no server catalog yet, so those requests keep the local channel.
+        textModel: config.textModel,
+        audioModel: config.audioModel,
+    }, [config, models]);
 }
 
 /** Normalize a mixed list of raw model names or model objects into deduped ChannelModel entries. */
@@ -426,6 +443,7 @@ export function modelOptionName(value: string) {
 }
 
 export function modelOptionLabel(config: AiConfig, value: string) {
+    if (!bypassLocalAuth) return useCatalogStore.getState().models.find((model) => model.id === value)?.name || "暂无可用模型";
     const decoded = decodeChannelModel(value);
     if (!decoded) return value;
     const channel = config.channels.find((item) => item.id === decoded.channelId);

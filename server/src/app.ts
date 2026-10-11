@@ -1,6 +1,8 @@
 import express, { type ErrorRequestHandler, type Request, type RequestHandler, type Response, type Router } from "express";
 import helmet from "helmet";
 
+import { logError } from "./log.js";
+
 type AppOptions = {
     appOrigin: string;
     apiRouter?: Router;
@@ -24,10 +26,11 @@ export function createApp(options: AppOptions) {
     app.use((_request, response) => {
         response.status(404).json({ error: { code: "NOT_FOUND", message: "接口不存在" } });
     });
-    const handleError: ErrorRequestHandler = (error, _request, response, next) => {
+    const handleError: ErrorRequestHandler = (error, request, response, next) => {
         if (response.headersSent) return next(error);
         if (error instanceof SyntaxError && "body" in error) return response.status(400).json({ error: { code: "INVALID_REQUEST", message: "请求格式无效" } });
         if (isBodyParserError(error) && error.type === "entity.too.large") return response.status(413).json({ error: { code: "PAYLOAD_TOO_LARGE", message: "请求内容过大" } });
+        logError("http", error, { method: request.method, path: request.path });
         return response.status(500).json({ error: { code: "INTERNAL_ERROR", message: "服务暂时不可用" } });
     };
     app.use(handleError);

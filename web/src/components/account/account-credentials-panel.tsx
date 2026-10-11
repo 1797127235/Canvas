@@ -2,19 +2,16 @@ import { useEffect, useState } from "react";
 import { Alert, Button, Input, Space } from "antd";
 
 import { clearCredential, getCredential, saveCredential } from "@/services/api/account";
-import { fetchServerModels, type PublicModel } from "@/services/api/catalog";
+import { useCatalogStore } from "@/stores/use-catalog-store";
 
 export function AccountCredentialsPanel() {
     const [key, setKey] = useState("");
     const [status, setStatus] = useState<{ configured: boolean; masked: string | null } | null>(null);
-    const [models, setModels] = useState<PublicModel[]>([]);
+    const models = useCatalogStore((state) => state.models);
     const [message, setMessage] = useState("");
     const [busy, setBusy] = useState(false);
     useEffect(() => {
-        void Promise.all([getCredential(), fetchServerModels()]).then(([credential, serverModels]) => {
-            setStatus(credential);
-            setModels(serverModels);
-        }).catch((error) => setMessage(error instanceof Error ? error.message : "账号配置读取失败"));
+        void getCredential().then(setStatus).catch((error) => setMessage(error instanceof Error ? error.message : "账号配置读取失败"));
     }, []);
     const save = async () => {
         if (!key.trim()) return;

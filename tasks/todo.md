@@ -26,7 +26,7 @@
 
 - [ ] Task 0：确认连接池/数据库/HTTP 边界、过期数据定期清理与保留策略；不得静默采用提案的 60 秒周期或 SQL/锁超时。
 - [ ] 生产反向代理可信地址/网段及 IP 识别、HTTPS 入口和正式数据库配置、依赖审计、备份/隐私流程与上线验收。开发仍用直接连接 IP，Vite 请求共用来源额度。
-- [ ] 用户最终验收确认；待确认内容继续留在 `pending-test.mdx`，不写入正式功能说明。
+- [x] 用户已确认身份主流程：注册、登录、锁定和双标签页退出。该确认不包含生产运行参数、代理、定期清理或其他业务模块。
 - [ ] workspace/media/credentials/catalog/generation 的规格与实现：identity 只提供可信用户 ID，不宣称资源隔离、云同步、对象存储或服务端代发请求已实现。
 
 ## 开发例外
@@ -65,6 +65,8 @@
   - 文件：`web/src/services/api/catalog.ts`、`web/tests/catalog.test.ts`。
   - 验证：`cd web && bun test tests/catalog.test.ts`。
 - [x] 关卡 B：目录测试、授权后的两端类型检查和独立 HTTP 冒烟；不执行构建或真实计费请求。后端/前端 typecheck 通过，前端 14/14 通过；Key、工作区版本冲突、目录和未配置媒体 HTTP 冒烟通过。
+- [x] GEN-T1：登录态图片、视频生成接入服务端目录。图片生成与参考图编辑、视频任务创建、查询和内容下载已接通；文本和音频保持本地渠道。生成任务表由服务启动时创建。真实上游和 MinIO 仍待部署验收。
+  - 验证：`cd server && node --import tsx --test tests/generation-http.test.ts`；`cd web && bun test tests/catalog-generation.test.ts`。
 - [ ] CAT-T6：文档收尾（依赖：T4/T5）。当前文档已记录纵向切片，仍需补真实模型目录和 MinIO 部署验收。
   - 验收：记录实际完成、未执行验证及后续 generation 边界；更新能力图/文档索引/TODO/Pending Tests/CHANGELOG，不把草案列成已实现功能。
 

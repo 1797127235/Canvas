@@ -102,10 +102,6 @@ export function WorkflowPreviewModal({ template, onClose }: { template: Workflow
             navigate(`/login?redirect=${encodeURIComponent(`/prompts?template=${encodeURIComponent(template.id)}`)}`);
             return;
         }
-        if (!bypassLocalAuth) {
-            message.info("账号画布存储尚未开放");
-            return;
-        }
         setCloning(true);
         try {
             const id = await cloneWorkflowTemplate(template);

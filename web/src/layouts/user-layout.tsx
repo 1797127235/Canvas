@@ -7,6 +7,7 @@ import { AppTopNav } from "@/components/layout/app-top-nav";
 import { bypassLocalAuth } from "@/lib/auth-access";
 import { subscribeAuthEvents } from "@/lib/auth-tab-sync";
 import { useUserStore } from "@/stores/use-user-store";
+import { useCatalogStore } from "@/stores/use-catalog-store";
 
 export default function UserLayout({ children }: { children: ReactNode }) {
     const refreshSession = useUserStore((state) => state.refreshSession);
@@ -16,6 +17,7 @@ export default function UserLayout({ children }: { children: ReactNode }) {
             useUserStore.getState().clearSession(false);
             return;
         }
+        void useCatalogStore.getState().load();
         void refreshSession();
         const unsubscribe = subscribeAuthEvents((type) => {
             if (type === "logout" || type === "session-expired") useUserStore.getState().clearSession(false);

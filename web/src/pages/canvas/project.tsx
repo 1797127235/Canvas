@@ -83,7 +83,6 @@ import {
     type CanvasNodeData,
     type CanvasNodeImage,
     type CanvasNodeText,
-    type CanvasNodeMetadata,
     type CanvasNodeTypeId,
     type ConnectionHandle,
     type ContextMenuState,
@@ -91,7 +90,6 @@ import {
     type SelectionBox,
     type ViewportTransform,
 } from "@/types/canvas";
-import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
 // Register built-in nodes in the shared registry once when the module loads.
@@ -199,7 +197,6 @@ function InfiniteCanvasPage() {
         movedIds: new Set(),
     });
 
-    const config = useConfigStore((state) => state.config);
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
@@ -322,8 +319,8 @@ function InfiniteCanvasPage() {
             videoPollIdsRef.current.add(node.id);
             let controller: AbortController | undefined;
             try {
-                const generationConfig = buildGenerationConfig(effectiveConfig, node, "video");
-                if (!isAiConfigReady(generationConfig, generationConfig.model)) {
+                const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "video"), ...(import.meta.env.DEV ? { model: "minimax-h3" } : {}) };
+                if (!import.meta.env.DEV && !isAiConfigReady(generationConfig, generationConfig.model)) {
                     if (silent) {
                         setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: t("workbench.configFirst") } } : item)));
                         return;

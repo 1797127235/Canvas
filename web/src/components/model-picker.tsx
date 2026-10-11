@@ -6,7 +6,8 @@ import i18n from "@/i18n";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { modelOptionLabel, modelOptionName, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
-import type { PublicModel } from "@/services/api/catalog";
+import { bypassLocalAuth } from "@/lib/auth-access";
+import { useCatalogStore } from "@/stores/use-catalog-store";
 
 type ModelPickerProps = {
     config: AiConfig;
@@ -17,17 +18,25 @@ type ModelPickerProps = {
     fullWidth?: boolean;
     placeholder?: string;
     onMissingConfig?: () => void;
-    serverModels?: PublicModel[];
 };
 
-export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder, onMissingConfig, serverModels }: ModelPickerProps) {
+export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder, onMissingConfig }: ModelPickerProps) {
     const { t } = useTranslation();
     const pickerId = useId();
     const [open, setOpen] = useState(false);
-    const serverOptions = useMemo(() => (serverModels || []).filter((model) => !capability || model.capability === capability), [capability, serverModels]);
-    const options = useMemo(() => serverModels ? serverOptions.map((model) => model.id) : Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability)].filter((model): model is string => Boolean(model)))), [capability, config, serverModels, serverOptions, value]);
+    const catalogModels = useCatalogStore((state) => state.models);
+    const catalogStatus = useCatalogStore((state) => state.status);
+    const loadCatalog = useCatalogStore((state) => state.load);
+    const activeServerModels = bypassLocalAuth ? undefined : catalogModels;
+    const serverOptions = useMemo(() => (activeServerModels || []).filter((model) => !capability || model.capability === capability), [activeServerModels, capability]);
+    const options = useMemo(() => activeServerModels ? serverOptions.map((model) => model.id) : Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability)].filter((model): model is string => Boolean(model)))), [activeServerModels, capability, config, serverOptions, value]);
     const current = value || "";
+    const resolvedCurrent = activeServerModels && !serverOptions.some((model) => model.id === current) ? serverOptions[0]?.id || "" : current;
     const pickerPlaceholder = placeholder || t("settingsPanels.model.select");
+
+    useEffect(() => {
+        if (!bypassLocalAuth) void loadCatalog();
+    }, [loadCatalog]);
 
     useEffect(() => {
         const closeOtherPicker = (event: Event) => {
@@ -40,9 +49,9 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
     return (
         <Select
             open={open}
-            value={current}
+            value={resolvedCurrent}
             onOpenChange={(nextOpen) => {
-                if (nextOpen && !options.length && !serverModels && config.channelMode === "local") onMissingConfig?.();
+                if (nextOpen && !options.length && bypassLocalAuth && config.channelMode === "local") onMissingConfig?.();
                 if (nextOpen) window.dispatchEvent(new CustomEvent("model-picker-open", { detail: pickerId }));
                 setOpen(nextOpen);
             }}
@@ -57,10 +66,10 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
                 )}
                 onMouseDown={(event) => event.stopPropagation()}
                 onPointerDown={(event) => event.stopPropagation()}
-                title={current ? modelOptionLabel(config, current) : pickerPlaceholder}
+                title={resolvedCurrent ? modelOptionLabel(config, resolvedCurrent) : pickerPlaceholder}
             >
-                <ModelIcon model={current} />
-                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current ? serverOptions.find((item) => item.id === current)?.name || modelOptionLabel(config, current) : pickerPlaceholder}</span>
+                <ModelIcon model={resolvedCurrent} />
+                <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{resolvedCurrent ? serverOptions.find((item) => item.id === resolvedCurrent)?.name || modelOptionLabel(config, resolvedCurrent) : pickerPlaceholder}</span>
             </SelectTrigger>
             <SelectContent
                 data-canvas-no-zoom
@@ -83,7 +92,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
                         })
                 ) : (
                     <SelectItem value="__empty__" disabled>
-                        {serverModels ? "暂无可用模型" : emptyModelLabel(config, capability)}
+                        {activeServerModels ? (catalogStatus === "error" ? "模型加载失败，请刷新重试" : catalogStatus === "ready" ? "暂无可用模型" : "正在加载模型…") : emptyModelLabel(config, capability)}
                     </SelectItem>
                 )}
             </SelectContent>
