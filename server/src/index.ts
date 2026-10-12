@@ -22,10 +22,13 @@ async function start() {
     const database = createDatabase(config);
     try {
         // 启动时验证数据库/schema 并清理过期记录；认证拒绝过期凭证不依赖清理。
-        await database.pool.query(await readFile(new URL("../sql/004-generation-tasks.sql", import.meta.url), "utf8"));
+        for (const file of ["003-workspace-credentials-media.sql", "004-generation-tasks.sql", "005-generation-history.sql"]) {
+            await database.pool.query(await readFile(new URL(`../sql/${file}`, import.meta.url), "utf8"));
+        }
         await clearExpiredIdentityData(database.pool);
         const secret = config.rateLimitSecret;
-        const dependencies = { database: database.pool, rateLimitSecret: secret, secureCookie: config.nodeEnv === "production" };
+        // 会话 Cookie 的 Secure 标志跟随实际访问协议：HTTP 部署下浏览器不回传 Secure Cookie。
+        const dependencies = { database: database.pool, rateLimitSecret: secret, secureCookie: config.appOrigin.startsWith("https:") };
         const catalog = await loadCatalog(config.catalogConfigPath, config.nodeEnv === "production");
         const minio = config.minioEndpoint && config.minioPort && config.minioAccessKey && config.minioSecretKey && config.minioBucket
             ? { client: new Client({ endPoint: config.minioEndpoint, port: config.minioPort, useSSL: config.nodeEnv === "production", accessKey: config.minioAccessKey, secretKey: config.minioSecretKey }), bucket: config.minioBucket }
@@ -33,11 +36,11 @@ async function start() {
         const apiRouter = createSessionRouter(database.pool, dependencies.secureCookie);
         apiRouter.use(createRegisterRouter({ ...dependencies, limiter: createRateLimiter(database.pool, "register", secret) }));
         apiRouter.use(createLoginRouter({ ...dependencies, limiter: createRateLimiter(database.pool, "login", secret) }));
-        apiRouter.use(createCatalogRouter(catalog));
+        apiRouter.use(createCatalogRouter(catalog, database.pool, config.credentialsEncryptionKey));
         apiRouter.use(createCredentialRouter(database.pool, { encryptionKey: config.credentialsEncryptionKey }));
         apiRouter.use(createWorkspaceRouter(database.pool));
         apiRouter.use(createMediaRouter(database.pool, minio));
-        apiRouter.use(createGenerationRouter(database.pool, { catalog }));
+        apiRouter.use(createGenerationRouter(database.pool, { catalog, encryptionKey: config.credentialsEncryptionKey }));
         const server = createApp({ appOrigin: config.appOrigin, apiRouter }).listen(config.port, config.host);
         let closing = false;
         const close = () => {

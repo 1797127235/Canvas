@@ -192,5 +192,2465 @@
       }
     ],
     "previewVideo": "/templates/cat-dance/media/video_bXceqPLL_4oG9Fyw2CyWc.mp4"
+  },
+  {
+    "id": "clothing-lookbook",
+    "title": "电商服装图片工作流",
+    "description": "替换模特和两套服装，复用都市街头场景及两种姿势，分别生成四组竖版换装图。保留效果示例，可独立编辑每条生成分支。",
+    "tags": [
+      "电商服装",
+      "模特换装",
+      "图生图"
+    ],
+    "author": "官方",
+    "cover": "/templates/covers/clothing-lookbook.webp",
+    "project": {
+      "title": "电商服装图片工作流",
+      "backgroundMode": "lines",
+      "viewport": {
+        "x": 80,
+        "y": 170,
+        "k": 0.4
+      },
+      "nodes": [
+        {
+          "id": "clothing-instructions",
+          "type": "text",
+          "title": "使用说明",
+          "position": {
+            "x": 0,
+            "y": -310
+          },
+          "width": 2350,
+          "height": 220,
+          "metadata": {
+            "status": "idle",
+            "fontSize": 20,
+            "content": "电商服装场景模板｜1 位模特 × 2 套服装 × 2 种姿势\n① 克隆后替换「模特图」和「服装 A / B」；调整两段姿势与共享场景。\n② 在生成配置中选择支持参考图编辑的图片模型，推荐 GPT Image 2.5；默认跟随当前账号图片模型。\n③ 四条分支可分别生成，统一竖幅 1152×2048。右侧四张图片为已有效果示例；替换素材后请从对应「生成」节点重新出图，结果更新到右侧固定输出。\n④ 发布商品图前，请核对人物一致性及服装颜色、花纹、版型、长度等细节。"
+          }
+        },
+        {
+          "id": "image-1791773086305-6kml5",
+          "type": "image",
+          "title": "替换模特图",
+          "position": {
+            "x": 0,
+            "y": 420
+          },
+          "width": 380,
+          "height": 507,
+          "metadata": {
+            "content": "/templates/clothing-lookbook/media/image_1F7MbY2lBRzemmlKVymM1.png",
+            "status": "success",
+            "storageKey": "image:1F7MbY2lBRzemmlKVymM1",
+            "naturalWidth": 755,
+            "naturalHeight": 1007,
+            "bytes": 920817,
+            "mimeType": "image/png",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "text-1791773129529-sespl",
+          "type": "text",
+          "title": "姿势 A · 侧身靠灯柱",
+          "position": {
+            "x": 0,
+            "y": 30
+          },
+          "width": 420,
+          "height": 290,
+          "metadata": {
+            "content": "身体侧向斜靠灯柱，以肩部接触灯柱作为支撑，重心微偏。头部自然转向侧方，下颌微收，视线望向远处。双腿小幅前后交错，右手自然下垂，轻握手包。姿态松弛、利落，完整展示服装。",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "image-1791773147783-ppaob",
+          "type": "image",
+          "title": "替换服装 A · 碎花连衣裙",
+          "position": {
+            "x": 490,
+            "y": 100
+          },
+          "width": 380,
+          "height": 521,
+          "metadata": {
+            "content": "/templates/clothing-lookbook/media/image_V0enBP7skJHLR3-5glVqt.png",
+            "status": "success",
+            "storageKey": "image:V0enBP7skJHLR3-5glVqt",
+            "naturalWidth": 864,
+            "naturalHeight": 1184,
+            "bytes": 1402283,
+            "mimeType": "image/png",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "text-1791773181466-nztyd",
+          "type": "text",
+          "title": "共享场景 · 都市街头",
+          "position": {
+            "x": 490,
+            "y": 770
+          },
+          "width": 420,
+          "height": 260,
+          "metadata": {
+            "content": "都市街头，自然斜向日光。背景为古典建筑石墙、浅色石材地砖与带复古纹饰底座的灰色金属灯柱，保持简约、优雅、真实的时装摄影氛围。根据姿势选择靠灯柱或靠墙位置。",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "image-1791773339163-xpgne",
+          "type": "image",
+          "title": "替换服装 B · 系带风衣",
+          "position": {
+            "x": 490,
+            "y": 1200
+          },
+          "width": 380,
+          "height": 521,
+          "metadata": {
+            "content": "/templates/clothing-lookbook/media/image_iujM6o6mtsGO8PXElplv3.png",
+            "status": "success",
+            "storageKey": "image:iujM6o6mtsGO8PXElplv3",
+            "naturalWidth": 864,
+            "naturalHeight": 1184,
+            "bytes": 994261,
+            "mimeType": "image/png",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "text-1791773478236-ib4on",
+          "type": "text",
+          "title": "姿势 B · 靠墙轻触后颈",
+          "position": {
+            "x": 0,
+            "y": 1350
+          },
+          "width": 420,
+          "height": 300,
+          "metadata": {
+            "content": "身体以三分之二侧身位站立，背部微倚墙面。左手自然抬起，指尖轻触后颈，手肘下沉；右手放松，轻握书籍。左肩斜挎皮包，头部微转，视线避开镜头望向远处。姿态自然，完整展示服装。",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "config-1791774493558-tiync",
+          "type": "config",
+          "title": "生成 · 服装 A · 靠灯柱",
+          "position": {
+            "x": 1030,
+            "y": 100
+          },
+          "width": 340,
+          "height": 320,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "size": "1152x2048",
+            "quality": "2k",
+            "count": 1,
+            "composerContent": "人物参考：@[node:image-1791773086305-6kml5]\n服装参考：@[node:image-1791773147783-ppaob]\n\n使用图片1中的模特作为唯一人物来源，保持脸部特征、发型与身材比例一致；将图片2的服装穿在该模特身上，准确保留服装颜色、图案、版型、领口、肩带或袖型、腰带和长度，不沿用图片1的原服装，不自行增加商品细节。\n\n姿势要求：@[node:text-1791773129529-sespl]\n场景要求：@[node:text-1791773181466-nztyd]\n\n生成竖幅全身电商服装场景图，头部和鞋子完整入镜，面料与服装细节清晰，人体结构自然；无文字、无水印、无拼图。",
+            "outputNodeId": "jmejP6zkMxPAvZcDqamsn"
+          }
+        },
+        {
+          "id": "config-1791774536263-uffi5",
+          "type": "config",
+          "title": "生成 · 服装 B · 靠灯柱",
+          "position": {
+            "x": 1030,
+            "y": 550
+          },
+          "width": 340,
+          "height": 320,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "size": "1152x2048",
+            "quality": "2k",
+            "count": 1,
+            "composerContent": "人物参考：@[node:image-1791773086305-6kml5]\n服装参考：@[node:image-1791773339163-xpgne]\n\n使用图片1中的模特作为唯一人物来源，保持脸部特征、发型与身材比例一致；将图片2的服装穿在该模特身上，准确保留服装颜色、图案、版型、领口、肩带或袖型、腰带和长度，不沿用图片1的原服装，不自行增加商品细节。\n\n姿势要求：@[node:text-1791773129529-sespl]\n场景要求：@[node:text-1791773181466-nztyd]\n\n生成竖幅全身电商服装场景图，头部和鞋子完整入镜，面料与服装细节清晰，人体结构自然；无文字、无水印、无拼图。",
+            "outputNodeId": "p9CyKCRakkxvM0DBFk7OK"
+          }
+        },
+        {
+          "id": "p9CyKCRakkxvM0DBFk7OK",
+          "type": "image",
+          "title": "效果示例 · 服装 B · 靠灯柱",
+          "position": {
+            "x": 1950,
+            "y": 100
+          },
+          "width": 400,
+          "height": 711.11,
+          "metadata": {
+            "prompt": "图片1 图片2 【文本1】 【文本2】\n\n【文本1】\n[上传参考图——模特＋服装]使用上传的人物参考图作为唯一人物来源，严格锁定人物身份一致性，确认是同一人。本姿势为以立柱为支点的侧向斜靠。身体重心向支撑侧微偏，通过左肩部与立柱的接触点建立稳定的斜线构图。头部向侧方自然转动，下颌微收，视线水平远眺，营造出疏离且松弛的叙事氛围。双腿采取小幅度的前后交错站立，有效打破了画面的垂直死板感。右手自然下垂衔接手包，与上半身的倚靠动势形成力量上的平衡，整体呈现出利落且具有高级感的都市职业女性形象。\n\n【文本2】\n[场景地点 自己输入】都市街头场景。人物侧身倚靠在带有复古纹饰底座的灰色金属灯柱旁。背景为具有古典建筑风格的石墙与街道，地面铺设浅色石材地砖。在自然斜向光线的照射下，整体画面呈现出简约、优雅且具有现代都市感的休闲氛围。",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "1152x2048",
+            "quality": "2k",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:1F7MbY2lBRzemmlKVymM1",
+              "image:iujM6o6mtsGO8PXElplv3"
+            ],
+            "content": "/templates/clothing-lookbook/media/image_x8TYOZBj5EsdikZ3gSzxY.png",
+            "storageKey": "image:x8TYOZBj5EsdikZ3gSzxY",
+            "naturalWidth": 1152,
+            "naturalHeight": 2048,
+            "bytes": 5299314,
+            "mimeType": "image/png",
+            "primaryImageId": "p9CyKCRakkxvM0DBFk7OK"
+          }
+        },
+        {
+          "id": "config-1791774654726-hd6tb",
+          "type": "config",
+          "title": "生成 · 服装 A · 靠墙",
+          "position": {
+            "x": 1030,
+            "y": 1200
+          },
+          "width": 340,
+          "height": 320,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "size": "1152x2048",
+            "quality": "2k",
+            "count": 1,
+            "composerContent": "人物参考：@[node:image-1791773086305-6kml5]\n服装参考：@[node:image-1791773147783-ppaob]\n\n使用图片1中的模特作为唯一人物来源，保持脸部特征、发型与身材比例一致；将图片2的服装穿在该模特身上，准确保留服装颜色、图案、版型、领口、肩带或袖型、腰带和长度，不沿用图片1的原服装，不自行增加商品细节。\n\n姿势要求：@[node:text-1791773478236-ib4on]\n场景要求：@[node:text-1791773181466-nztyd]\n\n生成竖幅全身电商服装场景图，头部和鞋子完整入镜，面料与服装细节清晰，人体结构自然；无文字、无水印、无拼图。",
+            "outputNodeId": "90-RjmFLbBrMyPrEWoayZ"
+          }
+        },
+        {
+          "id": "jmejP6zkMxPAvZcDqamsn",
+          "type": "image",
+          "title": "效果示例 · 服装 A · 靠灯柱",
+          "position": {
+            "x": 1480,
+            "y": 100
+          },
+          "width": 400,
+          "height": 710.73,
+          "metadata": {
+            "prompt": "图片1 图片2 [上传参考图——模特＋服装]使用上传的人物参考图作为唯一人物来源，严格锁定人物身份一致性，确认是同一人。本姿势为以立柱为支点的侧向斜靠。身体重心向支撑侧微偏，通过左肩部与立柱的接触点建立稳定的斜线构图。头部向侧方自然转动，下颌微收，视线水平远眺，营造出疏离且松弛的叙事氛围。双腿采取小幅度的前后交错站立，有效打破了画面的垂直死板感。右手自然下垂衔接手包，与上半身的倚靠动势形成力量上的平衡，整体呈现出利落且具有高级感的都市职业女性形象。\n\n[场景地点 自己输入】都市街头场景。人物侧身倚靠在带有复古纹饰底座的灰色金属灯柱旁。背景为具有古典建筑风格的石墙与街道，地面铺设浅色石材地砖。在自然斜向光线的照射下，整体画面呈现出简约、优雅且具有现代都市感的休闲氛围。",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "1152x2048",
+            "quality": "2k",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:1F7MbY2lBRzemmlKVymM1",
+              "image:V0enBP7skJHLR3-5glVqt"
+            ],
+            "content": "/templates/clothing-lookbook/media/image_kNIpbTVKkL0lrC-jrtD8e.png",
+            "storageKey": "image:kNIpbTVKkL0lrC-jrtD8e",
+            "naturalWidth": 941,
+            "naturalHeight": 1672,
+            "bytes": 2666555,
+            "mimeType": "image/png",
+            "primaryImageId": "jmejP6zkMxPAvZcDqamsn"
+          }
+        },
+        {
+          "id": "90-RjmFLbBrMyPrEWoayZ",
+          "type": "image",
+          "title": "效果示例 · 服装 A · 靠墙",
+          "position": {
+            "x": 1480,
+            "y": 1200
+          },
+          "width": 400,
+          "height": 711.49,
+          "metadata": {
+            "prompt": "[上传参考图——模特＋服装]使用上传的人物参考图作为唯一人物来源，严格锁定人物身份一致性，确认是同一人。主体采用三分之二侧身位站立，背部微倚墙面，利用建筑线条延伸视觉纵深。左手自然抬起，指尖轻触后颈发际线，手肘自然下沉，此动作旨在拉长颈部线条并构筑上肢的三角几何支撑感。右手垂直向下放松，轻握书籍以平衡画面重心的垂感。左肩斜挎皮质大包，包身自然贴合于侧腰，丰富躯干层次。头部向镜头方向微转，下颌略微收敛，眼神避开正视视角斜向远方，呈现出一种松弛且具有叙事感的职场静谧姿态。",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "1152x2048",
+            "quality": "2k",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:1F7MbY2lBRzemmlKVymM1",
+              "image:V0enBP7skJHLR3-5glVqt"
+            ],
+            "content": "/templates/clothing-lookbook/media/image_kncEvebQAF91Z4s-pugna.png",
+            "storageKey": "image:kncEvebQAF91Z4s-pugna",
+            "naturalWidth": 940,
+            "naturalHeight": 1672,
+            "bytes": 2616351,
+            "mimeType": "image/png",
+            "primaryImageId": "90-RjmFLbBrMyPrEWoayZ"
+          }
+        },
+        {
+          "id": "config-1791774722242-b69kv",
+          "type": "config",
+          "title": "生成 · 服装 B · 靠墙",
+          "position": {
+            "x": 1030,
+            "y": 1650
+          },
+          "width": 340,
+          "height": 320,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "size": "1152x2048",
+            "quality": "2k",
+            "count": 1,
+            "composerContent": "人物参考：@[node:image-1791773086305-6kml5]\n服装参考：@[node:image-1791773339163-xpgne]\n\n使用图片1中的模特作为唯一人物来源，保持脸部特征、发型与身材比例一致；将图片2的服装穿在该模特身上，准确保留服装颜色、图案、版型、领口、肩带或袖型、腰带和长度，不沿用图片1的原服装，不自行增加商品细节。\n\n姿势要求：@[node:text-1791773478236-ib4on]\n场景要求：@[node:text-1791773181466-nztyd]\n\n生成竖幅全身电商服装场景图，头部和鞋子完整入镜，面料与服装细节清晰，人体结构自然；无文字、无水印、无拼图。",
+            "outputNodeId": "Wv7TEwN-k8NhF3v-0z2GV"
+          }
+        },
+        {
+          "id": "Wv7TEwN-k8NhF3v-0z2GV",
+          "type": "image",
+          "title": "效果示例 · 服装 B · 靠墙",
+          "position": {
+            "x": 1950,
+            "y": 1200
+          },
+          "width": 400,
+          "height": 711.73,
+          "metadata": {
+            "prompt": "[上传参考图——模特＋服装]使用上传的人物参考图作为唯一人物来源，严格锁定人物身份一致性，确认是同一人。主体采用三分之二侧身位站立，背部微倚墙面，利用建筑线条延伸视觉纵深。左手自然抬起，指尖轻触后颈发际线，手肘自然下沉，此动作旨在拉长颈部线条并构筑上肢的三角几何支撑感。右手垂直向下放松，轻握书籍以平衡画面重心的垂感。左肩斜挎皮质大包，包身自然贴合于侧腰，丰富躯干层次。头部向镜头方向微转，下颌略微收敛，眼神避开正视视角斜向远方，呈现出一种松弛且具有叙事感的职场静谧姿态。",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "1152x2048",
+            "quality": "2k",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:1F7MbY2lBRzemmlKVymM1",
+              "image:iujM6o6mtsGO8PXElplv3"
+            ],
+            "content": "/templates/clothing-lookbook/media/image_gtUPmwBkIeCcLFLcoSqif.png",
+            "storageKey": "image:gtUPmwBkIeCcLFLcoSqif",
+            "naturalWidth": 1151,
+            "naturalHeight": 2048,
+            "bytes": 3108128,
+            "mimeType": "image/png",
+            "primaryImageId": "Wv7TEwN-k8NhF3v-0z2GV"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": "clothing-image-1791773086305-6kml5-config-1791774493558-tiync",
+          "fromNodeId": "image-1791773086305-6kml5",
+          "toNodeId": "config-1791774493558-tiync"
+        },
+        {
+          "id": "clothing-image-1791773147783-ppaob-config-1791774493558-tiync",
+          "fromNodeId": "image-1791773147783-ppaob",
+          "toNodeId": "config-1791774493558-tiync"
+        },
+        {
+          "id": "clothing-text-1791773129529-sespl-config-1791774493558-tiync",
+          "fromNodeId": "text-1791773129529-sespl",
+          "toNodeId": "config-1791774493558-tiync"
+        },
+        {
+          "id": "clothing-text-1791773181466-nztyd-config-1791774493558-tiync",
+          "fromNodeId": "text-1791773181466-nztyd",
+          "toNodeId": "config-1791774493558-tiync"
+        },
+        {
+          "id": "clothing-config-1791774493558-tiync-jmejP6zkMxPAvZcDqamsn",
+          "fromNodeId": "config-1791774493558-tiync",
+          "toNodeId": "jmejP6zkMxPAvZcDqamsn"
+        },
+        {
+          "id": "clothing-image-1791773086305-6kml5-config-1791774536263-uffi5",
+          "fromNodeId": "image-1791773086305-6kml5",
+          "toNodeId": "config-1791774536263-uffi5"
+        },
+        {
+          "id": "clothing-image-1791773339163-xpgne-config-1791774536263-uffi5",
+          "fromNodeId": "image-1791773339163-xpgne",
+          "toNodeId": "config-1791774536263-uffi5"
+        },
+        {
+          "id": "clothing-text-1791773129529-sespl-config-1791774536263-uffi5",
+          "fromNodeId": "text-1791773129529-sespl",
+          "toNodeId": "config-1791774536263-uffi5"
+        },
+        {
+          "id": "clothing-text-1791773181466-nztyd-config-1791774536263-uffi5",
+          "fromNodeId": "text-1791773181466-nztyd",
+          "toNodeId": "config-1791774536263-uffi5"
+        },
+        {
+          "id": "clothing-config-1791774536263-uffi5-p9CyKCRakkxvM0DBFk7OK",
+          "fromNodeId": "config-1791774536263-uffi5",
+          "toNodeId": "p9CyKCRakkxvM0DBFk7OK"
+        },
+        {
+          "id": "clothing-image-1791773086305-6kml5-config-1791774654726-hd6tb",
+          "fromNodeId": "image-1791773086305-6kml5",
+          "toNodeId": "config-1791774654726-hd6tb"
+        },
+        {
+          "id": "clothing-image-1791773147783-ppaob-config-1791774654726-hd6tb",
+          "fromNodeId": "image-1791773147783-ppaob",
+          "toNodeId": "config-1791774654726-hd6tb"
+        },
+        {
+          "id": "clothing-text-1791773478236-ib4on-config-1791774654726-hd6tb",
+          "fromNodeId": "text-1791773478236-ib4on",
+          "toNodeId": "config-1791774654726-hd6tb"
+        },
+        {
+          "id": "clothing-text-1791773181466-nztyd-config-1791774654726-hd6tb",
+          "fromNodeId": "text-1791773181466-nztyd",
+          "toNodeId": "config-1791774654726-hd6tb"
+        },
+        {
+          "id": "clothing-config-1791774654726-hd6tb-90-RjmFLbBrMyPrEWoayZ",
+          "fromNodeId": "config-1791774654726-hd6tb",
+          "toNodeId": "90-RjmFLbBrMyPrEWoayZ"
+        },
+        {
+          "id": "clothing-image-1791773086305-6kml5-config-1791774722242-b69kv",
+          "fromNodeId": "image-1791773086305-6kml5",
+          "toNodeId": "config-1791774722242-b69kv"
+        },
+        {
+          "id": "clothing-image-1791773339163-xpgne-config-1791774722242-b69kv",
+          "fromNodeId": "image-1791773339163-xpgne",
+          "toNodeId": "config-1791774722242-b69kv"
+        },
+        {
+          "id": "clothing-text-1791773478236-ib4on-config-1791774722242-b69kv",
+          "fromNodeId": "text-1791773478236-ib4on",
+          "toNodeId": "config-1791774722242-b69kv"
+        },
+        {
+          "id": "clothing-text-1791773181466-nztyd-config-1791774722242-b69kv",
+          "fromNodeId": "text-1791773181466-nztyd",
+          "toNodeId": "config-1791774722242-b69kv"
+        },
+        {
+          "id": "clothing-config-1791774722242-b69kv-Wv7TEwN-k8NhF3v-0z2GV",
+          "fromNodeId": "config-1791774722242-b69kv",
+          "toNodeId": "Wv7TEwN-k8NhF3v-0z2GV"
+        }
+      ]
+    },
+    "files": [
+      {
+        "storageKey": "image:1F7MbY2lBRzemmlKVymM1",
+        "path": "/templates/clothing-lookbook/media/image_1F7MbY2lBRzemmlKVymM1.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:V0enBP7skJHLR3-5glVqt",
+        "path": "/templates/clothing-lookbook/media/image_V0enBP7skJHLR3-5glVqt.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:iujM6o6mtsGO8PXElplv3",
+        "path": "/templates/clothing-lookbook/media/image_iujM6o6mtsGO8PXElplv3.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:x8TYOZBj5EsdikZ3gSzxY",
+        "path": "/templates/clothing-lookbook/media/image_x8TYOZBj5EsdikZ3gSzxY.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:kNIpbTVKkL0lrC-jrtD8e",
+        "path": "/templates/clothing-lookbook/media/image_kNIpbTVKkL0lrC-jrtD8e.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:kncEvebQAF91Z4s-pugna",
+        "path": "/templates/clothing-lookbook/media/image_kncEvebQAF91Z4s-pugna.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:gtUPmwBkIeCcLFLcoSqif",
+        "path": "/templates/clothing-lookbook/media/image_gtUPmwBkIeCcLFLcoSqif.png",
+        "mimeType": "image/png"
+      }
+    ]
+  },
+  {
+    "id": "outfit-change-video",
+    "title": "换装视频工作流",
+    "description": "替换模特与五套服装，先生成人物形象和换装图，再结合动作参考与可编辑分镜制作8秒竖版换装视频。",
+    "tags": [
+      "电商服装",
+      "换装视频",
+      "多图参考"
+    ],
+    "author": "官方",
+    "cover": "/templates/covers/outfit-change-video.webp",
+    "previewVideo": "/templates/outfit-change-video/media/video_AAOmKSi2fdD7X9MaAN3XV.mp4",
+    "project": {
+      "title": "换装视频工作流",
+      "backgroundMode": "lines",
+      "viewport": {
+        "x": 70,
+        "y": 150,
+        "k": 0.28
+      },
+      "nodes": [
+        {
+          "id": "outfit-instructions",
+          "type": "text",
+          "title": "使用说明",
+          "position": {
+            "x": 0,
+            "y": -340
+          },
+          "width": 4100,
+          "height": 260,
+          "metadata": {
+            "content": "换装视频模板｜人物形象图 → 五套换装图 → 动作参考视频\n① 替换模特图及五套服装，先生成或替换人物形象图。② 分别生成五张换装图，再生成8秒视频。生成会更新固定输出图；完成后再手动执行后续节点，后续读取最新结果。\n③ 可替换动作参考视频，并修改分镜、场景及动作节奏；保留已有图片和视频供预览。\n④ 图片推荐 GPT Image 2.5，视频原流程使用 Seedance；请选择支持多图与视频参考的可用模型，默认沿用项目现有选择逻辑。\n⑤ 替换输入后从对应「生成」节点重新生成，固定输出和下游引用会更新；商品细节需人工核对。",
+            "status": "idle",
+            "fontSize": 20
+          }
+        },
+        {
+          "id": "image-1791775170633-h8ear",
+          "type": "image",
+          "title": "替换模特图",
+          "position": {
+            "x": 0,
+            "y": 50
+          },
+          "width": 360,
+          "height": 480.0,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/image_cvBpNBqU4ncETxO9YwGpE.png",
+            "status": "success",
+            "storageKey": "image:cvBpNBqU4ncETxO9YwGpE",
+            "naturalWidth": 1086,
+            "naturalHeight": 1448,
+            "bytes": 2620314,
+            "mimeType": "image/png",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "text-1791775219264-h39d0",
+          "type": "text",
+          "title": "人物形象图要求",
+          "position": {
+            "x": 0,
+            "y": 600
+          },
+          "width": 420,
+          "height": 330,
+          "metadata": {
+            "content": "模特的三视图，身穿运动背心，短裤，运动鞋。要求：要能展示九头身的身材细节！横版拼接电商展示图，左侧为人物胸部以上特写，双手垂立，不能遮盖脸部，右侧为同一人物全身三视图（正面、90 度正侧面、正背面）横向均匀排列，画面顶部有黑色宋体中文标题「形象展示」，三视图下方分别标注对应文字「正面展示」「侧面展示」「背面展示」； 人物正视镜头，标准站姿，双手自然垂于身体两侧，脚上根据服装，自动搭配鞋子； 纯白色无影墙影棚背景，专业商业人像布光，35mm 胶片实拍效果，柔和自然光，自然细腻，高对比度，高饱和度，超高细节，写实风格。",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "703w8YDng-UX9Y-Ge3J5k",
+          "type": "image",
+          "title": "人物形象图 · 先生成或替换",
+          "position": {
+            "x": 970,
+            "y": 120
+          },
+          "width": 720,
+          "height": 405.22,
+          "metadata": {
+            "prompt": "模特的三视图，身穿运动背心，短裤，运动鞋。要求：要能展示九头身的身材细节！横版拼接电商展示图，左侧为人物胸部以上特写，双手垂立，不能遮盖脸部，右侧为同一人物全身三视图（正面、90 度正侧面、正背面）横向均匀排列，画面顶部有黑色宋体中文标题「形象展示」，三视图下方分别标注对应文字「正面展示」「侧面展示」「背面展示」； 人物正视镜头，标准站姿，双手自然垂于身体两侧，脚上根据服装，自动搭配鞋子； 纯白色无影墙影棚背景，专业商业人像布光，35mm 胶片实拍效果，柔和自然光，自然细腻，高对比度，高饱和度，超高细节，写实风格。",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "2048x1152",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:cvBpNBqU4ncETxO9YwGpE"
+            ],
+            "content": "/templates/outfit-change-video/media/image_wabw_5Ed8H7Yvbr59Onb1.png",
+            "storageKey": "image:wabw_5Ed8H7Yvbr59Onb1",
+            "naturalWidth": 1672,
+            "naturalHeight": 941,
+            "bytes": 1651686,
+            "mimeType": "image/png",
+            "primaryImageId": "703w8YDng-UX9Y-Ge3J5k"
+          }
+        },
+        {
+          "id": "image-1791775273055-p8wyq",
+          "type": "image",
+          "title": "替换服装 1 · 粉色上衣与白色短裙",
+          "position": {
+            "x": 970,
+            "y": 1060
+          },
+          "width": 360,
+          "height": 480.0,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/image_3Phe2ag9QjQl_BnaeOpEP.png",
+            "status": "success",
+            "storageKey": "image:3Phe2ag9QjQl_BnaeOpEP",
+            "naturalWidth": 1728,
+            "naturalHeight": 2304,
+            "bytes": 2590916,
+            "mimeType": "image/png",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "image-1791775280713-plzms",
+          "type": "image",
+          "title": "替换服装 2 · 黄色吊带裙",
+          "position": {
+            "x": 970,
+            "y": 1840
+          },
+          "width": 360,
+          "height": 480.0,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/image_JLV1hdTZpIOWYWm0X_xy7.png",
+            "status": "success",
+            "storageKey": "image:JLV1hdTZpIOWYWm0X_xy7",
+            "naturalWidth": 1728,
+            "naturalHeight": 2304,
+            "bytes": 3052550,
+            "mimeType": "image/png",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "image-1791775290800-ouezs",
+          "type": "image",
+          "title": "替换服装 3 · 绿色上衣与白色长裙",
+          "position": {
+            "x": 970,
+            "y": 2620
+          },
+          "width": 360,
+          "height": 480.0,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/image_4I7QDoLd_dnttwsV7eRhW.png",
+            "status": "success",
+            "prompt": "",
+            "storageKey": "image:4I7QDoLd_dnttwsV7eRhW",
+            "naturalWidth": 1728,
+            "naturalHeight": 2304,
+            "bytes": 2498118,
+            "mimeType": "image/png",
+            "freeResize": false
+          }
+        },
+        {
+          "id": "image-1791775320328-f17dq",
+          "type": "image",
+          "title": "替换服装 4 · 碎花吊带连衣裙",
+          "position": {
+            "x": 970,
+            "y": 3400
+          },
+          "width": 360,
+          "height": 493.33,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/image_f0jthTK1hSAnPAyDEjnQ1.png",
+            "status": "success",
+            "storageKey": "image:f0jthTK1hSAnPAyDEjnQ1",
+            "naturalWidth": 864,
+            "naturalHeight": 1184,
+            "bytes": 1402283,
+            "mimeType": "image/png",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "video-1791775426979-c2i6g",
+          "type": "video",
+          "title": "替换动作参考视频",
+          "position": {
+            "x": 2630,
+            "y": 1000
+          },
+          "width": 360,
+          "height": 640.0,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/video_c3Xm8zcMAr4B7RxdLnWKG.mp4",
+            "status": "success",
+            "storageKey": "video:c3Xm8zcMAr4B7RxdLnWKG",
+            "naturalWidth": 720,
+            "naturalHeight": 1280,
+            "bytes": 1169794,
+            "mimeType": "video/mp4",
+            "durationMs": 7833,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "image-1791775573042-od804",
+          "type": "image",
+          "title": "替换服装 5 · 米白色连衣裙",
+          "position": {
+            "x": 970,
+            "y": 4180
+          },
+          "width": 360,
+          "height": 360.0,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/image_wSr51K9o8Zfwl6MXaSQUJ.webp",
+            "status": "success",
+            "storageKey": "image:wSr51K9o8Zfwl6MXaSQUJ",
+            "naturalWidth": 1706,
+            "naturalHeight": 1706,
+            "bytes": 119754,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "image-1791775611023-b0nxl",
+          "type": "image",
+          "title": "换装图 1 · 视频参考",
+          "position": {
+            "x": 2050,
+            "y": 1060
+          },
+          "width": 360,
+          "height": 639.66,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/image_UsEbCTYH2aiUa5WRg-LP3.png",
+            "status": "success",
+            "prompt": "图片1模特穿上图片2的服装，保持人物身份与服装细节，生成竖幅全身展示图。",
+            "size": "1152x2048",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:wabw_5Ed8H7Yvbr59Onb1",
+              "image:3Phe2ag9QjQl_BnaeOpEP"
+            ],
+            "storageKey": "image:UsEbCTYH2aiUa5WRg-LP3",
+            "naturalWidth": 941,
+            "naturalHeight": 1672,
+            "bytes": 1636310,
+            "mimeType": "image/png",
+            "primaryImageId": "image-1791775611023-b0nxl"
+          }
+        },
+        {
+          "id": "image-1791775648935-w6iuh",
+          "type": "image",
+          "title": "换装图 2 · 视频参考",
+          "position": {
+            "x": 2050,
+            "y": 1840
+          },
+          "width": 360,
+          "height": 640.34,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/image_mAC-zL16JaiSptwok79ao.png",
+            "status": "success",
+            "prompt": "图片1模特穿上图片2的服装，保持人物身份与服装细节，生成竖幅全身展示图。",
+            "size": "1152x2048",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:wabw_5Ed8H7Yvbr59Onb1",
+              "image:JLV1hdTZpIOWYWm0X_xy7"
+            ],
+            "storageKey": "image:mAC-zL16JaiSptwok79ao",
+            "naturalWidth": 940,
+            "naturalHeight": 1672,
+            "bytes": 1672527,
+            "mimeType": "image/png",
+            "primaryImageId": "image-1791775648935-w6iuh"
+          }
+        },
+        {
+          "id": "image-1791775691678-4iks4",
+          "type": "image",
+          "title": "换装图 3 · 视频参考",
+          "position": {
+            "x": 2050,
+            "y": 2620
+          },
+          "width": 360,
+          "height": 640.0,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/image_WPeAtkvQL3udFuxVNK0fq.png",
+            "status": "success",
+            "prompt": "图片1模特穿上图片2的服装，保持人物身份与服装细节，生成竖幅全身展示图。",
+            "size": "1152x2048",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:wabw_5Ed8H7Yvbr59Onb1",
+              "image:4I7QDoLd_dnttwsV7eRhW"
+            ],
+            "storageKey": "image:WPeAtkvQL3udFuxVNK0fq",
+            "naturalWidth": 1152,
+            "naturalHeight": 2048,
+            "bytes": 2576463,
+            "mimeType": "image/png",
+            "primaryImageId": "image-1791775691678-4iks4"
+          }
+        },
+        {
+          "id": "image-1791775760769-u2qgz",
+          "type": "image",
+          "title": "换装图 4 · 视频参考",
+          "position": {
+            "x": 2050,
+            "y": 3400
+          },
+          "width": 360,
+          "height": 640.0,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/image_DE3x6j_r5Z8wApHY2n50i.png",
+            "status": "success",
+            "prompt": "图片1模特穿上图片2的服装，保持人物身份与服装细节，生成竖幅全身展示图。",
+            "size": "1152x2048",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:wabw_5Ed8H7Yvbr59Onb1",
+              "image:f0jthTK1hSAnPAyDEjnQ1"
+            ],
+            "storageKey": "image:DE3x6j_r5Z8wApHY2n50i",
+            "naturalWidth": 1152,
+            "naturalHeight": 2048,
+            "bytes": 2836560,
+            "mimeType": "image/png",
+            "primaryImageId": "image-1791775760769-u2qgz"
+          }
+        },
+        {
+          "id": "image-1791775800152-fvrzi",
+          "type": "image",
+          "title": "换装图 5 · 视频参考",
+          "position": {
+            "x": 2050,
+            "y": 4180
+          },
+          "width": 360,
+          "height": 640.0,
+          "metadata": {
+            "content": "/templates/outfit-change-video/media/image_JE09_A78ULZPW47S4zoe2.png",
+            "status": "success",
+            "prompt": "图片1模特穿上图片2的服装，保持人物身份与服装细节，生成竖幅全身展示图。",
+            "size": "1152x2048",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:wabw_5Ed8H7Yvbr59Onb1",
+              "image:wSr51K9o8Zfwl6MXaSQUJ"
+            ],
+            "storageKey": "image:JE09_A78ULZPW47S4zoe2",
+            "naturalWidth": 1152,
+            "naturalHeight": 2048,
+            "bytes": 2516341,
+            "mimeType": "image/png",
+            "primaryImageId": "image-1791775800152-fvrzi"
+          }
+        },
+        {
+          "id": "video-1791775915390-oxxja",
+          "type": "video",
+          "title": "效果示例 · 8 秒五套换装",
+          "position": {
+            "x": 3700,
+            "y": 1300
+          },
+          "width": 430,
+          "height": 749.03,
+          "metadata": {
+            "prompt": "沙发换装视频：\n\n@图片1\n\n@图片2\n\n@图片3\n\n@图片4\n\n@图片5\n 这是需要换装的五套衣服；\n\n@视频1 \n 这是参考视频， 拍摄环境： 室内，暖色台灯，白色纱帘，棕色木地板\n固定景别： 高角度俯拍（约 45° 俯视），中全景，机位全程固定不动\n时间动作 / 动态景别0.0s主体从画面外快速入画，向后自然倾倒高角度俯拍 · 中全景，主体靠在沙发靠垫上，单手自然抬起，手持包袋轻放身侧，头部微倾，闭眼，姿态放松高角度俯拍 · 中全景（静止定帧）1.8s主体快速，完成换装转场，再次向后自然倾倒高角度俯拍 · 中全景2.2s，靠在沙发上，一手轻触脸颊旁靠垫，一手持与服装搭配的包放身侧，闭眼微侧头，姿态放松高角度俯拍 · 中全景（静止定帧）3.5s主体快速，完成换装转场，向后自然倾倒高角度俯拍 · 中全景4.0s，靠在沙发上，一手轻撩头发，手持与服装搭配的包放身侧，闭眼微侧头高角度俯拍 · 中全景（静止定帧）5.0s主体快，快速完成换装转场，向后自然倾倒高角度俯拍 · 中全景5.5s，靠在沙发上，一手轻放腹部，一手持包放身侧，闭眼微侧头高角度俯拍 · 中全景（静止定帧）6.5s主体快速完成换装转场，向后自然倾倒高角度俯拍 · 中全景7.0s，靠在沙发上，一手轻放胸前，手持与服装搭配的包放身侧，闭眼微侧头高角度俯拍 · 中全景（静止定帧）动作规律： 每次转场 = 快速换装，站立→ 向后自然倾倒 → 靠在沙发上定格摆姿（约 1-1.5 秒静止）",
+            "status": "success",
+            "size": "9:16",
+            "seconds": "8",
+            "vquality": "480p",
+            "generateAudio": "false",
+            "watermark": "false",
+            "references": [
+              "image:UsEbCTYH2aiUa5WRg-LP3",
+              "image:mAC-zL16JaiSptwok79ao",
+              "image:WPeAtkvQL3udFuxVNK0fq",
+              "image:DE3x6j_r5Z8wApHY2n50i",
+              "image:JE09_A78ULZPW47S4zoe2",
+              "video:c3Xm8zcMAr4B7RxdLnWKG"
+            ],
+            "content": "/templates/outfit-change-video/media/video_AAOmKSi2fdD7X9MaAN3XV.mp4",
+            "storageKey": "video:AAOmKSi2fdD7X9MaAN3XV",
+            "naturalWidth": 496,
+            "naturalHeight": 864,
+            "bytes": 1989513,
+            "mimeType": "video/mp4",
+            "durationMs": 8042
+          }
+        },
+        {
+          "id": "config-1791775190839-2tpci",
+          "type": "config",
+          "title": "步骤 1 · 生成人物形象图",
+          "position": {
+            "x": 500,
+            "y": 100
+          },
+          "width": 340,
+          "height": 300,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "人物参考：@[node:image-1791775170633-h8ear]\n保持参考人物的脸部、发型和身份一致。\n形象图要求：@[node:text-1791775219264-h39d0]",
+            "size": "2048x1152",
+            "quality": "2k",
+            "outputNodeId": "703w8YDng-UX9Y-Ge3J5k"
+          }
+        },
+        {
+          "id": "outfit-look-1",
+          "type": "config",
+          "title": "步骤 2.1 · 生成换装图",
+          "position": {
+            "x": 1550,
+            "y": 1160
+          },
+          "width": 340,
+          "height": 300,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "人物参考：@[node:703w8YDng-UX9Y-Ge3J5k]\n服装参考：@[node:image-1791775273055-p8wyq]\n使用图片1中的同一位模特，保持脸部、发型和身材一致，穿上图片2中的完整服装，准确保留商品的颜色、图案、版型和长度。生成竖幅全身展示图，人物和鞋子完整入镜，背景简洁，姿势自然，面料细节清晰，不生成三视图或拼图。",
+            "size": "1152x2048",
+            "quality": "2k",
+            "outputNodeId": "image-1791775611023-b0nxl"
+          }
+        },
+        {
+          "id": "outfit-look-2",
+          "type": "config",
+          "title": "步骤 2.2 · 生成换装图",
+          "position": {
+            "x": 1550,
+            "y": 1940
+          },
+          "width": 340,
+          "height": 300,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "人物参考：@[node:703w8YDng-UX9Y-Ge3J5k]\n服装参考：@[node:image-1791775280713-plzms]\n使用图片1中的同一位模特，保持脸部、发型和身材一致，穿上图片2中的完整服装，准确保留商品的颜色、图案、版型和长度。生成竖幅全身展示图，人物和鞋子完整入镜，背景简洁，姿势自然，面料细节清晰，不生成三视图或拼图。",
+            "size": "1152x2048",
+            "quality": "2k",
+            "outputNodeId": "image-1791775648935-w6iuh"
+          }
+        },
+        {
+          "id": "outfit-look-3",
+          "type": "config",
+          "title": "步骤 2.3 · 生成换装图",
+          "position": {
+            "x": 1550,
+            "y": 2720
+          },
+          "width": 340,
+          "height": 300,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "人物参考：@[node:703w8YDng-UX9Y-Ge3J5k]\n服装参考：@[node:image-1791775290800-ouezs]\n使用图片1中的同一位模特，保持脸部、发型和身材一致，穿上图片2中的完整服装，准确保留商品的颜色、图案、版型和长度。生成竖幅全身展示图，人物和鞋子完整入镜，背景简洁，姿势自然，面料细节清晰，不生成三视图或拼图。",
+            "size": "1152x2048",
+            "quality": "2k",
+            "outputNodeId": "image-1791775691678-4iks4"
+          }
+        },
+        {
+          "id": "outfit-look-4",
+          "type": "config",
+          "title": "步骤 2.4 · 生成换装图",
+          "position": {
+            "x": 1550,
+            "y": 3500
+          },
+          "width": 340,
+          "height": 300,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "人物参考：@[node:703w8YDng-UX9Y-Ge3J5k]\n服装参考：@[node:image-1791775320328-f17dq]\n使用图片1中的同一位模特，保持脸部、发型和身材一致，穿上图片2中的完整服装，准确保留商品的颜色、图案、版型和长度。生成竖幅全身展示图，人物和鞋子完整入镜，背景简洁，姿势自然，面料细节清晰，不生成三视图或拼图。",
+            "size": "1152x2048",
+            "quality": "2k",
+            "outputNodeId": "image-1791775760769-u2qgz"
+          }
+        },
+        {
+          "id": "outfit-look-5",
+          "type": "config",
+          "title": "步骤 2.5 · 生成换装图",
+          "position": {
+            "x": 1550,
+            "y": 4280
+          },
+          "width": 340,
+          "height": 300,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "人物参考：@[node:703w8YDng-UX9Y-Ge3J5k]\n服装参考：@[node:image-1791775573042-od804]\n使用图片1中的同一位模特，保持脸部、发型和身材一致，穿上图片2中的完整服装，准确保留商品的颜色、图案、版型和长度。生成竖幅全身展示图，人物和鞋子完整入镜，背景简洁，姿势自然，面料细节清晰，不生成三视图或拼图。",
+            "size": "1152x2048",
+            "quality": "2k",
+            "outputNodeId": "image-1791775800152-fvrzi"
+          }
+        },
+        {
+          "id": "outfit-video-script",
+          "type": "text",
+          "title": "可编辑 · 换装分镜与场景",
+          "position": {
+            "x": 2630,
+            "y": 50
+          },
+          "width": 510,
+          "height": 650,
+          "metadata": {
+            "content": "室内沙发换装视频：暖色台灯、白色纱帘、棕色木地板。固定高角度俯拍（约45°），中全景，机位全程不动。\n按五套服装依次换装，保持同一人物、环境与光线。每次转场为快速换装、站立后向后自然倾倒、靠在沙发上放松定格。\n0–1.8秒：第一套，单手自然抬起，包袋轻放身侧；1.8–3.5秒：第二套，轻触脸颊旁靠垫；3.5–5秒：第三套，轻撩头发；5–6.5秒：第四套，一手轻放腹部；6.5–8秒：第五套，一手轻放胸前。动作衔接流畅，服装清晰，无文字水印。",
+            "status": "idle",
+            "fontSize": 16
+          }
+        },
+        {
+          "id": "outfit-video-config",
+          "type": "config",
+          "title": "步骤 3 · 生成换装视频",
+          "position": {
+            "x": 3150,
+            "y": 1300
+          },
+          "width": 340,
+          "height": 300,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "video",
+            "count": 1,
+            "composerContent": "五套换装图（依次对应服装1–5）：\n@[node:image-1791775611023-b0nxl]\n@[node:image-1791775648935-w6iuh]\n@[node:image-1791775691678-4iks4]\n@[node:image-1791775760769-u2qgz]\n@[node:image-1791775800152-fvrzi]\n动作参考：@[node:video-1791775426979-c2i6g]\n分镜与场景：@[node:outfit-video-script]\n参考视频只提供动作、节奏与机位，人物及服装以五张换装图为准。",
+            "size": "9:16",
+            "seconds": "8",
+            "vquality": "480p",
+            "generateAudio": "false",
+            "watermark": "false",
+            "videoMode": "reference",
+            "outputNodeId": "video-1791775915390-oxxja"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": "link-image-1791775170633-h8ear-config-1791775190839-2tpci",
+          "fromNodeId": "image-1791775170633-h8ear",
+          "toNodeId": "config-1791775190839-2tpci"
+        },
+        {
+          "id": "link-text-1791775219264-h39d0-config-1791775190839-2tpci",
+          "fromNodeId": "text-1791775219264-h39d0",
+          "toNodeId": "config-1791775190839-2tpci"
+        },
+        {
+          "id": "link-config-1791775190839-2tpci-703w8YDng-UX9Y-Ge3J5k",
+          "fromNodeId": "config-1791775190839-2tpci",
+          "toNodeId": "703w8YDng-UX9Y-Ge3J5k"
+        },
+        {
+          "id": "link-703w8YDng-UX9Y-Ge3J5k-outfit-look-1",
+          "fromNodeId": "703w8YDng-UX9Y-Ge3J5k",
+          "toNodeId": "outfit-look-1"
+        },
+        {
+          "id": "link-image-1791775273055-p8wyq-outfit-look-1",
+          "fromNodeId": "image-1791775273055-p8wyq",
+          "toNodeId": "outfit-look-1"
+        },
+        {
+          "id": "link-outfit-look-1-image-1791775611023-b0nxl",
+          "fromNodeId": "outfit-look-1",
+          "toNodeId": "image-1791775611023-b0nxl"
+        },
+        {
+          "id": "link-703w8YDng-UX9Y-Ge3J5k-outfit-look-2",
+          "fromNodeId": "703w8YDng-UX9Y-Ge3J5k",
+          "toNodeId": "outfit-look-2"
+        },
+        {
+          "id": "link-image-1791775280713-plzms-outfit-look-2",
+          "fromNodeId": "image-1791775280713-plzms",
+          "toNodeId": "outfit-look-2"
+        },
+        {
+          "id": "link-outfit-look-2-image-1791775648935-w6iuh",
+          "fromNodeId": "outfit-look-2",
+          "toNodeId": "image-1791775648935-w6iuh"
+        },
+        {
+          "id": "link-703w8YDng-UX9Y-Ge3J5k-outfit-look-3",
+          "fromNodeId": "703w8YDng-UX9Y-Ge3J5k",
+          "toNodeId": "outfit-look-3"
+        },
+        {
+          "id": "link-image-1791775290800-ouezs-outfit-look-3",
+          "fromNodeId": "image-1791775290800-ouezs",
+          "toNodeId": "outfit-look-3"
+        },
+        {
+          "id": "link-outfit-look-3-image-1791775691678-4iks4",
+          "fromNodeId": "outfit-look-3",
+          "toNodeId": "image-1791775691678-4iks4"
+        },
+        {
+          "id": "link-703w8YDng-UX9Y-Ge3J5k-outfit-look-4",
+          "fromNodeId": "703w8YDng-UX9Y-Ge3J5k",
+          "toNodeId": "outfit-look-4"
+        },
+        {
+          "id": "link-image-1791775320328-f17dq-outfit-look-4",
+          "fromNodeId": "image-1791775320328-f17dq",
+          "toNodeId": "outfit-look-4"
+        },
+        {
+          "id": "link-outfit-look-4-image-1791775760769-u2qgz",
+          "fromNodeId": "outfit-look-4",
+          "toNodeId": "image-1791775760769-u2qgz"
+        },
+        {
+          "id": "link-703w8YDng-UX9Y-Ge3J5k-outfit-look-5",
+          "fromNodeId": "703w8YDng-UX9Y-Ge3J5k",
+          "toNodeId": "outfit-look-5"
+        },
+        {
+          "id": "link-image-1791775573042-od804-outfit-look-5",
+          "fromNodeId": "image-1791775573042-od804",
+          "toNodeId": "outfit-look-5"
+        },
+        {
+          "id": "link-outfit-look-5-image-1791775800152-fvrzi",
+          "fromNodeId": "outfit-look-5",
+          "toNodeId": "image-1791775800152-fvrzi"
+        },
+        {
+          "id": "link-image-1791775611023-b0nxl-outfit-video-config",
+          "fromNodeId": "image-1791775611023-b0nxl",
+          "toNodeId": "outfit-video-config"
+        },
+        {
+          "id": "link-image-1791775648935-w6iuh-outfit-video-config",
+          "fromNodeId": "image-1791775648935-w6iuh",
+          "toNodeId": "outfit-video-config"
+        },
+        {
+          "id": "link-image-1791775691678-4iks4-outfit-video-config",
+          "fromNodeId": "image-1791775691678-4iks4",
+          "toNodeId": "outfit-video-config"
+        },
+        {
+          "id": "link-image-1791775760769-u2qgz-outfit-video-config",
+          "fromNodeId": "image-1791775760769-u2qgz",
+          "toNodeId": "outfit-video-config"
+        },
+        {
+          "id": "link-image-1791775800152-fvrzi-outfit-video-config",
+          "fromNodeId": "image-1791775800152-fvrzi",
+          "toNodeId": "outfit-video-config"
+        },
+        {
+          "id": "link-video-1791775426979-c2i6g-outfit-video-config",
+          "fromNodeId": "video-1791775426979-c2i6g",
+          "toNodeId": "outfit-video-config"
+        },
+        {
+          "id": "link-outfit-video-script-outfit-video-config",
+          "fromNodeId": "outfit-video-script",
+          "toNodeId": "outfit-video-config"
+        },
+        {
+          "id": "link-outfit-video-config-video-1791775915390-oxxja",
+          "fromNodeId": "outfit-video-config",
+          "toNodeId": "video-1791775915390-oxxja"
+        }
+      ]
+    },
+    "files": [
+      {
+        "storageKey": "image:cvBpNBqU4ncETxO9YwGpE",
+        "path": "/templates/outfit-change-video/media/image_cvBpNBqU4ncETxO9YwGpE.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:wabw_5Ed8H7Yvbr59Onb1",
+        "path": "/templates/outfit-change-video/media/image_wabw_5Ed8H7Yvbr59Onb1.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:3Phe2ag9QjQl_BnaeOpEP",
+        "path": "/templates/outfit-change-video/media/image_3Phe2ag9QjQl_BnaeOpEP.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:JLV1hdTZpIOWYWm0X_xy7",
+        "path": "/templates/outfit-change-video/media/image_JLV1hdTZpIOWYWm0X_xy7.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:4I7QDoLd_dnttwsV7eRhW",
+        "path": "/templates/outfit-change-video/media/image_4I7QDoLd_dnttwsV7eRhW.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:f0jthTK1hSAnPAyDEjnQ1",
+        "path": "/templates/outfit-change-video/media/image_f0jthTK1hSAnPAyDEjnQ1.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "video:c3Xm8zcMAr4B7RxdLnWKG",
+        "path": "/templates/outfit-change-video/media/video_c3Xm8zcMAr4B7RxdLnWKG.mp4",
+        "mimeType": "video/mp4"
+      },
+      {
+        "storageKey": "image:wSr51K9o8Zfwl6MXaSQUJ",
+        "path": "/templates/outfit-change-video/media/image_wSr51K9o8Zfwl6MXaSQUJ.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:UsEbCTYH2aiUa5WRg-LP3",
+        "path": "/templates/outfit-change-video/media/image_UsEbCTYH2aiUa5WRg-LP3.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:mAC-zL16JaiSptwok79ao",
+        "path": "/templates/outfit-change-video/media/image_mAC-zL16JaiSptwok79ao.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:WPeAtkvQL3udFuxVNK0fq",
+        "path": "/templates/outfit-change-video/media/image_WPeAtkvQL3udFuxVNK0fq.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:DE3x6j_r5Z8wApHY2n50i",
+        "path": "/templates/outfit-change-video/media/image_DE3x6j_r5Z8wApHY2n50i.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:JE09_A78ULZPW47S4zoe2",
+        "path": "/templates/outfit-change-video/media/image_JE09_A78ULZPW47S4zoe2.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "video:AAOmKSi2fdD7X9MaAN3XV",
+        "path": "/templates/outfit-change-video/media/video_AAOmKSi2fdD7X9MaAN3XV.mp4",
+        "mimeType": "video/mp4"
+      }
+    ]
+  },
+  {
+    "id": "talking-product-ad",
+    "title": "口播广告 Grok 工作流",
+    "description": "替换人物、门店与商品参考图，编辑口播文案和表演要求，生成带声音的竖版商品广告，附两段成果示例。",
+    "tags": [
+      "口播广告",
+      "商品展示",
+      "图生视频"
+    ],
+    "author": "官方",
+    "cover": "/templates/covers/talking-product-ad.webp",
+    "previewVideo": "/templates/talking-product-ad/media/video_VV2aa11uasQ3FJmmW26c-.mp4",
+    "project": {
+      "title": "口播广告 Grok 工作流",
+      "backgroundMode": "lines",
+      "viewport": {
+        "x": 70,
+        "y": 150,
+        "k": 0.28
+      },
+      "nodes": [
+        {
+          "id": "talking-ad-instructions",
+          "type": "text",
+          "title": "使用说明",
+          "position": {
+            "x": 0,
+            "y": -320
+          },
+          "width": 2480,
+          "height": 240,
+          "metadata": {
+            "content": "口播广告模板｜人物 + 门店场景 + 商品 + 口播文案\n① 替换三张参考图，编辑口播台词和场景表演说明。现有图片是截图预览，正式出片建议替换为清晰、无界面按钮的原图。\n② 原流程使用 Grok 视频模型；生成时选择支持多图参考及音频输出的可用视频模型，模型下拉框沿用现有逻辑。\n③ 默认5秒、9:16、480p、有声音，可按文案长度调整时长；右侧两段视频为原有成果示例。\n④ 从「生成 · 竖版口播广告」重新生成，替换素材不会自动更新示例；请按实际商品修改台词并检查口型和商品细节。",
+            "status": "idle",
+            "fontSize": 20
+          }
+        },
+        {
+          "id": "image-1791447781021-uapuj",
+          "type": "image",
+          "title": "替换门店或场景图",
+          "position": {
+            "x": 0,
+            "y": 460
+          },
+          "width": 280,
+          "height": 278.65,
+          "metadata": {
+            "content": "/templates/talking-product-ad/media/image_0MiINpmGEnZhxkHEjG3jL.png",
+            "storageKey": "image:0MiINpmGEnZhxkHEjG3jL",
+            "status": "success",
+            "naturalWidth": 208,
+            "naturalHeight": 207,
+            "bytes": 50307,
+            "mimeType": "image/png"
+          }
+        },
+        {
+          "id": "image-1791447784423-6yr2c",
+          "type": "image",
+          "title": "替换人物参考图",
+          "position": {
+            "x": 0,
+            "y": 60
+          },
+          "width": 280,
+          "height": 280.0,
+          "metadata": {
+            "content": "/templates/talking-product-ad/media/image_5SIq3O5wf5cWOSn4IH_FC.png",
+            "storageKey": "image:5SIq3O5wf5cWOSn4IH_FC",
+            "status": "success",
+            "naturalWidth": 208,
+            "naturalHeight": 208,
+            "bytes": 84612,
+            "mimeType": "image/png"
+          }
+        },
+        {
+          "id": "image-1791447786211-p682m",
+          "type": "image",
+          "title": "替换商品图",
+          "position": {
+            "x": 0,
+            "y": 860
+          },
+          "width": 280,
+          "height": 277.33,
+          "metadata": {
+            "content": "/templates/talking-product-ad/media/image_N1l1qXu6jO1yBYMTT6_ZO.png",
+            "storageKey": "image:N1l1qXu6jO1yBYMTT6_ZO",
+            "status": "success",
+            "naturalWidth": 210,
+            "naturalHeight": 208,
+            "bytes": 47059,
+            "mimeType": "image/png"
+          }
+        },
+        {
+          "id": "video-1791447849242-yjedj",
+          "type": "video",
+          "title": "效果示例 B · 口播广告",
+          "position": {
+            "x": 2100,
+            "y": 60
+          },
+          "width": 360,
+          "height": 636.0,
+          "metadata": {
+            "prompt": "真实商品广告视频，画面从首帧就自然启动动作，开头无静止卡顿；全程固定同一个场景，不发生场景切换、环境跳转。\n苹果门店背景-截图预览.png 中的人物人物参考-截图预览.png 手持图片3 站在参考苹果门店背景-截图预览.png 门店前，配合自然肢体手势介绍产品。\n人物口播台词：“家人们，这个就是最新出的iPhone折叠屏手机，全新上市，怎么折都有面！",
+            "status": "success",
+            "size": "1152x2048",
+            "seconds": "5",
+            "vquality": "480p",
+            "generateAudio": "true",
+            "watermark": "false",
+            "references": [
+              "image:0MiINpmGEnZhxkHEjG3jL",
+              "image:5SIq3O5wf5cWOSn4IH_FC",
+              "image:N1l1qXu6jO1yBYMTT6_ZO"
+            ],
+            "content": "/templates/talking-product-ad/media/video_yj1fWwuIuqRqSYtgC83xN.mp4",
+            "storageKey": "video:yj1fWwuIuqRqSYtgC83xN",
+            "naturalWidth": 480,
+            "naturalHeight": 848,
+            "bytes": 1205629,
+            "mimeType": "video/mp4",
+            "durationMs": 5042
+          }
+        },
+        {
+          "id": "video-1791777716300-vfo4o",
+          "type": "video",
+          "title": "效果示例 A · 口播广告",
+          "position": {
+            "x": 1630,
+            "y": 60
+          },
+          "width": 360,
+          "height": 636.0,
+          "metadata": {
+            "prompt": "真实商品广告视频，画面从首帧就自然启动动作，开头无静止卡顿；全程固定同一个场景，不发生场景切换、环境跳转。\n苹果门店背景图片2  中的人物人物图片1 手持图片3 站在参考苹果门店背景图片2 ，配合自然肢体手势介绍产品。\n人物口播台词：“家人们，这个就是最新出的iPhone折叠屏手机，全新上市，怎么折都有面！",
+            "status": "success",
+            "size": "9:16",
+            "seconds": "5",
+            "vquality": "480p",
+            "generateAudio": "true",
+            "watermark": "false",
+            "references": [
+              "image:5SIq3O5wf5cWOSn4IH_FC",
+              "image:0MiINpmGEnZhxkHEjG3jL",
+              "image:N1l1qXu6jO1yBYMTT6_ZO"
+            ],
+            "content": "/templates/talking-product-ad/media/video_VV2aa11uasQ3FJmmW26c-.mp4",
+            "storageKey": "video:VV2aa11uasQ3FJmmW26c-",
+            "naturalWidth": 480,
+            "naturalHeight": 848,
+            "bytes": 1059433,
+            "mimeType": "video/mp4",
+            "durationMs": 5042
+          }
+        },
+        {
+          "id": "talking-ad-copy",
+          "type": "text",
+          "title": "可编辑 · 口播文案",
+          "position": {
+            "x": 440,
+            "y": 60
+          },
+          "width": 460,
+          "height": 260,
+          "metadata": {
+            "content": "家人们，这款折叠屏手机，展开大屏，合上轻巧，怎么折都有面！",
+            "status": "idle",
+            "fontSize": 20
+          }
+        },
+        {
+          "id": "talking-ad-scene",
+          "type": "text",
+          "title": "可编辑 · 场景与表演",
+          "position": {
+            "x": 440,
+            "y": 500
+          },
+          "width": 460,
+          "height": 360,
+          "metadata": {
+            "content": "真实商品广告视频，从首帧自然启动动作，开头无静止卡顿。全程保持同一个门店场景、人物、服装与光线，不切换环境。人物手持商品，配合自然肢体手势和产品展示动作介绍产品；口型与中文口播匹配，声音清晰，背景音不过强，不添加文字、水印或额外标识。",
+            "status": "idle",
+            "fontSize": 16
+          }
+        },
+        {
+          "id": "talking-ad-config",
+          "type": "config",
+          "title": "生成 · 竖版口播广告",
+          "position": {
+            "x": 1060,
+            "y": 300
+          },
+          "width": 340,
+          "height": 300,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "video",
+            "count": 1,
+            "composerContent": "人物参考：@[node:image-1791447784423-6yr2c]\n门店背景：@[node:image-1791447781021-uapuj]\n商品参考：@[node:image-1791447786211-p682m]\n\n图片1中的人物站在图片2的门店场景中，手持并介绍图片3的商品。保持人物身份与商品外观一致，不带入参考截图中的按钮、边框或标记。\n表演要求：@[node:talking-ad-scene]\n人物中文口播台词：@[node:talking-ad-copy]",
+            "size": "9:16",
+            "seconds": "5",
+            "vquality": "480p",
+            "generateAudio": "true",
+            "watermark": "false",
+            "videoMode": "reference",
+            "outputNodeId": "video-1791777716300-vfo4o"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": "link-image-1791447784423-6yr2c-talking-ad-config",
+          "fromNodeId": "image-1791447784423-6yr2c",
+          "toNodeId": "talking-ad-config"
+        },
+        {
+          "id": "link-image-1791447781021-uapuj-talking-ad-config",
+          "fromNodeId": "image-1791447781021-uapuj",
+          "toNodeId": "talking-ad-config"
+        },
+        {
+          "id": "link-image-1791447786211-p682m-talking-ad-config",
+          "fromNodeId": "image-1791447786211-p682m",
+          "toNodeId": "talking-ad-config"
+        },
+        {
+          "id": "link-talking-ad-scene-talking-ad-config",
+          "fromNodeId": "talking-ad-scene",
+          "toNodeId": "talking-ad-config"
+        },
+        {
+          "id": "link-talking-ad-copy-talking-ad-config",
+          "fromNodeId": "talking-ad-copy",
+          "toNodeId": "talking-ad-config"
+        },
+        {
+          "id": "link-talking-ad-config-video-1791777716300-vfo4o",
+          "fromNodeId": "talking-ad-config",
+          "toNodeId": "video-1791777716300-vfo4o"
+        },
+        {
+          "id": "link-talking-ad-config-video-1791447849242-yjedj",
+          "fromNodeId": "talking-ad-config",
+          "toNodeId": "video-1791447849242-yjedj"
+        }
+      ]
+    },
+    "files": [
+      {
+        "storageKey": "image:0MiINpmGEnZhxkHEjG3jL",
+        "path": "/templates/talking-product-ad/media/image_0MiINpmGEnZhxkHEjG3jL.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:5SIq3O5wf5cWOSn4IH_FC",
+        "path": "/templates/talking-product-ad/media/image_5SIq3O5wf5cWOSn4IH_FC.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "image:N1l1qXu6jO1yBYMTT6_ZO",
+        "path": "/templates/talking-product-ad/media/image_N1l1qXu6jO1yBYMTT6_ZO.png",
+        "mimeType": "image/png"
+      },
+      {
+        "storageKey": "video:yj1fWwuIuqRqSYtgC83xN",
+        "path": "/templates/talking-product-ad/media/video_yj1fWwuIuqRqSYtgC83xN.mp4",
+        "mimeType": "video/mp4"
+      },
+      {
+        "storageKey": "video:VV2aa11uasQ3FJmmW26c-",
+        "path": "/templates/talking-product-ad/media/video_VV2aa11uasQ3FJmmW26c-.mp4",
+        "mimeType": "video/mp4"
+      }
+    ]
+  },
+  {
+    "id": "jeans-lookbook",
+    "title": "牛仔裤换装图片工作流",
+    "description": "上传一张商品裤装图和 8 张模特参考图，批量把商品裤子换到每位模特身上。只替换裤子，保留人物身份、姿势、背景、光线和鞋子，一次得到 8 张成片。",
+    "tags": [
+      "电商服装",
+      "裤子换装",
+      "批量出图"
+    ],
+    "author": "官方",
+    "cover": "/templates/covers/jeans-lookbook.webp",
+    "project": {
+      "title": "牛仔裤换装",
+      "backgroundMode": "lines",
+      "viewport": {
+        "x": 200,
+        "y": 200,
+        "k": 0.35
+      },
+      "nodes": [
+        {
+          "id": "qian-instructions",
+          "type": "text",
+          "title": "使用说明",
+          "position": {
+            "x": 0,
+            "y": -380
+          },
+          "width": 2420,
+          "height": 180,
+          "metadata": {
+            "content": "牛仔裤换装图片工作流｜1 张商品裤装 + 8 张模特参考图 → 8 张成品\n① 克隆后替换「商品裤装图」和 8 张「模特参考图」；商品图可用平铺图、挂拍图或模特上身图。\n② 在右侧 8 个生成配置中选择支持参考图编辑的图片模型，逐个点生成，或只改需要重出的那一条。\n③ 换装结果只替换裤子，人物身份、姿势、背景、光线和鞋子保持不变。",
+            "status": "idle",
+            "fontSize": 16
+          }
+        },
+        {
+          "id": "qian-product",
+          "type": "image",
+          "title": "替换商品裤装图 · 平铺/挂拍/上身",
+          "position": {
+            "x": 0,
+            "y": 40
+          },
+          "width": 300,
+          "height": 300,
+          "metadata": {
+            "content": "/templates/jeans-lookbook/media/image_qianProduct.webp",
+            "status": "success",
+            "storageKey": "image:qianProduct",
+            "naturalWidth": 1600,
+            "naturalHeight": 1600,
+            "bytes": 229870,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "qian-ref-1",
+          "type": "image",
+          "title": "替换参考图1 · 模特与姿势",
+          "position": {
+            "x": 460,
+            "y": 0
+          },
+          "width": 300,
+          "height": 300,
+          "metadata": {
+            "content": "/templates/jeans-lookbook/media/image_qianRef1.webp",
+            "status": "success",
+            "storageKey": "image:qianRef1",
+            "naturalWidth": 1600,
+            "naturalHeight": 1600,
+            "bytes": 90026,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "qian-config-1",
+          "type": "config",
+          "title": "步骤 1 · 把商品裤装换到参考图1",
+          "position": {
+            "x": 860,
+            "y": 20
+          },
+          "width": 300,
+          "height": 280,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "商品裤装：@[node:qian-product]\n模特参考：@[node:qian-ref-1]\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "size": "2048x2048",
+            "quality": "2k",
+            "outputNodeId": "qian-result-1"
+          }
+        },
+        {
+          "id": "qian-result-1",
+          "type": "image",
+          "title": "成品1 · 换装效果",
+          "position": {
+            "x": 1240,
+            "y": 0
+          },
+          "width": 320,
+          "height": 320,
+          "metadata": {
+            "prompt": "商品裤装：图片1\n模特参考：图片2\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "status": "success",
+            "generationType": "edit",
+            "size": "2048x2048",
+            "quality": "2k",
+            "count": 1,
+            "references": [
+              "image:qianProduct",
+              "image:qianRef1"
+            ],
+            "content": "/templates/jeans-lookbook/media/image_qianOut1.webp",
+            "storageKey": "image:qianOut1",
+            "naturalWidth": 1280,
+            "naturalHeight": 1280,
+            "bytes": 69694,
+            "mimeType": "image/webp",
+            "primaryImageId": "qian-result-1"
+          }
+        },
+        {
+          "id": "qian-ref-2",
+          "type": "image",
+          "title": "替换参考图2 · 模特与姿势",
+          "position": {
+            "x": 460,
+            "y": 420
+          },
+          "width": 300,
+          "height": 300,
+          "metadata": {
+            "content": "/templates/jeans-lookbook/media/image_qianRef2.webp",
+            "status": "success",
+            "storageKey": "image:qianRef2",
+            "naturalWidth": 1600,
+            "naturalHeight": 1600,
+            "bytes": 94254,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "qian-config-2",
+          "type": "config",
+          "title": "步骤 2 · 把商品裤装换到参考图2",
+          "position": {
+            "x": 860,
+            "y": 440
+          },
+          "width": 300,
+          "height": 280,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "商品裤装：@[node:qian-product]\n模特参考：@[node:qian-ref-2]\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "size": "2048x2048",
+            "quality": "2k",
+            "outputNodeId": "qian-result-2"
+          }
+        },
+        {
+          "id": "qian-result-2",
+          "type": "image",
+          "title": "成品2 · 换装效果",
+          "position": {
+            "x": 1240,
+            "y": 420
+          },
+          "width": 320,
+          "height": 320,
+          "metadata": {
+            "prompt": "商品裤装：图片1\n模特参考：图片2\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "status": "success",
+            "generationType": "edit",
+            "size": "2048x2048",
+            "quality": "2k",
+            "count": 1,
+            "references": [
+              "image:qianProduct",
+              "image:qianRef2"
+            ],
+            "content": "/templates/jeans-lookbook/media/image_qianOut2.webp",
+            "storageKey": "image:qianOut2",
+            "naturalWidth": 1280,
+            "naturalHeight": 1280,
+            "bytes": 85718,
+            "mimeType": "image/webp",
+            "primaryImageId": "qian-result-2"
+          }
+        },
+        {
+          "id": "qian-ref-3",
+          "type": "image",
+          "title": "替换参考图3 · 模特与姿势",
+          "position": {
+            "x": 460,
+            "y": 840
+          },
+          "width": 300,
+          "height": 300,
+          "metadata": {
+            "content": "/templates/jeans-lookbook/media/image_qianRef3.webp",
+            "status": "success",
+            "storageKey": "image:qianRef3",
+            "naturalWidth": 1600,
+            "naturalHeight": 1600,
+            "bytes": 96958,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "qian-config-3",
+          "type": "config",
+          "title": "步骤 3 · 把商品裤装换到参考图3",
+          "position": {
+            "x": 860,
+            "y": 860
+          },
+          "width": 300,
+          "height": 280,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "商品裤装：@[node:qian-product]\n模特参考：@[node:qian-ref-3]\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "size": "2048x2048",
+            "quality": "2k",
+            "outputNodeId": "qian-result-3"
+          }
+        },
+        {
+          "id": "qian-result-3",
+          "type": "image",
+          "title": "成品3 · 换装效果",
+          "position": {
+            "x": 1240,
+            "y": 840
+          },
+          "width": 320,
+          "height": 320,
+          "metadata": {
+            "prompt": "商品裤装：图片1\n模特参考：图片2\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "status": "success",
+            "generationType": "edit",
+            "size": "2048x2048",
+            "quality": "2k",
+            "count": 1,
+            "references": [
+              "image:qianProduct",
+              "image:qianRef3"
+            ],
+            "content": "/templates/jeans-lookbook/media/image_qianOut3.webp",
+            "storageKey": "image:qianOut3",
+            "naturalWidth": 1280,
+            "naturalHeight": 1280,
+            "bytes": 73734,
+            "mimeType": "image/webp",
+            "primaryImageId": "qian-result-3"
+          }
+        },
+        {
+          "id": "qian-ref-4",
+          "type": "image",
+          "title": "替换参考图4 · 模特与姿势",
+          "position": {
+            "x": 460,
+            "y": 1260
+          },
+          "width": 300,
+          "height": 300,
+          "metadata": {
+            "content": "/templates/jeans-lookbook/media/image_qianRef4.webp",
+            "status": "success",
+            "storageKey": "image:qianRef4",
+            "naturalWidth": 1600,
+            "naturalHeight": 1600,
+            "bytes": 90472,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "qian-config-4",
+          "type": "config",
+          "title": "步骤 4 · 把商品裤装换到参考图4",
+          "position": {
+            "x": 860,
+            "y": 1280
+          },
+          "width": 300,
+          "height": 280,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "商品裤装：@[node:qian-product]\n模特参考：@[node:qian-ref-4]\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "size": "2048x2048",
+            "quality": "2k",
+            "outputNodeId": "qian-result-4"
+          }
+        },
+        {
+          "id": "qian-result-4",
+          "type": "image",
+          "title": "成品4 · 换装效果",
+          "position": {
+            "x": 1240,
+            "y": 1260
+          },
+          "width": 320,
+          "height": 320,
+          "metadata": {
+            "prompt": "商品裤装：图片1\n模特参考：图片2\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "status": "success",
+            "generationType": "edit",
+            "size": "2048x2048",
+            "quality": "2k",
+            "count": 1,
+            "references": [
+              "image:qianProduct",
+              "image:qianRef4"
+            ],
+            "content": "/templates/jeans-lookbook/media/image_qianOut4.webp",
+            "storageKey": "image:qianOut4",
+            "naturalWidth": 1280,
+            "naturalHeight": 1280,
+            "bytes": 81864,
+            "mimeType": "image/webp",
+            "primaryImageId": "qian-result-4"
+          }
+        },
+        {
+          "id": "qian-ref-5",
+          "type": "image",
+          "title": "替换参考图5 · 模特与姿势",
+          "position": {
+            "x": 1760,
+            "y": 0
+          },
+          "width": 300,
+          "height": 300,
+          "metadata": {
+            "content": "/templates/jeans-lookbook/media/image_qianRef5.webp",
+            "status": "success",
+            "storageKey": "image:qianRef5",
+            "naturalWidth": 1600,
+            "naturalHeight": 1600,
+            "bytes": 89144,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "qian-config-5",
+          "type": "config",
+          "title": "步骤 5 · 把商品裤装换到参考图5",
+          "position": {
+            "x": 2160,
+            "y": 20
+          },
+          "width": 300,
+          "height": 280,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "商品裤装：@[node:qian-product]\n模特参考：@[node:qian-ref-5]\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "size": "2048x2048",
+            "quality": "2k",
+            "outputNodeId": "qian-result-5"
+          }
+        },
+        {
+          "id": "qian-result-5",
+          "type": "image",
+          "title": "成品5 · 换装效果",
+          "position": {
+            "x": 2540,
+            "y": 0
+          },
+          "width": 320,
+          "height": 320,
+          "metadata": {
+            "prompt": "商品裤装：图片1\n模特参考：图片2\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "status": "success",
+            "generationType": "edit",
+            "size": "2048x2048",
+            "quality": "2k",
+            "count": 1,
+            "references": [
+              "image:qianProduct",
+              "image:qianRef5"
+            ],
+            "content": "/templates/jeans-lookbook/media/image_qianOut5.webp",
+            "storageKey": "image:qianOut5",
+            "naturalWidth": 1280,
+            "naturalHeight": 1280,
+            "bytes": 69600,
+            "mimeType": "image/webp",
+            "primaryImageId": "qian-result-5"
+          }
+        },
+        {
+          "id": "qian-ref-6",
+          "type": "image",
+          "title": "替换参考图6 · 模特与姿势",
+          "position": {
+            "x": 1760,
+            "y": 420
+          },
+          "width": 300,
+          "height": 300,
+          "metadata": {
+            "content": "/templates/jeans-lookbook/media/image_qianRef6.webp",
+            "status": "success",
+            "storageKey": "image:qianRef6",
+            "naturalWidth": 1600,
+            "naturalHeight": 1600,
+            "bytes": 93824,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "qian-config-6",
+          "type": "config",
+          "title": "步骤 6 · 把商品裤装换到参考图6",
+          "position": {
+            "x": 2160,
+            "y": 440
+          },
+          "width": 300,
+          "height": 280,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "商品裤装：@[node:qian-product]\n模特参考：@[node:qian-ref-6]\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "size": "2048x2048",
+            "quality": "2k",
+            "outputNodeId": "qian-result-6"
+          }
+        },
+        {
+          "id": "qian-result-6",
+          "type": "image",
+          "title": "成品6 · 换装效果",
+          "position": {
+            "x": 2540,
+            "y": 420
+          },
+          "width": 320,
+          "height": 320,
+          "metadata": {
+            "prompt": "商品裤装：图片1\n模特参考：图片2\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "status": "success",
+            "generationType": "edit",
+            "size": "2048x2048",
+            "quality": "2k",
+            "count": 1,
+            "references": [
+              "image:qianProduct",
+              "image:qianRef6"
+            ],
+            "content": "/templates/jeans-lookbook/media/image_qianOut6.webp",
+            "storageKey": "image:qianOut6",
+            "naturalWidth": 1280,
+            "naturalHeight": 1280,
+            "bytes": 65498,
+            "mimeType": "image/webp",
+            "primaryImageId": "qian-result-6"
+          }
+        },
+        {
+          "id": "qian-ref-7",
+          "type": "image",
+          "title": "替换参考图7 · 模特与姿势",
+          "position": {
+            "x": 1760,
+            "y": 840
+          },
+          "width": 300,
+          "height": 300,
+          "metadata": {
+            "content": "/templates/jeans-lookbook/media/image_qianRef7.webp",
+            "status": "success",
+            "storageKey": "image:qianRef7",
+            "naturalWidth": 1600,
+            "naturalHeight": 1600,
+            "bytes": 87476,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "qian-config-7",
+          "type": "config",
+          "title": "步骤 7 · 把商品裤装换到参考图7",
+          "position": {
+            "x": 2160,
+            "y": 860
+          },
+          "width": 300,
+          "height": 280,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "商品裤装：@[node:qian-product]\n模特参考：@[node:qian-ref-7]\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "size": "2048x2048",
+            "quality": "2k",
+            "outputNodeId": "qian-result-7"
+          }
+        },
+        {
+          "id": "qian-result-7",
+          "type": "image",
+          "title": "成品7 · 换装效果",
+          "position": {
+            "x": 2540,
+            "y": 840
+          },
+          "width": 320,
+          "height": 320,
+          "metadata": {
+            "prompt": "商品裤装：图片1\n模特参考：图片2\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "status": "success",
+            "generationType": "edit",
+            "size": "2048x2048",
+            "quality": "2k",
+            "count": 1,
+            "references": [
+              "image:qianProduct",
+              "image:qianRef7"
+            ],
+            "content": "/templates/jeans-lookbook/media/image_qianOut7.webp",
+            "storageKey": "image:qianOut7",
+            "naturalWidth": 1280,
+            "naturalHeight": 1280,
+            "bytes": 80220,
+            "mimeType": "image/webp",
+            "primaryImageId": "qian-result-7"
+          }
+        },
+        {
+          "id": "qian-ref-8",
+          "type": "image",
+          "title": "替换参考图8 · 模特与姿势",
+          "position": {
+            "x": 1760,
+            "y": 1260
+          },
+          "width": 300,
+          "height": 300,
+          "metadata": {
+            "content": "/templates/jeans-lookbook/media/image_qianRef8.webp",
+            "status": "success",
+            "storageKey": "image:qianRef8",
+            "naturalWidth": 1600,
+            "naturalHeight": 1600,
+            "bytes": 60214,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "qian-config-8",
+          "type": "config",
+          "title": "步骤 8 · 把商品裤装换到参考图8",
+          "position": {
+            "x": 2160,
+            "y": 1280
+          },
+          "width": 300,
+          "height": 280,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "count": 1,
+            "composerContent": "商品裤装：@[node:qian-product]\n模特参考：@[node:qian-ref-8]\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "size": "2048x2048",
+            "quality": "2k",
+            "outputNodeId": "qian-result-8"
+          }
+        },
+        {
+          "id": "qian-result-8",
+          "type": "image",
+          "title": "成品8 · 换装效果",
+          "position": {
+            "x": 2540,
+            "y": 1260
+          },
+          "width": 320,
+          "height": 320,
+          "metadata": {
+            "prompt": "商品裤装：图片1\n模特参考：图片2\n\n把图片1中的牛仔裤换到图片2的人物身上，裤型、水洗、颜色和细节与图片1保持一致；保留图片2的人物身份、姿势、背景、光线和鞋子，只替换裤子，其他部分保持不变。",
+            "status": "success",
+            "generationType": "edit",
+            "size": "2048x2048",
+            "quality": "2k",
+            "count": 1,
+            "references": [
+              "image:qianProduct",
+              "image:qianRef8"
+            ],
+            "content": "/templates/jeans-lookbook/media/image_qianOut8.webp",
+            "storageKey": "image:qianOut8",
+            "naturalWidth": 1280,
+            "naturalHeight": 1280,
+            "bytes": 93624,
+            "mimeType": "image/webp",
+            "primaryImageId": "qian-result-8"
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": "jeans-product-config-1",
+          "fromNodeId": "qian-product",
+          "toNodeId": "qian-config-1"
+        },
+        {
+          "id": "jeans-ref1-config-1",
+          "fromNodeId": "qian-ref-1",
+          "toNodeId": "qian-config-1"
+        },
+        {
+          "id": "jeans-config-1-result-1",
+          "fromNodeId": "qian-config-1",
+          "toNodeId": "qian-result-1"
+        },
+        {
+          "id": "jeans-product-config-2",
+          "fromNodeId": "qian-product",
+          "toNodeId": "qian-config-2"
+        },
+        {
+          "id": "jeans-ref2-config-2",
+          "fromNodeId": "qian-ref-2",
+          "toNodeId": "qian-config-2"
+        },
+        {
+          "id": "jeans-config-2-result-2",
+          "fromNodeId": "qian-config-2",
+          "toNodeId": "qian-result-2"
+        },
+        {
+          "id": "jeans-product-config-3",
+          "fromNodeId": "qian-product",
+          "toNodeId": "qian-config-3"
+        },
+        {
+          "id": "jeans-ref3-config-3",
+          "fromNodeId": "qian-ref-3",
+          "toNodeId": "qian-config-3"
+        },
+        {
+          "id": "jeans-config-3-result-3",
+          "fromNodeId": "qian-config-3",
+          "toNodeId": "qian-result-3"
+        },
+        {
+          "id": "jeans-product-config-4",
+          "fromNodeId": "qian-product",
+          "toNodeId": "qian-config-4"
+        },
+        {
+          "id": "jeans-ref4-config-4",
+          "fromNodeId": "qian-ref-4",
+          "toNodeId": "qian-config-4"
+        },
+        {
+          "id": "jeans-config-4-result-4",
+          "fromNodeId": "qian-config-4",
+          "toNodeId": "qian-result-4"
+        },
+        {
+          "id": "jeans-product-config-5",
+          "fromNodeId": "qian-product",
+          "toNodeId": "qian-config-5"
+        },
+        {
+          "id": "jeans-ref5-config-5",
+          "fromNodeId": "qian-ref-5",
+          "toNodeId": "qian-config-5"
+        },
+        {
+          "id": "jeans-config-5-result-5",
+          "fromNodeId": "qian-config-5",
+          "toNodeId": "qian-result-5"
+        },
+        {
+          "id": "jeans-product-config-6",
+          "fromNodeId": "qian-product",
+          "toNodeId": "qian-config-6"
+        },
+        {
+          "id": "jeans-ref6-config-6",
+          "fromNodeId": "qian-ref-6",
+          "toNodeId": "qian-config-6"
+        },
+        {
+          "id": "jeans-config-6-result-6",
+          "fromNodeId": "qian-config-6",
+          "toNodeId": "qian-result-6"
+        },
+        {
+          "id": "jeans-product-config-7",
+          "fromNodeId": "qian-product",
+          "toNodeId": "qian-config-7"
+        },
+        {
+          "id": "jeans-ref7-config-7",
+          "fromNodeId": "qian-ref-7",
+          "toNodeId": "qian-config-7"
+        },
+        {
+          "id": "jeans-config-7-result-7",
+          "fromNodeId": "qian-config-7",
+          "toNodeId": "qian-result-7"
+        },
+        {
+          "id": "jeans-product-config-8",
+          "fromNodeId": "qian-product",
+          "toNodeId": "qian-config-8"
+        },
+        {
+          "id": "jeans-ref8-config-8",
+          "fromNodeId": "qian-ref-8",
+          "toNodeId": "qian-config-8"
+        },
+        {
+          "id": "jeans-config-8-result-8",
+          "fromNodeId": "qian-config-8",
+          "toNodeId": "qian-result-8"
+        }
+      ]
+    },
+    "files": [
+      {
+        "storageKey": "image:qianProduct",
+        "path": "/templates/jeans-lookbook/media/image_qianProduct.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianRef1",
+        "path": "/templates/jeans-lookbook/media/image_qianRef1.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianRef2",
+        "path": "/templates/jeans-lookbook/media/image_qianRef2.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianRef3",
+        "path": "/templates/jeans-lookbook/media/image_qianRef3.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianRef4",
+        "path": "/templates/jeans-lookbook/media/image_qianRef4.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianRef5",
+        "path": "/templates/jeans-lookbook/media/image_qianRef5.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianRef6",
+        "path": "/templates/jeans-lookbook/media/image_qianRef6.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianRef7",
+        "path": "/templates/jeans-lookbook/media/image_qianRef7.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianRef8",
+        "path": "/templates/jeans-lookbook/media/image_qianRef8.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianOut1",
+        "path": "/templates/jeans-lookbook/media/image_qianOut1.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianOut2",
+        "path": "/templates/jeans-lookbook/media/image_qianOut2.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianOut3",
+        "path": "/templates/jeans-lookbook/media/image_qianOut3.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianOut4",
+        "path": "/templates/jeans-lookbook/media/image_qianOut4.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianOut5",
+        "path": "/templates/jeans-lookbook/media/image_qianOut5.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianOut6",
+        "path": "/templates/jeans-lookbook/media/image_qianOut6.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianOut7",
+        "path": "/templates/jeans-lookbook/media/image_qianOut7.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:qianOut8",
+        "path": "/templates/jeans-lookbook/media/image_qianOut8.webp",
+        "mimeType": "image/webp"
+      }
+    ]
   }
 ]

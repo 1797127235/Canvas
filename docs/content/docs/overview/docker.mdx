@@ -1,62 +1,42 @@
 ---
 title: Docker Deployment
-description: Deploy Infinite Canvas with Docker Compose
+description: Deploy the multi-user Infinite Canvas with Docker Compose
 ---
 
 # Docker Deployment
 
-## Use the published image
+The multi-user edition ships as one compose stack: PostgreSQL, the Node 24 API backend, and an nginx frontend that serves the static app and proxies `/api`. The database has no host port; only the frontend is exposed (default port 3015, HTTP).
+
+## First deployment
 
 ```bash
-git clone git@github.com:basketikun/infinite-canvas.git
-cd infinite-canvas
-docker compose up -d
+cp .env.example .env
+# Fill in POSTGRES_PASSWORD and RATE_LIMIT_SECRET, then generate the
+# credential encryption key (back it up outside the server; it cannot change later):
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+docker compose up -d --build
+curl http://127.0.0.1:3015/api/health   # {"ok":true}
 ```
 
-Open `http://localhost:3000`.
+Open `http://server-ip:3015`, register the first account, and save your upstream API key in the account settings.
 
-## Build locally
+Identity tables (`001/002`) are created once by the `db-init` service; workspace, credential, media, task, and history tables (`003~005`) are applied by the backend on every startup. Existing data is never cleared.
+
+## Updating and rollback
 
 ```bash
-docker compose -f docker-compose.local.yml up -d --build
+git pull
+# set IMAGE_TAG in .env to the new version or commit hash
+docker compose build && docker compose up -d
 ```
 
-## Documentation image
+Rollback: point `IMAGE_TAG` back to the previous tag and run `docker compose up -d`. Database changes so far are additive only, so rolling code back does not affect data.
 
-The documentation in `docs/` is a separate Next.js standalone application with server capabilities.
+## Backup
 
-```bash
-cd docs
-docker compose up -d
-```
+`scripts/backup.ps1` dumps the database, tars the media volume, and copies `.env` (which contains the encryption key), keeping the last 7 runs. Schedule it daily via Windows Task Scheduler. Restore commands are in the Chinese version of this page.
 
-To build it from the current source:
+## Security note
 
-```bash
-cd docs
-docker compose -f docker-compose.local.yml up -d --build
-```
-
-The main application container only runs Next.js. Canvases, My Assets, generation history, and API keys are stored in the browser by default, while prompt repositories are fetched directly by the frontend. No persistent data volume is required for this data.
-
-## Optional analytics
-
-No analytics are enabled by default. A deployment can enable GA4, Baidu Analytics, or both at runtime:
-
-| Variable | Description |
-| --- | --- |
-| `ANALYTICS_GA4_ID` | Google Analytics 4 measurement ID (`G-XXXX`) |
-| `ANALYTICS_BAIDU_ID` | Baidu site ID, the hash after `hm.js?` |
-
-```yaml
-services:
-  app:
-    image: ghcr.io/basketikun/infinite-canvas:latest
-    ports:
-      - "3000:3000"
-    environment:
-      ANALYTICS_GA4_ID: G-XXXXXXXXXX
-      ANALYTICS_BAIDU_ID: e8263761cc5c32f5f7a855b8203b965a
-```
-
-SPA route changes automatically report page views to enabled providers. Only configure analytics IDs on sites you control, and do not commit them to the repository.
+The default deployment is LAN HTTP: credentials cross the network in cleartext, which is only acceptable on a trusted network. Add HTTPS (reverse proxy with a certificate, or a tunnel) before exposing the service to the public internet, and update `APP_ORIGIN` accordingly.

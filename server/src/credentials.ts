@@ -7,6 +7,13 @@ import { encryptCredential, decryptCredential } from "./credential-crypto.js";
 
 export { encryptCredential, decryptCredential };
 
+export async function readUserApiKey(database: Pool, userId: string, encryptionKey?: string) {
+    if (!encryptionKey) return null;
+    const result = await database.query<{ encrypted_api_key: Buffer }>("SELECT encrypted_api_key FROM user_credentials WHERE user_id = $1", [userId]);
+    const encrypted = result.rows[0]?.encrypted_api_key;
+    return encrypted ? decryptCredential(encrypted, encryptionKey) : null;
+}
+
 const inputSchema = z.object({ apiKey: z.string().min(1).max(4096) });
 type CredentialOptions = { encryptionKey?: string };
 

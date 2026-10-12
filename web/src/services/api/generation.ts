@@ -1,18 +1,25 @@
 import { z } from "zod";
 import { nanoid } from "nanoid";
+import { useUserStore } from "@/stores/use-user-store";
 
 const responseSchema = z.record(z.string(), z.unknown());
 const imageResponseSchema = z.object({ data: z.array(z.object({ b64_json: z.string().optional(), url: z.string().url().optional() })) });
 
-export async function requestServerGeneration(capability: "image" | "video" | "audio" | "text", modelId: string, input: Record<string, unknown>, signal?: AbortSignal) {
+export async function requestServerGenerationResponse(capability: "image" | "video" | "audio" | "text", modelId: string, input: Record<string, unknown>, signal?: AbortSignal) {
+    const userId = useUserStore.getState().user?.id;
     const response = await fetch("/api/generations", {
         method: "POST", signal,
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...(userId ? { "X-Account-Id": userId } : {}) },
         body: JSON.stringify({ capability, modelId, input }),
     });
+    if (userId !== useUserStore.getState().user?.id) throw new DOMException("账号已切换", "AbortError");
     if (!response.ok) throw await readGenerationError(response);
-    return responseSchema.parse(await response.json());
+    return response;
+}
+
+export async function requestServerGeneration(capability: "image" | "video" | "audio" | "text", modelId: string, input: Record<string, unknown>, signal?: AbortSignal) {
+    return responseSchema.parse(await (await requestServerGenerationResponse(capability, modelId, input, signal)).json());
 }
 
 export async function pollServerGeneration(id: string, signal?: AbortSignal) {

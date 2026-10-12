@@ -21,13 +21,14 @@ async function getWorkspace(_request: Request, response: Response, database: Poo
 }
 
 async function putWorkspace(request: Request, response: Response, database: Pool) {
-    const version = Number(request.header("if-match-version"));
+    const versionHeader = request.header("if-match-version");
+    const version = Number(versionHeader);
     const parsed = workspaceSchema.safeParse(request.body);
-    if (!Number.isSafeInteger(version) || version < 0 || !parsed.success) return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "工作区数据或版本无效" } });
+    if (!versionHeader || !/^\d+$/.test(versionHeader) || !Number.isSafeInteger(version) || version < 0 || !parsed.success) return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "工作区数据或版本无效" } });
     const result = await database.query<{ version: string }>(
-        `INSERT INTO user_workspaces (user_id, version, data) VALUES ($1, 1, $2)
+        `INSERT INTO user_workspaces (user_id, version, data) SELECT $1, 1, $2 WHERE $3::bigint = 0 OR EXISTS (SELECT 1 FROM user_workspaces WHERE user_id = $1)
          ON CONFLICT (user_id) DO UPDATE SET version = user_workspaces.version + 1, data = EXCLUDED.data, updated_at = CURRENT_TIMESTAMP
-         WHERE user_workspaces.version = $3
+         WHERE user_workspaces.version = $3::bigint
          RETURNING version`,
         [response.locals.user.id, parsed.data, version],
     );

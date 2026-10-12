@@ -24,7 +24,7 @@ const configSchema = z.object({
         return;
     }
     const isLocal = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-    const validProtocol = config.NODE_ENV === "production" ? url.protocol === "https:" : ["http:", "https:"].includes(url.protocol) && isLocal;
+    const validProtocol = ["http:", "https:"].includes(url.protocol) && (config.NODE_ENV === "production" || isLocal);
     if (!validProtocol || url.pathname !== "/" || url.search || url.hash || url.username || url.password) {
         context.addIssue({ code: "custom", path: ["APP_ORIGIN"], message: "Invalid origin" });
     }

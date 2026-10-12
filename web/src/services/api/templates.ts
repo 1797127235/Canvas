@@ -4,6 +4,7 @@ import { bypassLocalAuth, canAccessLocalFeatures } from "@/lib/auth-access";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useUserStore } from "@/stores/use-user-store";
+import { useWorkspaceStore } from "@/stores/use-workspace-store";
 import type { CanvasConnection, CanvasNodeData, ViewportTransform } from "@/types/canvas";
 
 // 内置工作流模板：索引和画布数据在 /templates/templates.json，媒体按 files 里的路径单独拉取。
@@ -51,27 +52,44 @@ export async function loadTemplateMedia(template: WorkflowTemplate) {
     return new Map(entries);
 }
 
-// 克隆模板：媒体按原 storageKey 写进本地 IndexedDB（和画布导入同构，打开时 hydrate 自动恢复内容），
-// 画布项目用新 id 插入列表，返回新画布 id。
+// 克隆模板：账号模式重新上传媒体并改写引用，开发豁免模式写入 IndexedDB；返回新画布 id。
 export async function cloneWorkflowTemplate(template: WorkflowTemplate) {
     if (!canAccessLocalFeatures(useUserStore.getState().status)) throw new Error("AUTH_REQUIRED");
-    const replacements = new Map<string, { storageKey: string; url: string }>();
-    for (const file of template.files) {
-        const response = await fetch(templateMediaPath(file.path));
-        if (!response.ok) throw new Error(`template media request failed: ${file.path}`);
-        const blob = await response.blob();
-        const typed = blob.type ? blob : blob.slice(0, blob.size, file.mimeType);
-        if (bypassLocalAuth) {
-            await (file.storageKey.startsWith("image:") ? setImageBlob(file.storageKey, typed) : setMediaBlob(file.storageKey, typed));
-            continue;
+    const userId = useUserStore.getState().user?.id;
+    if (!bypassLocalAuth && (useWorkspaceStore.getState().owner !== userId || useWorkspaceStore.getState().status !== "ready")) throw new Error("账号工作区尚未就绪");
+    const controller = new AbortController();
+    const checkAccount = () => {
+        if (!bypassLocalAuth && userId !== useUserStore.getState().user?.id) controller.abort(new Error("账号已切换，克隆已取消"));
+        controller.signal.throwIfAborted();
+    };
+    const unsubscribe = useUserStore.subscribe(() => {
+        if (!bypassLocalAuth && userId !== useUserStore.getState().user?.id) controller.abort(new Error("账号已切换，克隆已取消"));
+    });
+    try {
+        const replacements = new Map<string, { storageKey: string; url: string }>();
+        for (const file of template.files) {
+            checkAccount();
+            const response = await fetch(templateMediaPath(file.path), { signal: controller.signal });
+            if (!response.ok) throw new Error(`template media request failed: ${file.path}`);
+            const blob = await response.blob();
+            const typed = blob.type ? blob : blob.slice(0, blob.size, file.mimeType);
+            checkAccount();
+            if (bypassLocalAuth) {
+                await (file.storageKey.startsWith("image:") ? setImageBlob(file.storageKey, typed) : setMediaBlob(file.storageKey, typed));
+                continue;
+            }
+            const uploaded = file.storageKey.startsWith("image:") ? await uploadImage(typed, { signal: controller.signal }) : await uploadMediaFile(typed, file.storageKey.split(":")[0], { signal: controller.signal });
+            checkAccount();
+            if (!uploaded.storageKey) throw new Error("template media upload failed");
+            replacements.set(file.storageKey, { storageKey: uploaded.storageKey, url: uploaded.url });
         }
-        const uploaded = file.storageKey.startsWith("image:") ? await uploadImage(typed) : await uploadMediaFile(typed, file.storageKey.split(":")[0]);
-        if (!uploaded.storageKey) throw new Error("template media upload failed");
-        replacements.set(file.storageKey, { storageKey: uploaded.storageKey, url: uploaded.url });
+        const project = structuredClone(template.project);
+        if (replacements.size) rewriteMediaReferences(project, replacements);
+        checkAccount();
+        return useCanvasStore.getState().importProject({ ...project, title: template.title });
+    } finally {
+        unsubscribe();
     }
-    const project = structuredClone(template.project);
-    if (replacements.size) rewriteMediaReferences(project, replacements);
-    return useCanvasStore.getState().importProject({ ...project, title: template.title });
 }
 
 function templateMediaPath(path: string) {
@@ -88,7 +106,10 @@ function templateMediaPath(path: string) {
 function rewriteMediaReferences(value: unknown, replacements: Map<string, { storageKey: string; url: string }>) {
     if (!value || typeof value !== "object") return;
     if (Array.isArray(value)) {
-        value.forEach((item) => rewriteMediaReferences(item, replacements));
+        value.forEach((item, index) => {
+            if (typeof item === "string" && replacements.has(item)) value[index] = replacements.get(item)!.storageKey;
+            else rewriteMediaReferences(item, replacements);
+        });
         return;
     }
     const record = value as Record<string, unknown>;

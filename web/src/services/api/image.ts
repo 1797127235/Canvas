@@ -4,7 +4,7 @@ import i18n from "@/i18n";
 import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
 import { normalizePluginImages, runModelPlugin } from "./model-plugin";
 import { bypassLocalAuth } from "@/lib/auth-access";
-import { requestServerImageGeneration } from "./generation";
+import { requestServerGenerationResponse, requestServerImageGeneration } from "./generation";
 import { useCatalogStore, catalogModel } from "@/stores/use-catalog-store";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
@@ -426,6 +426,12 @@ function consumeResponseStreamBlock(block: string, state: ResponseStreamState, o
     } catch {
         return;
     }
+    const choices = event.choices as Array<{ delta?: { content?: string } }> | undefined;
+    const delta = choices?.[0]?.delta?.content;
+    if (typeof delta === "string") {
+        state.text += delta;
+        onDelta?.(state.text);
+    }
     const type = stringValue(event.type);
     const errorMessage = responseErrorMessage(event);
     if (errorMessage) state.error = errorMessage;
@@ -459,18 +465,19 @@ function consumeResponseStreamText(state: ResponseStreamState, text: string, onD
     }
 }
 
-async function requestStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
-    const response = await fetch(aiApiUrl(config, "/responses"), {
+async function requestStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions, accountResponse?: Response): Promise<ToolResponseResult> {
+    const response = accountResponse || await fetch(aiApiUrl(config, "/responses"), {
         method: "POST",
         headers: { ...aiHeaders(config, "application/json"), Accept: "text/event-stream" },
         body: JSON.stringify({ ...body, stream: true }),
         signal: options?.signal,
     });
     if (!response.ok) throw new Error(await readFetchError(response, apiText("requestFailed")));
-    if (!response.body) {
-        const payload = (await response.json()) as ResponseApiPayload;
+    if (!response.body || response.headers.get("content-type")?.includes("application/json")) {
+        const payload = (await response.json()) as ResponseApiPayload & { choices?: Array<{ message?: { content?: string } }> };
         validateResponsePayload(payload);
-        return parseToolResponse(payload);
+        const result = parseToolResponse(payload);
+        return { ...result, content: payload.choices?.[0]?.message?.content || result.content };
     }
 
     const reader = response.body.getReader();
@@ -678,7 +685,7 @@ function accountImageSize(quality: string, size: string) {
 async function requestAccountImages(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
     await useCatalogStore.getState().load();
     const model = catalogModel("image", config.model || config.imageModel);
-    if (!model) throw new Error("暂无可用图片模型");
+    if (!model) throw new Error(useCatalogStore.getState().error || "暂无可用图片模型");
     const quality = normalizeQuality(config.quality);
     const size = accountImageSize(config.quality, config.size);
     const background = normalizeBackground(config.background);
@@ -820,6 +827,18 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
 }
 
 export async function requestImageQuestion(config: AiConfig, messages: AiTextMessage[], onDelta: (text: string) => void, options?: RequestOptions) {
+    if (!bypassLocalAuth) {
+        await useCatalogStore.getState().load();
+        const model = catalogModel("text", config.model || config.textModel);
+        if (!model) throw new Error(useCatalogStore.getState().error || "暂无可用文本模型");
+        const response = await requestServerGenerationResponse("text", model.id, {
+            messages: withSystemMessage(config, messages), stream: true,
+            ...(config.reasoningEffort === "auto" ? {} : { reasoning_effort: config.reasoningEffort }),
+        }, options?.signal);
+        const answer = (await requestStreamingResponse(config, {}, onDelta, options, response)).content || apiText("noContent");
+        onDelta(answer);
+        return answer;
+    }
     const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);
     const script = resolveModelScript(config, config.model || config.textModel);
     if (script) {

@@ -5,6 +5,9 @@ export type PublicModel = z.infer<typeof modelsSchema>["models"][number];
 
 export async function fetchServerModels() {
     const response = await fetch("/api/models", { credentials: "same-origin", headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error("服务端模型目录读取失败");
+    if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+        throw new Error(payload?.error?.message || "服务端模型目录读取失败");
+    }
     return modelsSchema.parse(await response.json()).models;
 }

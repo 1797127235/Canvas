@@ -17,3 +17,5 @@ plugins/canvas/*/dist
 plugins/canvas/*/node_modules
 web/public/plugins
 server/config/catalog.json
+
+backups/

@@ -14,11 +14,11 @@
 
 ## Multi-user Specifications
 
-- [Capability Map](../CAPABILITY-MAP.md): approved module boundaries and dependency order; only identity has a local implementation.
+- [Capability Map](../CAPABILITY-MAP.md): local multi-user scope, account key, upstream discovery, workspace/media/generation/history boundaries.
 - [Identity Spec](../SPEC-identity.md): approved requirements, contracts and local acceptance evidence.
 - [Identity Plan](../tasks/plan.md): approved technical plan, staged access policy and outstanding production decisions.
-- [Identity Tasks](../tasks/todo.md): local backend 54/54 and frontend 14/14 tests, both typechecks and isolated browser primary flows pass; user sign-off and production parameters remain pending. Unisolated local business features are available only under the development bypass.
-- [Catalog Spec](../SPEC-catalog.md): draft server-controlled model catalog and adapter contracts; plan/tasks appended to the existing multi-user tracker, awaiting review and not implemented.
+- [Identity Tasks](../tasks/todo.md): previous identity acceptance and current multi-user implementation tracker; new changes need acceptance and do not inherit earlier test results.
+- [Catalog Spec](../SPEC-catalog.md): account upstream model discovery, four generation protocols, account history, and local development contracts.
 
 ## Development and Data
 
@@ -38,5 +38,5 @@
 
 ## Notes
 
-- Canvas projects and My Assets are stored in the browser. There is no cross-device sync.
-- The AI API key is stored in the browser, which sends requests directly to OpenAI-compatible endpoints.
+- Default local development uses the account server: workspace/history in PostgreSQL, media on server disk or optional MinIO; new behavior awaits acceptance.
+- The account API key is encrypted on the server and used for upstream generation. Old browser-only storage and direct requests remain only in explicit development bypass mode.

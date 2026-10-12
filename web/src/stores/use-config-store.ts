@@ -132,7 +132,7 @@ type ConfigStore = {
     clearPromptContinue: () => void;
 };
 
-const VIDEO_KEYWORDS = ["video", "sora", "veo", "kling", "wan", "hailuo"];
+const VIDEO_KEYWORDS = ["video", "sora", "veo", "kling", "wan", "hailuo", "seedance", "minimax-h"];
 
 export function boolConfig(value: string, fallback: boolean) {
     return value ? value === "true" : fallback;
@@ -168,8 +168,8 @@ export function modelMatchesCapability(config: AiConfig, value: string, capabili
 }
 
 export function resolveModelForCapability(config: AiConfig, currentModel: string | undefined, capability: ModelCapability) {
-    if (!bypassLocalAuth) return catalogModel(capability, currentModel)?.id || "";
     const defaultModel = capability === "image" ? config.imageModel : capability === "video" ? config.videoModel : capability === "audio" ? config.audioModel : config.textModel;
+    if (!bypassLocalAuth) return catalogModel(capability, currentModel || defaultModel)?.id || "";
     const fallbackModel = capability === "image" ? defaultConfig.imageModel : capability === "video" ? defaultConfig.videoModel : capability === "audio" ? defaultConfig.audioModel : defaultConfig.textModel;
     if (currentModel && modelMatchesCapability(config, currentModel, capability)) return currentModel;
     if (defaultModel && modelMatchesCapability(config, defaultModel, capability)) return defaultModel;
@@ -268,14 +268,12 @@ export function useEffectiveConfig() {
     const models = useCatalogStore((state) => state.models);
     return useMemo((): AiConfig => bypassLocalAuth ? config : {
         ...config, channelMode: "remote",
-        models: [...models.map((model) => model.id), ...config.models],
-        // Development image generation keeps the local provider selection.
-        model: import.meta.env.DEV ? config.imageModel : catalogModel("image", config.imageModel)?.id || "",
-        imageModel: import.meta.env.DEV ? config.imageModel : catalogModel("image", config.imageModel)?.id || "",
-        videoModel: import.meta.env.DEV ? "minimax-h3" : catalogModel("video", config.videoModel)?.id || "",
-        // Text and audio have no server catalog yet, so those requests keep the local channel.
-        textModel: config.textModel,
-        audioModel: config.audioModel,
+        models: models.map((model) => model.id),
+        model: catalogModel("image", config.imageModel)?.id || "",
+        imageModel: catalogModel("image", config.imageModel)?.id || "",
+        videoModel: catalogModel("video", config.videoModel)?.id || "",
+        textModel: catalogModel("text", config.textModel)?.id || "",
+        audioModel: catalogModel("audio", config.audioModel)?.id || "",
     }, [config, models]);
 }
 
@@ -343,10 +341,7 @@ export function applyLocalChannelEntries(config: AiConfig, entries: LocalChannel
         return models.length ? [{ ...channel, models }] : [];
     });
     let next = channels.length === config.channels.length && channels.every((channel, index) => channel === config.channels[index]) ? config : { ...config, channels };
-    const preferred: Array<{ capability: ModelCapability; name: string }> = [
-        { capability: "image", name: "grok-imagine-image" },
-        { capability: "video", name: "minimax-h3" },
-    ];
+    const preferredImage = "grok-imagine-image";
     for (const entry of entries) {
         const baseUrl = entry.baseUrl?.trim() || "";
         const apiKey = entry.apiKey?.trim() || "";
@@ -378,9 +373,9 @@ export function applyLocalChannelEntries(config: AiConfig, entries: LocalChannel
     return {
         ...next,
         models,
-        model: models.includes(next.model) ? next.model : fallback("image", preferred[0].name, next.imageModel),
-        imageModel: fallback("image", preferred[0].name, next.imageModel),
-        videoModel: fallback("video", preferred[1].name, next.videoModel),
+        model: models.includes(next.model) ? next.model : fallback("image", preferredImage, next.imageModel),
+        imageModel: fallback("image", preferredImage, next.imageModel),
+        videoModel: fallback("video", "", next.videoModel),
     };
 }
 

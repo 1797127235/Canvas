@@ -5,6 +5,9 @@ import { audioMimeType, normalizeAudioFormatValue, normalizeAudioSpeedValue, nor
 import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, type AiConfig } from "@/stores/use-config-store";
 import { runModelPlugin } from "./model-plugin";
+import { bypassLocalAuth } from "@/lib/auth-access";
+import { catalogModel, useCatalogStore } from "@/stores/use-catalog-store";
+import { requestServerGenerationResponse } from "./generation";
 
 type RequestOptions = { signal?: AbortSignal };
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
@@ -21,6 +24,20 @@ function aiHeaders(config: AiConfig) {
 }
 
 export async function requestAudioGeneration(config: AiConfig, prompt: string, options?: RequestOptions): Promise<Blob> {
+    if (!bypassLocalAuth) {
+        await useCatalogStore.getState().load();
+        const model = catalogModel("audio", config.model || config.audioModel);
+        if (!model) throw new Error(useCatalogStore.getState().error || "暂无可用音频模型");
+        const format = normalizeAudioFormatValue(config.audioFormat);
+        const response = await requestServerGenerationResponse("audio", model.id, {
+            input: prompt, voice: normalizeAudioVoiceValue(config.audioVoice), response_format: format,
+            speed: Number(normalizeAudioSpeedValue(config.audioSpeed)),
+            ...(config.audioInstructions.trim() ? { instructions: config.audioInstructions.trim() } : {}),
+        }, options?.signal);
+        const blob = await response.blob();
+        await assertAudioBlob(blob);
+        return blob.type.startsWith("audio/") ? blob : new Blob([blob], { type: audioMimeType(format) });
+    }
     const requestConfig = resolveModelRequestConfig(config, config.model || config.audioModel);
     const model = requestConfig.model.trim();
     const format = normalizeAudioFormatValue(config.audioFormat);

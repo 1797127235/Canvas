@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "无限画布后端架构",
+    "quality_profile": "showcase",
+    "repository": { "url": "https://github.com/1797127235/Canvas", "revision": "ffa76f4ee214969e2e7f439ed04226558ec97e59" },
+    "viewBox": [1680, 900],
+    "views": [
+      { "id": "request", "label": "同源请求", "focus": ["browser", "express", "postgres"], "note": "浏览器经 Vite 或同源入口访问 Express，业务数据写入 PostgreSQL。" },
+      { "id": "identity", "label": "身份边界", "focus": ["express", "identity", "postgres"], "note": "注册登录写会话 Cookie，后续模块只使用已解析的用户 ID。" },
+      { "id": "generation", "label": "生成代理", "focus": ["generation", "catalog", "credentials", "postgres", "upstream"], "note": "校验模型后解密用户 Key，再向上游代发生成请求。" }
+    ]
+  },
+  "components": [
+    { "id": "browser", "type": "frontend", "label": "浏览器前端", "sublabel": "web · Vite /api 代理", "pos": [60, 470], "size": [210, 84], "sources": [{ "path": "web/vite.config.ts", "line": 43 }] },
+    { "id": "express", "type": "backend", "label": "Express 入口", "sublabel": "helmet · JSON · 同源校验", "pos": [400, 470], "size": [230, 84], "sources": [{ "path": "server/src/app.ts", "line": 10 }, { "path": "server/src/index.ts", "line": 18 }] },
+    { "id": "identity", "type": "security", "label": "identity", "sublabel": "注册 · 登录 · 会话", "pos": [790, 110], "size": [210, 76], "sources": [{ "path": "server/src/identity/session.ts" }] },
+    { "id": "catalog", "type": "backend", "label": "catalog", "sublabel": "GET /api/models", "pos": [790, 250], "size": [210, 76], "sources": [{ "path": "server/src/catalog.ts", "line": 7 }] },
+    { "id": "credentials", "type": "security", "label": "credentials", "sublabel": "单 Key · AES 加密", "pos": [790, 390], "size": [210, 76], "sources": [{ "path": "server/src/credentials.ts", "line": 16 }] },
+    { "id": "workspace", "type": "backend", "label": "workspace", "sublabel": "画布 · 版本校验", "pos": [790, 530], "size": [210, 76], "sources": [{ "path": "server/src/workspace.ts", "line": 12 }] },
+    { "id": "media", "type": "backend", "label": "media", "sublabel": "上传 · 读取 · 删除", "pos": [790, 670], "size": [210, 76], "sources": [{ "path": "server/src/media.ts", "line": 14 }] },
+    { "id": "generation", "type": "backend", "label": "generation", "sublabel": "图片 / 视频代理", "pos": [1180, 390], "size": [220, 76], "sources": [{ "path": "server/src/generation.ts", "line": 38 }] },
+    { "id": "catalogfile", "type": "external", "label": "模型目录配置", "sublabel": "catalog.json", "pos": [1180, 250], "size": [220, 76], "sources": [{ "path": "server/src/catalog/catalog.ts", "line": 12 }] },
+    { "id": "postgres", "type": "database", "label": "PostgreSQL", "sublabel": "pg · 账号与业务表", "pos": [1180, 530], "size": [220, 76], "sources": [{ "path": "server/src/db.ts", "line": 11 }] },
+    { "id": "objectstore", "type": "cloud", "label": "对象存储", "sublabel": "MinIO 或本地目录", "pos": [1180, 670], "size": [220, 76], "sources": [{ "path": "server/src/index.ts", "line": 30 }] },
+    { "id": "upstream", "type": "external", "label": "上游 AI 服务", "sublabel": "OpenAI 兼容接口", "pos": [1460, 390], "size": [180, 76], "sources": [{ "path": "server/src/generation.ts", "line": 80 }] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "server 进程", "wraps": ["express", "identity", "catalog", "credentials", "workspace", "media", "generation"] },
+    { "kind": "security-group", "label": "登录后按用户 ID 隔离", "wraps": ["credentials", "workspace", "media", "generation"] }
+  ],
+  "connections": [
+    { "id": "browser-api", "from": "browser", "to": "express", "label": "同源 /api", "variant": "emphasis" },
+    { "id": "express-modules", "from": "express", "to": "workspace", "label": "/api 路由", "variant": "emphasis" },
+    { "id": "catalog-file", "from": "catalog", "to": "catalogfile", "label": "启动加载", "variant": "dashed" },
+    { "id": "generation-model", "from": "catalogfile", "to": "generation", "label": "校验模型", "variant": "dashed", "labelDy": 18 },
+    { "id": "generation-key", "from": "credentials", "to": "generation", "label": "解密 Key", "variant": "security" },
+    { "id": "workspace-db", "from": "workspace", "to": "postgres", "label": "SQL" },
+    { "id": "media-store", "from": "media", "to": "objectstore", "label": "对象读写" },
+    { "id": "generation-upstream", "from": "generation", "to": "upstream", "label": "代发请求", "variant": "emphasis", "labelDy": -18 }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "入口", "items": ["Vite 将 /api 代理到后端，默认 127.0.0.1:4100", "变更请求校验 Origin，JSON 请求体上限 10 MB"] },
+    { "dot": "emerald", "title": "模块", "items": ["identity 管会话，其余模块只按用户 ID 隔离", "catalog 不读取用户 Key；文本和音频仍走浏览器直连"] },
+    { "dot": "rose", "title": "外部依赖", "items": ["PostgreSQL 保存账号、工作区、媒体索引和生成任务", "未配置 MinIO 时媒体落到 server/data/media"] }
+  ]
+}

@@ -5,19 +5,52 @@ mock.module("@/lib/auth-access", () => ({ bypassLocalAuth: false, canAccessLocal
 import { useCatalogStore, catalogModel } from "../src/stores/use-catalog-store";
 import { defaultConfig, resolveModelForCapability } from "../src/stores/use-config-store";
 import { buildGenerationConfig } from "../src/lib/canvas/canvas-generation-helpers";
-import { requestGeneration, requestEdit } from "../src/services/api/image";
+import { requestGeneration, requestEdit, requestImageQuestion } from "../src/services/api/image";
+import { requestAudioGeneration } from "../src/services/api/audio";
 import { createVideoGenerationTask, pollVideoGenerationTask } from "../src/services/api/video";
 import { CanvasNodeType } from "../src/types/canvas";
+
+test("text streams and speech use the account endpoint without local credentials", async () => {
+    useCatalogStore.setState({ status: "ready", models: [
+        { id: "chat", name: "Chat", capability: "text" }, { id: "speech", name: "Speech", capability: "audio" },
+    ] });
+    const sent: Array<Record<string, unknown>> = [];
+    globalThis.fetch = (async (url, init) => {
+        expect(String(url)).toBe("/api/generations");
+        const body = JSON.parse(String(init?.body));
+        sent.push(body);
+        if (body.capability === "audio") return new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "audio/mpeg" } });
+        return new Response('data: {"choices":[{"delta":{"content":"你好"}}]}\n\ndata: [DONE]\n\n', { headers: { "content-type": "text/event-stream" } });
+    }) as typeof fetch;
+    const updates: string[] = [];
+    expect(await requestImageQuestion({ ...obsoleteConfig, model: "chat" }, [{ role: "user", content: "hello" }], text => updates.push(text))).toBe("你好");
+    expect(updates.at(-1)).toBe("你好");
+    const audio = await requestAudioGeneration({ ...obsoleteConfig, model: "speech" }, "hello");
+    expect(new Uint8Array(await audio.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    expect(JSON.stringify(sent)).not.toContain("old-local-key");
+    expect(JSON.stringify(sent)).not.toContain("old.invalid");
+});
+
+test("catalog reset rejects a late response from a previous key", async () => {
+    let finish!: (response: Response) => void;
+    globalThis.fetch = (() => new Promise<Response>(resolve => { finish = resolve; })) as typeof fetch;
+    const pending = useCatalogStore.getState().load();
+    useCatalogStore.getState().reset();
+    finish(json({ models }));
+    await pending;
+    expect(useCatalogStore.getState().models).toEqual([]);
+    expect(useCatalogStore.getState().status).toBe("idle");
+});
 
 const originalFetch = globalThis.fetch;
 const models = [
     { id: "openai-image-2-5", name: "GPT Image 2.5", capability: "image" as const },
-    { id: "minimax-h3", name: "MiniMax H3", capability: "video" as const },
+    { id: "doubao-seedance-2-0-mini", name: "doubao-seedance-2-0-mini", capability: "video" as const },
 ];
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
 const obsoleteConfig = { ...defaultConfig, model: "old::grok-image", imageModel: "old::grok-image", videoModel: "old::doubao", apiKey: "old-local-key", baseUrl: "https://old.invalid" };
 
-afterEach(() => { globalThis.fetch = originalFetch; useCatalogStore.setState({ models: [], status: "idle" }); });
+afterEach(() => { globalThis.fetch = originalFetch; useCatalogStore.getState().reset(); });
 
 test("loads one catalog for concurrent consumers, with no stale fallback after failure", async () => {
     let complete!: (response: Response) => void;

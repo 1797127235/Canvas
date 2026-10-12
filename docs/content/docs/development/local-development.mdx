@@ -1,34 +1,38 @@
 ---
-title: Local Development
-description: Frontend-first local development
+title: 本地开发
+description: 前后端多用户开发环境
 ---
 
-# Local Development
+# 本地开发
 
-The main application lives in `web/`. The browser sends AI requests directly to the user's OpenAI-compatible endpoint.
+前端在 `web/`，账号后端在 `server/`。本地默认真实注册登录，画布、素材和图片/视频历史保存在 PostgreSQL，媒体默认保存在 `server/data/media/`。AI 请求由服务端使用当前账号的一把 Key 发给唯一上游；模型从上游 `/models` 获取。
 
-## Start the frontend
+## 首次准备
+
+准备可连接的 PostgreSQL 数据库，将 `server/.env.example` 复制为 `server/.env`，填写 `DATABASE_URL`。`RATE_LIMIT_SECRET` 用随机字符串，`CREDENTIALS_ENCRYPTION_KEY` 用 32 字节 base64：
 
 ```bash
-cd web
-bun install
-bun run dev
+node -e 'console.log(require("node:crypto").randomBytes(32).toString("base64"))'
 ```
 
-Open `http://localhost:3000`, then enter your `Base URL`, `API Key`, and model names in Settings. Prompt sources are also accessed directly by the browser.
+两项分别生成并填入；账号 Key 加密后不可随意更换加密密钥，否则旧 Key 无法解密。环境文件和 Key 不提交到 Git。
 
-## 身份接口联调
+新数据库首次应用身份表；已有身份数据库跳过这一步：
 
-本地 Vite 默认免登录，继续使用浏览器本地画布、素材、渠道配置及 Agent。它不伪造账号，也不放开后端鉴权。
-
-联调时在 `web/.env.local` 设置并重启 Vite：
-
-```dotenv
-VITE_AUTH_BYPASS=false
-VITE_API_PROXY_TARGET=http://127.0.0.1:4100
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f server/sql/001-identity.sql
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f server/sql/002-identity-rate-limits.sql
 ```
 
-按 `server/.env.example` 在本机填写配置，数据库必须独立于其他项目；先显式应用 `server/sql/001-identity.sql` 与 `002-identity-rate-limits.sql`。服务不会自动建表。`APP_ORIGIN` 必须等于实际浏览器来源，例如 `http://localhost:3001`，与 `127.0.0.1` 不等价。
+工作区、账号凭证、媒体、任务和历史表在启动时按 `003`～`005` 建立，不清理账号业务记录。过期身份记录只在启动时清理。
+
+将 `server/config/catalog.example.json` 复制为 `server/config/catalog.json`，设置真实上游 `baseUrl`（含必要的 `/v1`），所有模型配置项使用同一地址。配置中没有 Key；配置项仅作模型能力和显示名称映射，不限制上游返回的其他模型。未配置 Key 时模型页提示先保存 Key，不能用示例地址生成。
+
+MinIO 可选；不配其环境变量就使用本地磁盘。不设置文件、账号容量或画布数量额度。
+
+## 启动
+
+后端：
 
 ```bash
 cd server
@@ -36,19 +40,26 @@ bun install --frozen-lockfile --ignore-scripts
 node --env-file=.env --import tsx src/index.ts
 ```
 
-环境文件和秘密不要提交。启动会清理过期会话及限流窗口，不删除账号；当前未设置定期清理周期。正常身份模式先验收 `/register`、`/login` 与会话，私人业务在服务端账号存储接入前暂不开放，原 IndexedDB 不迁移、不删除。
-
-全量后端测试只能连接独立 `TEST_DATABASE_URL`，数据库名必须以 `_test` 结尾，且不能与 `DATABASE_URL` 指向同一库。测试会清理该库记录，不能指向用户正在手动测试的数据库。
-
-## Start the documentation site
+另一终端启动前端：
 
 ```bash
-cd docs
+cd web
+bun install
 bun run dev
 ```
 
-Common locations:
+使用 Vite 输出的实际地址，并让 `server/.env` 的 `APP_ORIGIN` 与之完全一致，`localhost` 和 `127.0.0.1` 不是同一来源。Vite 的 `/api` 默认代理到 `http://127.0.0.1:4100`；需要更改后端地址时设置 `VITE_API_PROXY_TARGET`。
 
-- Canvas, pages, and interactions: `web/`
-- Prompt caching: `web/src/services/api/prompts.ts`
-- Documentation content: `docs/content/docs/`
+进入注册/登录后，在账号配置中保存上游 Key。图片、视频、文本和音频都使用账号 Key，视频保留原生参数面板，实际能力由上游模型决定。旧 IndexedDB 不会自动迁移。
+
+## 旧本地工作区
+
+只有显式在 `web/.env.local` 写入 `VITE_AUTH_BYPASS=true` 并重启 Vite，才使用旧浏览器工作区、渠道和外部 Agent。它不伪造服务端账号，不能放开后端鉴权；生产构建不启用此豁免。
+
+## 验证
+
+本轮改动待验收，见 [Pending Tests](/docs/progress/pending-test)。本地开发不要求先完成生产代理、备份等部署关卡。生产环境允许直接 http 访问，`APP_ORIGIN` 为 http 时会话 Cookie 不带 Secure 标志。
+
+全量后端测试只能连接独立 `TEST_DATABASE_URL`，数据库名必须以 `_test` 结尾且不能和业务库相同；会清理测试记录，不得指向手动验收账号库。按项目规则，不自动执行构建或类型检查。
+
+文档站在 `docs/`，使用 `bun run dev` 启动。

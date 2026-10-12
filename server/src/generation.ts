@@ -4,9 +4,11 @@ import { request as httpsRequest } from "node:https";
 import { Router, type Request, type Response } from "express";
 import type { Pool } from "pg";
 import { z } from "zod";
+import sharp from "sharp";
 
 import { requireUser } from "./identity/auth-middleware.js";
-import { resolveModel, type Catalog } from "./catalog/catalog.js";
+import { accountModels, resolveModel, type Catalog } from "./catalog/catalog.js";
+import { readUserApiKey } from "./credentials.js";
 
 const imageData = z.string().regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/);
 const videoData = z.string().regex(/^data:video\/(mp4|webm);base64,[A-Za-z0-9+/]+={0,2}$/);
@@ -21,13 +23,29 @@ const videoInput = z.strictObject({
     generate_audio: z.boolean().optional(), watermark: z.boolean().optional(), mode: z.enum(["frames", "reference"]).optional(),
     images: z.array(imageData).optional(), videos: z.array(videoData).optional(), audios: z.array(audioData).optional(),
 });
+const textInput = z.strictObject({
+    messages: z.array(z.strictObject({
+        role: z.enum(["system", "user", "assistant"]),
+        content: z.union([z.string(), z.array(z.discriminatedUnion("type", [
+            z.strictObject({ type: z.literal("text"), text: z.string() }),
+            z.strictObject({ type: z.literal("image_url"), image_url: z.strictObject({ url: z.string() }) }),
+        ]))]),
+    })).min(1),
+    stream: z.boolean().optional(), reasoning_effort: z.string().optional(),
+});
+const speechInput = z.strictObject({
+    input: z.string().min(1), voice: z.string().min(1), response_format: z.string().optional(),
+    speed: z.number().positive().optional(), instructions: z.string().optional(),
+});
 const inputSchema = z.discriminatedUnion("capability", [
     z.strictObject({ capability: z.literal("image"), modelId: z.string().min(1), input: imageInput }),
     z.strictObject({ capability: z.literal("video"), modelId: z.string().min(1), input: videoInput }),
+    z.strictObject({ capability: z.literal("text"), modelId: z.string().min(1), input: textInput }),
+    z.strictObject({ capability: z.literal("audio"), modelId: z.string().min(1), input: speechInput }),
 ]);
 const taskIdSchema = z.string().uuid();
 const taskResponseSchema = z.object({ id: z.string().min(1), status: z.string().optional() });
-type GenerationOptions = { catalog: Catalog };
+type GenerationOptions = { catalog: Catalog; encryptionKey?: string };
 type UpstreamResponse = { status: number; contentType: string; body: Buffer };
 
 export function createGenerationRouter(database: Pool, options: GenerationOptions) {
@@ -36,8 +54,22 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
     router.post("/generations", requireUser(database), async (request, response) => {
         const parsed = inputSchema.safeParse(request.body);
         if (!parsed.success) return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "生成参数无效" } });
-        const model = resolveModel(options.catalog, parsed.data.modelId, parsed.data.capability);
+        const apiKey = await readUserApiKey(database, response.locals.user.id, options.encryptionKey);
+        if (!apiKey) return response.status(409).json({ error: { code: "API_KEY_REQUIRED", message: "请先保存账号 API Key" } });
+        let models;
+        try { models = await accountModels(options.catalog, apiKey); }
+        catch { return upstreamFailure(response, 502); }
+        const model = resolveModel({ models }, parsed.data.modelId, parsed.data.capability);
         if (!model) return response.status(404).json({ error: { code: "MODEL_NOT_FOUND", message: "模型不可用" } });
+        if (parsed.data.capability === "text" || parsed.data.capability === "audio") {
+            const target = upstreamTarget(model.baseUrl, parsed.data.capability === "text" ? "chat/completions" : "audio/speech");
+            if (!target) return unavailable(response);
+            const body = Buffer.from(JSON.stringify({ ...parsed.data.input, model: model.upstreamModel }));
+            if (parsed.data.capability === "text" && parsed.data.input.stream) return streamText(target, apiKey, body, response);
+            const upstream = await requestUpstream(target, apiKey, body, "application/json");
+            if (upstream.status < 200 || upstream.status >= 300) return upstreamFailure(response, upstream.status, upstream.body);
+            return response.status(200).type(upstream.contentType || "application/octet-stream").send(upstream.body);
+        }
         const input = parsed.data.input;
         const isVideo = parsed.data.capability === "video";
         const isEdit = !isVideo && Boolean(input.images?.length);
@@ -46,33 +78,30 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
         if (!url) return unavailable(response);
         let body: Buffer;
         let contentType: string;
-        if (isVideo && model.adapter === "minimax-videos") {
-            const video = input as z.infer<typeof videoInput>;
-            body = Buffer.from(JSON.stringify({
-                model: model.upstreamModel, prompt: video.prompt,
-                duration: Math.min(MINIMAX_SECONDS_MAX, Math.max(MINIMAX_SECONDS_MIN, Number(video.seconds) || 6)),
-                resolution: MINIMAX_RESOLUTION, ratio: minimaxRatio(video.size),
-                ...(video.images?.[0] ? { image: video.images[0] } : {}),
-            }));
+        if (isVideo) {
+            // 视频网关只收 JSON：时长/分辨率/比例/参考图，参考图仅支持单张 image.{url}。
+            const video = parsed.data.input as z.infer<typeof videoInput>;
+            const payload: Record<string, unknown> = { model: model.upstreamModel, prompt: video.prompt };
+            const duration = Number(video.seconds);
+            if (duration > 0) payload.duration = duration;
+            if (video.resolution_name) payload.resolution = video.resolution_name;
+            if (video.size) payload.aspect_ratio = aspectRatio(video.size);
+            if (video.generate_audio !== undefined) payload.generate_audio = video.generate_audio;
+            if (video.watermark !== undefined) payload.watermark = video.watermark;
+            // 单张走 image；多张走 reference_images（上游拒绝 images 数组，reference_images 实测可用）。
+            const references = await Promise.all((video.images || []).map(image => normalizeVideoImage(image)));
+            if (references.length === 1) payload.image = { url: references[0] };
+            else if (references.length > 1) payload.reference_images = references.map(url => ({ url }));
+            body = Buffer.from(JSON.stringify(payload));
             contentType = "application/json";
-        } else if (isVideo || isEdit) {
+        } else if (isEdit) {
             const form = new FormData();
             form.set("model", model.upstreamModel);
             for (const [key, value] of Object.entries(input)) {
                 if (value !== undefined && !Array.isArray(value)) form.set(key, String(value));
             }
-            if (isVideo) {
-                const video = parsed.data.input as z.infer<typeof videoInput>;
-                if (video.mode === "frames") {
-                    if (video.images?.[0]) appendMedia(form, "first_frame", video.images[0]);
-                    if (video.images?.[1]) appendMedia(form, "last_frame", video.images[1]);
-                } else for (const image of video.images || []) appendMedia(form, "image[]", image);
-                for (const reference of video.videos || []) appendMedia(form, "video[]", reference);
-                for (const reference of video.audios || []) appendMedia(form, "audio[]", reference);
-            } else {
-                const images = input.images || [];
-                for (const image of images) appendMedia(form, images.length === 1 ? "image" : "image[]", image);
-            }
+            const images = input.images || [];
+            for (const image of images) appendMedia(form, images.length === 1 ? "image" : "image[]", image);
             // Use Node's standard multipart encoder, including boundary generation.
             const encoded = new Response(form);
             body = Buffer.from(await encoded.arrayBuffer());
@@ -82,8 +111,8 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
             body = Buffer.from(JSON.stringify({ ...params, model: model.upstreamModel }));
             contentType = "application/json";
         }
-        const upstream = await requestUpstream(url, model.apiKey, body, contentType);
-        if (upstream.status < 200 || upstream.status >= 300) return upstreamFailure(response, upstream.status);
+        const upstream = await requestUpstream(url, apiKey, body, contentType);
+        if (upstream.status < 200 || upstream.status >= 300) return upstreamFailure(response, upstream.status, upstream.body);
         if (isVideo) {
             const task = parseTaskResponse(upstream.body);
             if (!task) return upstreamFailure(response, 502);
@@ -96,6 +125,26 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
         }
         return response.status(200).type("application/json").send(upstream.body);
     });
+    const historyKind = z.enum(["image", "video"]);
+    router.get("/generation-history/:kind", requireUser(database), async (request, response) => {
+        const kind = historyKind.safeParse(request.params.kind);
+        if (!kind.success) return taskNotFound(response);
+        const rows = await database.query<{ data: unknown }>("SELECT data FROM user_generation_history WHERE user_id = $1 AND kind = $2", [response.locals.user.id, kind.data]);
+        return response.json({ logs: rows.rows.map(row => row.data) });
+    });
+    router.put("/generation-history/:kind/:id", requireUser(database), async (request, response) => {
+        const kind = historyKind.safeParse(request.params.kind);
+        const data = z.record(z.string(), z.unknown()).safeParse(request.body);
+        if (!kind.success || !data.success || data.data.id !== request.params.id) return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "生成记录无效" } });
+        await database.query("INSERT INTO user_generation_history (user_id, kind, id, data) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, kind, id) DO UPDATE SET data = EXCLUDED.data", [response.locals.user.id, kind.data, request.params.id, data.data]);
+        return response.status(204).end();
+    });
+    router.delete("/generation-history/:kind/:id", requireUser(database), async (request, response) => {
+        const kind = historyKind.safeParse(request.params.kind);
+        if (!kind.success) return taskNotFound(response);
+        await database.query("DELETE FROM user_generation_history WHERE user_id = $1 AND kind = $2 AND id = $3", [response.locals.user.id, kind.data, request.params.id]);
+        return response.status(204).end();
+    });
     router.get("/generations/:id", requireUser(database), (request, response) => readTask(request, response, database, options, false));
     router.get("/generations/:id/content", requireUser(database), (request, response) => readTask(request, response, database, options, true));
     return router;
@@ -104,43 +153,46 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
 async function readTask(request: Request, response: Response, database: Pool, options: GenerationOptions, content: boolean) {
     const parsed = taskIdSchema.safeParse(request.params.id);
     if (!parsed.success) return taskNotFound(response);
-    const task = await database.query<{ upstream_id: string; model_id: string }>(
-        "SELECT upstream_id, model_id FROM user_generation_tasks WHERE id = $1 AND user_id = $2", [parsed.data, response.locals.user.id],
+    const task = await database.query<{ upstream_id: string; base_url: string }>(
+        "SELECT upstream_id, base_url FROM user_generation_tasks WHERE id = $1 AND user_id = $2", [parsed.data, response.locals.user.id],
     );
     const row = task.rows[0];
     if (!row) return taskNotFound(response);
-    // Resolve by model id, not by base URL: several models may share one upstream host with different keys.
-    const model = resolveModel(options.catalog, row.model_id, "video");
-    if (!model) return unavailable(response);
+    const apiKey = await readUserApiKey(database, response.locals.user.id, options.encryptionKey);
+    if (!apiKey) return response.status(409).json({ error: { code: "API_KEY_REQUIRED", message: "请先保存账号 API Key" } });
     const path = `videos/${encodeURIComponent(row.upstream_id)}${content ? "/content" : ""}`;
-    const target = upstreamTarget(model.baseUrl, path);
+    const target = upstreamTarget(row.base_url, path);
     if (!target) return unavailable(response);
-    const upstream = await requestUpstream(target, model.apiKey);
-    if (upstream.status < 200 || upstream.status >= 300) return upstreamFailure(response, upstream.status);
+    const upstream = await requestUpstream(target, apiKey);
+    if (upstream.status < 200 || upstream.status >= 300) return upstreamFailure(response, upstream.status, upstream.body);
     return response.status(200).type(content ? "video/mp4" : "application/json").send(upstream.body);
 }
 
-// MiniMax accepts a fixed ratio set and a fixed output resolution; the client sends pixel sizes.
-const MINIMAX_RESOLUTION = "768P";
-const MINIMAX_SECONDS_MIN = 4;
-const MINIMAX_SECONDS_MAX = 15;
-const minimaxRatios = [
-    { value: "1:1", width: 1, height: 1 }, { value: "3:4", width: 3, height: 4 }, { value: "4:3", width: 4, height: 3 },
-    { value: "16:9", width: 16, height: 9 }, { value: "9:16", width: 9, height: 16 }, { value: "21:9", width: 21, height: 9 },
-] as const;
-
-function minimaxRatio(size?: string) {
-    const target = aspectRatioOf(size);
-    if (!target) return "16:9";
-    return minimaxRatios.reduce((best, item) => Math.abs(item.width / item.height - target) < Math.abs(best.width / best.height - target) ? item : best).value;
-}
-
-// Accepts both the pixel sizes the client sends ("720x1280") and plain ratios ("9:16").
-function aspectRatioOf(size?: string) {
-    const value = (size || "").trim();
-    const match = /^(\d+)[x:](\d+)$/.exec(value);
-    const ratio = match ? Number(match[1]) / Number(match[2]) : NaN;
-    return Number.isFinite(ratio) && ratio > 0 ? ratio : null;
+function streamText(target: URL, apiKey: string, body: Buffer, response: Response): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const request = target.protocol === "https:" ? httpsRequest : httpRequest;
+        const client = request(target, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "text/event-stream", "Content-Length": body.length },
+        }, (incoming) => {
+            const status = incoming.statusCode || 502;
+            if (status < 200 || status >= 300) {
+                incoming.resume();
+                upstreamFailure(response, status);
+                resolve();
+                return;
+            }
+            response.type(incoming.headers["content-type"] || "text/event-stream");
+            response.flushHeaders();
+            incoming.on("error", reject);
+            incoming.on("aborted", () => reject(new Error("Upstream response aborted")));
+            incoming.on("end", resolve);
+            incoming.pipe(response);
+        });
+        response.on("close", () => { client.destroy(); resolve(); });
+        client.on("error", reject);
+        client.end(body);
+    });
 }
 
 function upstreamTarget(baseUrl: string, path: string) {
@@ -164,7 +216,8 @@ function appendMedia(form: FormData, field: string, dataUrl: string) {
 function parseTaskResponse(body: Buffer) {
     try {
         const payload = JSON.parse(body.toString("utf8"));
-        const parsed = taskResponseSchema.safeParse(payload.data || payload);
+        const raw = (payload.data || payload) as { id?: unknown; request_id?: unknown; status?: unknown };
+        const parsed = taskResponseSchema.safeParse({ ...raw, id: raw.id || raw.request_id });
         return parsed.success ? parsed.data : null;
     } catch {
         return null;
@@ -173,9 +226,56 @@ function parseTaskResponse(body: Buffer) {
 
 function unavailable(response: Response) { return response.status(503).json({ error: { code: "GENERATION_NOT_CONFIGURED", message: "生成服务尚未配置" } }); }
 function taskNotFound(response: Response) { return response.status(404).json({ error: { code: "GENERATION_NOT_FOUND", message: "生成任务不存在" } }); }
-function upstreamFailure(response: Response, status: number) {
+function upstreamFailure(response: Response, status: number, body?: Buffer) {
     const unauthorized = status === 401 || status === 403;
-    return response.status(502).json({ error: { code: unauthorized ? "UPSTREAM_AUTH_FAILED" : "UPSTREAM_ERROR", message: unauthorized ? "上游认证失败，请检查账号 API Key" : "上游生成失败，请检查模型和参数" } });
+    return response.status(502).json({ error: { code: unauthorized ? "UPSTREAM_AUTH_FAILED" : "UPSTREAM_ERROR", message: unauthorized ? "上游认证失败，请检查账号 API Key" : readUpstreamError(body) || "上游生成失败，请检查模型和参数" } });
+}
+function readUpstreamError(body?: Buffer) {
+    if (!body?.length) return "";
+    try {
+        const payload = JSON.parse(body.toString("utf8")) as { error?: unknown; message?: unknown };
+        const error = payload.error;
+        const message = typeof error === "string" ? error : (error as { message?: unknown } | null)?.message || payload.message;
+        return typeof message === "string" && message.trim() ? message.trim().slice(0, 300) : "";
+    } catch {
+        return "";
+    }
+}
+// 把像素尺寸折算成上游接受的标准比例，无法解析时不传而不是猜。
+function aspectRatio(size: string) {
+    const [width, height] = size.split("x").map(Number);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return "";
+    return ["1:1", "3:4", "4:3", "16:9", "9:16", "21:9"].reduce((best, current) => {
+        const [currentWidth, currentHeight] = current.split(":").map(Number);
+        const [bestWidth, bestHeight] = best.split(":").map(Number);
+        return Math.abs(currentWidth / currentHeight - width / height) < Math.abs(bestWidth / bestHeight - width / height) ? current : best;
+    });
+}
+
+// 上游对参考图有未公开的字节数上限（实测 2.5MB 拒、全尺寸 137KB 过），超限时逐级压到限内。
+const VIDEO_IMAGE_MAX_BYTES = 512 * 1024;
+const VIDEO_IMAGE_STEPS: Array<{ side: number; quality: number }> = [
+    { side: 2048, quality: 85 }, { side: 1536, quality: 80 }, { side: 1024, quality: 75 }, { side: 768, quality: 70 },
+];
+
+async function normalizeVideoImage(dataUrl: string): Promise<string> {
+    const match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+=*)$/.exec(dataUrl);
+    if (!match) return dataUrl;
+    const bytes = Buffer.from(match[2], "base64");
+    if (bytes.length <= VIDEO_IMAGE_MAX_BYTES) return dataUrl;
+    try {
+        const source = sharp(bytes).rotate();
+        let smallest = "";
+        for (const { side, quality } of VIDEO_IMAGE_STEPS) {
+            const buffer = await source.clone().resize({ width: side, height: side, fit: "inside", withoutEnlargement: true }).flatten({ background: "#ffffff" }).jpeg({ quality }).toBuffer();
+            smallest = `data:image/jpeg;base64,${buffer.toString("base64")}`;
+            if (buffer.length <= VIDEO_IMAGE_MAX_BYTES) break;
+        }
+        return smallest;
+    } catch {
+        // 压缩失败（如损坏图片）时回退原图，让上游返回真实错误而不是本地 500。
+        return dataUrl;
+    }
 }
 
 // Target is built solely from the validated catalog and fixed API paths. Redirects are not followed.

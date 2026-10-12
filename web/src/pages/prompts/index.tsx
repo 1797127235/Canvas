@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { bypassLocalAuth } from "@/lib/auth-access";
 import { stageWorkbenchPrompt } from "@/lib/workbench-prompt";
 import { useUserStore } from "@/stores/use-user-store";
+import { useWorkspaceStore } from "@/stores/use-workspace-store";
 
 import { PromptCard } from "@/components/prompts/prompt-card";
 import { usePromptList } from "@/components/prompts/use-prompt-list";
@@ -64,9 +65,12 @@ export default function PromptsPage() {
     };
 
     const savePromptAsset = (item: Prompt) => {
-        if (!bypassLocalAuth) {
-            if (useUserStore.getState().status !== "authenticated") navigate(`/login?redirect=${encodeURIComponent("/prompts")}`);
-            else message.info("账号素材存储尚未开放");
+        if (!bypassLocalAuth && useUserStore.getState().status !== "authenticated") {
+            navigate(`/login?redirect=${encodeURIComponent("/prompts")}`);
+            return;
+        }
+        if (!bypassLocalAuth && useWorkspaceStore.getState().status !== "ready") {
+            message.info("账号工作区尚未就绪，请稍后重试");
             return;
         }
         addAsset({ kind: "text", title: item.title, coverUrl: item.coverUrl, tags: item.tags, source: item.category, data: { content: item.prompt }, metadata: { source: "prompt-library", promptId: item.id, githubUrl: item.githubUrl } });

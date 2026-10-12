@@ -1,91 +1,95 @@
 ---
 title: Docker 部署
-description: 使用 Docker Compose 部署无限画布
+description: 使用 Docker Compose 部署多用户版无限画布
 ---
 
 # Docker 部署
 
-如果你希望在自己的机器或服务器上运行项目，可以直接使用 Docker Compose。
+多用户版使用一套 compose 栈部署：PostgreSQL、后端（Node 24 API）、前端（nginx 托管静态页并反代 `/api`）。数据库默认不对宿主机开放端口，只能在栈内部访问；前端对外暴露一个 HTTP 端口（默认 3015）。
 
-## 使用发布镜像
+## 前置条件
 
-```bash
-git clone git@github.com:basketikun/infinite-canvas.git
-cd infinite-canvas
-docker compose up -d
-```
+- 已安装 Docker 和 Docker Compose v2。
+- 服务器能访问镜像仓库和 npm 源（首次构建需要）。
+- 知道用户浏览器实际访问服务器的地址（IP 或域名 + 端口）。
 
-启动后访问：
-
-```text
-http://localhost:3000
-```
-
-## 本地构建镜像
-
-如果需要基于当前源码构建镜像：
+## 首次部署
 
 ```bash
-docker compose -f docker-compose.local.yml up -d --build
+# 1. 准备配置
+cp .env.example .env
+# 编辑 .env：填 POSTGRES_PASSWORD、RATE_LIMIT_SECRET，
+# 并生成加密密钥（生成后必须异地备份一份，之后不能更换）：
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# 2. 构建并启动
+docker compose up -d --build
+
+# 3. 验证
+curl http://127.0.0.1:3015/api/health   # 应返回 {"ok":true}
 ```
 
-## 文档站镜像
+浏览器打开 `http://服务器IP:3015`，注册第一个账号，在账号配置里保存上游 API Key 即可开始使用。
 
-文档站位于 `docs/` 目录，按带服务端能力的 Next.js standalone 应用单独构建，不打进主应用镜像。
+数据库表结构自动就绪：`001/002`（用户和会话）由 `db-init` 一次性服务创建，`003~005`（工作区、凭证、媒体、任务、历史）由后端每次启动自动补建，都不会清理已有数据。
 
-使用发布镜像：
-
-```bash
-cd docs
-docker compose up -d
-```
-
-基于当前源码本地构建：
-
-```bash
-cd docs
-docker compose -f docker-compose.local.yml up -d --build
-```
-
-## 数据说明
-
-当前主应用镜像只启动 Next.js。画布、我的素材、生成记录和 AI API Key 默认保存在浏览器本地；第三方提示词由浏览器前端直连拉取，不需要额外挂载数据目录。
-
-## 统计分析（可选）
-
-项目**默认不接入任何统计**：不设置下列环境变量时，页面不会加载任何统计脚本，也不会发送任何外部请求。你在自己的部署上想查看流量时，设置对应环境变量即可，无需修改代码或重新构建镜像——镜像启动时会据此生成运行期配置。
-
-统计按「每家一个独立变量」配置：**填了谁就启用谁，可同时启用多家**（例如 GA4 + 百度一起开）。仅支持 GA4 与百度，两者都只接受 ID，脚本地址由代码固定拼接，不接受任意脚本地址或内联 JS。
+## 关键配置（.env）
 
 | 变量 | 说明 |
 | --- | --- |
-| `ANALYTICS_GA4_ID` | Google Analytics 4 衡量 ID（`G-XXXX`） |
-| `ANALYTICS_BAIDU_ID` | 百度统计站点 ID（`hm.js?` 后面那串 hash） |
+| `APP_ORIGIN` | 浏览器地址栏里的完整地址（含端口）。写请求按来源校验，不一致会被后端以 403 拒绝；换端口或域名访问时要同步改这一项并重启。 |
+| `WEB_PORT` | 前端对外端口，默认 3015。 |
+| `POSTGRES_PASSWORD` | 数据库密码，长随机串。 |
+| `CREDENTIALS_ENCRYPTION_KEY` | 32 字节 base64，加密所有账号保存的 API Key。首次设置后不能更换，丢失等于全部账号 Key 作废，必须在服务器之外再存一份。 |
+| `RATE_LIMIT_SECRET` | 登录/注册限流签名，任意随机串。 |
+| `CATALOG_CONFIG_PATH` | 上游目录配置路径，compose 已把 `server/config/catalog.json` 挂载为容器内路径，保持默认。全部模型共用其中的 `baseUrl`，账号 Key 只在该上游做模型发现；修改后重启 api 生效。 |
+| `IMAGE_TAG` | 镜像标签，升级时换成新版本号或提交号，便于回滚。 |
 
-在 `docker-compose.yml` 的 `environment` 中配置（文件内已附注释示例），下例同时启用 GA4 与百度：
+媒体文件默认存在命名卷 `media_data`；`MINIO_*` 五个字段全部配置后改存 MinIO（桶需预先创建）。
 
-```yaml
-services:
-  app:
-    image: ghcr.io/basketikun/infinite-canvas:latest
-    ports:
-      - "3000:3000"
-    environment:
-      ANALYTICS_GA4_ID: G-XXXXXXXXXX
-      ANALYTICS_BAIDU_ID: e8263761cc5c32f5f7a855b8203b965a
-```
-
-或使用 `docker run`：
+## 更新
 
 ```bash
-docker run -d -p 3000:3000 \
-  -e ANALYTICS_GA4_ID=G-XXXXXXXXXX \
-  -e ANALYTICS_BAIDU_ID=e8263761cc5c32f5f7a855b8203b965a \
-  ghcr.io/basketikun/infinite-canvas:latest
+git pull
+# .env 里把 IMAGE_TAG 改成新版本号（如 git 短哈希）
+docker compose build
+docker compose up -d
 ```
 
-单页应用的路由切换会自动向所有已启用的统计上报 pageview。
+数据库结构由后端启动时自动补齐，无独立迁移步骤。
 
-<Callout type="warn">
-请只在你自己的站点上配置统计 ID，不要把 ID 提交进仓库；fork 或自托管本项目的用户默认不会产生任何统计。
-</Callout>
+## 回滚
+
+把 `.env` 的 `IMAGE_TAG` 改回上一个值再 `docker compose up -d` 即可，前提是旧镜像未删除。数据库结构变更目前只增不删，回滚旧版代码不影响数据。
+
+## 备份与恢复
+
+```powershell
+# 每日备份（数据库导出 + 媒体复制 + .env），保留最近 7 份
+powershell -ExecutionPolicy Bypass -File scripts\backup.ps1 -ProjectDir D:\infinite-canvas-v2
+```
+
+建议在 Windows 计划任务里每日执行一次。恢复（先 `docker compose up -d` 确保服务在运行）：
+
+```powershell
+# 数据库：把备份拷进容器再执行 psql，避免 PowerShell 管道改写文件内容
+docker compose cp backups\<时间戳>\db.sql db:/tmp/db.sql
+docker compose exec -T db psql -U infinite_canvas -d infinite_canvas -f /tmp/db.sql
+# 媒体：把备份的 media 目录复制回容器数据目录
+docker compose cp backups\<时间戳>\media api:/app/server/dist/data
+```
+
+`CREDENTIALS_ENCRYPTION_KEY` 包含在备份的 `.env` 里，备份目录请限制访问权限。
+
+## 发布后验证清单
+
+每次部署或升级后：
+
+1. `curl http://127.0.0.1:3015/api/health` 返回 `{"ok":true}`；
+2. `docker compose ps` 三个长驻服务均为 running/healthy；
+3. 浏览器实际注册/登录一次，保存 Key 并试一次生成；
+4. `docker compose logs api --since 10m` 无异常堆栈。
+
+## 安全说明
+
+当前部署走局域网 HTTP：密码和 Key 在内网明文传输，仅适合可信网络。若要通过公网访问，必须先补 HTTPS（反向代理 + 证书或隧道），并把 `APP_ORIGIN` 改成公网地址。

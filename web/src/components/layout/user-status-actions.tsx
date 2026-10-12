@@ -69,7 +69,11 @@ export function UserStatusActions({ variant = "default", onOpenShortcuts, onOpen
                 <button type="button" className={naturalIconClass} style={iconStyle} onClick={() => openConfigDialog(false)} aria-label={t("navigation.config")} title={t("navigation.config")}>
                     <Settings2 className="size-4" />
                 </button>
-            ) : null}
+            ) : (
+                <Link to="/config" className={naturalIconClass} style={iconStyle} aria-label="账号配置" title="账号配置">
+                    <Settings2 className="size-4" />
+                </Link>
+            )}
             {onOpenPlugins ? (
                 <button type="button" className={naturalIconClass} style={iconStyle} onClick={onOpenPlugins} aria-label={t("topNav.plugins")} title={t("topNav.plugins")}>
                     <Puzzle className="size-4" />

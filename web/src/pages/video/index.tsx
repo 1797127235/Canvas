@@ -2,6 +2,8 @@ import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download,
 import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Input, Modal, Tag, Typography } from "antd";
 import localforage from "localforage";
+import { generationHistoryStore } from "@/services/api/generation-history";
+import { useUserStore } from "@/stores/use-user-store";
 import { nanoid } from "nanoid";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
@@ -72,6 +74,13 @@ const logStore = localforage.createInstance({ name: "infinite-canvas", storeName
 export default function VideoPage() {
     const { message } = App.useApp();
     const { t } = useTranslation();
+    const userId = useUserStore((state) => state.user?.id);
+    const history = generationHistoryStore<GenerationLog>("video", logStore, userId);
+    const requestController = useRef(new AbortController());
+    useEffect(() => {
+        requestController.current = new AbortController();
+        return () => requestController.current.abort();
+    }, []);
     useSyncExternalStore(subscribeImagePreviews, getImagePreviewRevision);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const dragDepthRef = useRef(0);
@@ -185,11 +194,12 @@ export default function VideoPage() {
         const batchStartedAt = performance.now();
         setStartedAt(batchStartedAt);
         try {
-            const task = await createVideoGenerationTask(snapshot.config, snapshot.text, snapshot.references);
+            const task = await createVideoGenerationTask(snapshot.config, snapshot.text, snapshot.references, { signal: requestController.current.signal });
             const log = buildLog({ prompt: snapshot.text, model, config: snapshot.config, references: snapshot.references, durationMs: 0, status: "pending", task });
             await saveLog(log, false);
             void pollGenerationLog(log, snapshot.config, agentTaskId);
         } catch (error) {
+            if (requestController.current.signal.aborted || (!bypassLocalAuth && userId !== useUserStore.getState().user?.id)) return;
             const errorMessage = error instanceof Error ? error.message : t("workbench.generationFailed");
             setResults([{ id: nanoid(), status: "failed", error: errorMessage }]);
             if (agentTaskId) updateAgentTask(agentTaskId, { status: "failed", successCount: 0, failCount: 1, error: errorMessage });
@@ -281,7 +291,7 @@ export default function VideoPage() {
             .filter((log) => selectedLogIds.includes(log.id))
             .map((log) => log.video?.storageKey)
             .filter((key): key is string => Boolean(key));
-        void Promise.all([deleteStoredMedia(mediaKeys), ...selectedLogIds.map((id) => logStore.removeItem(id))]).then(() => refreshLogs());
+        void Promise.all([deleteStoredMedia(mediaKeys), ...selectedLogIds.map((id) => history.removeItem(id))]).then(() => refreshLogs());
         if (previewLog && selectedLogIds.includes(previewLog.id)) {
             setPreviewLog(null);
             setResults([]);
@@ -291,15 +301,21 @@ export default function VideoPage() {
     };
 
     const saveLog = async (log: GenerationLog, resumePending = true) => {
-        await logStore.setItem(log.id, serializeLog(log));
+        await history.setItem(log.id, serializeLog(log));
         await refreshLogs(resumePending);
     };
 
     const refreshLogs = async (resumePending = true) => {
-        const nextLogs = await readStoredLogs();
-        setLogs(nextLogs);
-        if (resumePending) resumePendingLogs(nextLogs);
-        return nextLogs;
+        try {
+            const nextLogs = await readStoredLogs(userId);
+            if (!bypassLocalAuth && userId !== useUserStore.getState().user?.id) return [];
+            setLogs(nextLogs);
+            if (resumePending) resumePendingLogs(nextLogs);
+            return nextLogs;
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "生成记录读取失败");
+            return [];
+        }
     };
 
     const resumePendingLogs = (items: GenerationLog[]) => {
@@ -316,7 +332,8 @@ export default function VideoPage() {
         setResults((value) => (value.length ? value : [{ id: log.id, status: "pending" }]));
         const taskConfig = buildVideoConfig({ ...effectiveConfig, ...log.config }, log.task.model || log.model);
         try {
-            const result = await waitForVideoGenerationTask(configOverride || taskConfig, log.task);
+            const result = await waitForVideoGenerationTask(configOverride || taskConfig, log.task, { signal: requestController.current.signal });
+            if (requestController.current.signal.aborted || (!bypassLocalAuth && userId !== useUserStore.getState().user?.id)) return;
             const stored = await storeGeneratedVideo(result);
             const nextVideo: GeneratedVideo = {
                 id: nanoid(),
@@ -333,6 +350,7 @@ export default function VideoPage() {
             await saveLog({ ...log, status: "success", durationMs: nextVideo.durationMs, video: nextVideo, error: undefined });
             message.success(t("videoWorkbench.generated"));
         } catch (error) {
+            if (requestController.current.signal.aborted || (!bypassLocalAuth && userId !== useUserStore.getState().user?.id)) return;
             const errorMessage = error instanceof Error ? error.message : t("workbench.generationFailed");
             setResults([{ id: log.id, status: "failed", error: errorMessage }]);
             if (agentTaskId) updateAgentTask(agentTaskId, { status: "failed", successCount: 0, failCount: 1, error: errorMessage });
@@ -540,7 +558,7 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
         <>
             <label className="col-span-2 block min-w-0 sm:col-span-1">
                 <span className="mb-1.5 block text-sm font-semibold sm:mb-2 sm:text-base">{t("workbench.model")}</span>
-                {import.meta.env.DEV ? <div className="flex h-8 items-center text-sm">MiniMax H3</div> : <ModelPicker config={config} value={model} onChange={(value) => updateConfig("videoModel", value)} capability="video" fullWidth onMissingConfig={() => openConfigDialog(false)} />}
+                <ModelPicker config={config} value={model} onChange={(value) => updateConfig("videoModel", value)} capability="video" fullWidth onMissingConfig={() => openConfigDialog(false)} />
             </label>
             <div className="col-span-2">
                 <VideoSettingsPanel config={config} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-4" />
@@ -692,15 +710,13 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
     );
 }
 
-async function readStoredLogs() {
+async function readStoredLogs(userId?: string) {
     if (typeof window === "undefined") return [];
     try {
-        const logs: GenerationLog[] = [];
-        await logStore.iterate<GenerationLog, void>((value) => {
-            logs.push(value);
-        });
+        const logs = await generationHistoryStore<GenerationLog>("video", logStore, userId).read();
         return (await Promise.all(logs.map(normalizeLog))).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    } catch {
+    } catch (error) {
+        if (!bypassLocalAuth) throw error;
         return [];
     }
 }

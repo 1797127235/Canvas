@@ -2,6 +2,8 @@ import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download,
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Tooltip, Typography } from "antd";
 import localforage from "localforage";
+import { generationHistoryStore } from "@/services/api/generation-history";
+import { useUserStore } from "@/stores/use-user-store";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
@@ -72,6 +74,13 @@ const logStore = localforage.createInstance({ name: "infinite-canvas", storeName
 export default function ImagePage() {
     const { message } = App.useApp();
     const { t } = useTranslation();
+    const userId = useUserStore((state) => state.user?.id);
+    const history = generationHistoryStore<GenerationLog>("image", logStore, userId);
+    const requestController = useRef(new AbortController());
+    useEffect(() => {
+        requestController.current = new AbortController();
+        return () => requestController.current.abort();
+    }, []);
     useSyncExternalStore(subscribeImagePreviews, getImagePreviewRevision);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const dragDepthRef = useRef(0);
@@ -182,6 +191,7 @@ export default function ImagePage() {
         const tasks = Array.from({ length: generationCount }, (_, index) => runGenerationSlot(index, snapshot));
 
         const result = await Promise.allSettled(tasks);
+        if (requestController.current.signal.aborted || (!bypassLocalAuth && userId !== useUserStore.getState().user?.id)) return;
         const successImages = result.filter((item): item is PromiseFulfilledResult<GeneratedImage> => item.status === "fulfilled").map((item) => item.value);
         const successCount = successImages.length;
         const failCount = generationCount - successCount;
@@ -280,7 +290,7 @@ export default function ImagePage() {
 
     const deleteSelectedLogs = () => {
         const imageKeys = logs.filter((log) => selectedLogIds.includes(log.id)).flatMap((log) => log.images.map((image) => image.storageKey).filter((key): key is string => Boolean(key)));
-        void Promise.all([deleteStoredImages(imageKeys), ...selectedLogIds.map((id) => logStore.removeItem(id))]).then(refreshLogs);
+        void Promise.all([deleteStoredImages(imageKeys), ...selectedLogIds.map((id) => history.removeItem(id))]).then(refreshLogs);
         if (previewLog && selectedLogIds.includes(previewLog.id)) {
             setPreviewLog(null);
             setResults([]);
@@ -290,10 +300,17 @@ export default function ImagePage() {
     };
 
     const saveLog = (log: GenerationLog) => {
-        void logStore.setItem(log.id, serializeLog(log)).then(refreshLogs);
+        void history.setItem(log.id, serializeLog(log)).then(refreshLogs).catch(error => message.error(error instanceof Error ? error.message : "生成记录保存失败"));
     };
 
-    const refreshLogs = async () => setLogs(await readStoredLogs());
+    const refreshLogs = async () => {
+        try {
+            const items = await readStoredLogs(userId);
+            if (bypassLocalAuth || userId === useUserStore.getState().user?.id) setLogs(items);
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "生成记录读取失败");
+        }
+    };
 
     const previewGenerationLog = async (log: GenerationLog) => {
         setPreviewLog(log);
@@ -324,10 +341,12 @@ export default function ImagePage() {
     const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }) => {
         const itemStartedAt = performance.now();
         try {
-            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references) : await requestGeneration(snapshot.config, snapshot.text);
+            const signal = requestController.current.signal;
+            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references, { signal }) : await requestGeneration(snapshot.config, snapshot.text, { signal });
+            if (!bypassLocalAuth && userId !== useUserStore.getState().user?.id) throw new DOMException("账号已切换", "AbortError");
             const image = result[0];
             if (!image) throw new Error(t("imageWorkbench.missingResult"));
-            const stored = await uploadImage(image.dataUrl);
+            const stored = await uploadImage(image.dataUrl, { signal: requestController.current.signal });
             const nextImage: GeneratedImage = {
                 id: image.id,
                 dataUrl: stored.url,
@@ -781,16 +800,14 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
     );
 }
 
-async function readStoredLogs() {
+async function readStoredLogs(userId?: string) {
     if (typeof window === "undefined") return [];
     try {
-        const values: GenerationLog[] = [];
-        await logStore.iterate<GenerationLog, void>((value) => {
-            values.push(value);
-        });
+        const values = await generationHistoryStore<GenerationLog>("image", logStore, userId).read();
         const logs = await Promise.all(values.map(normalizeLog));
         return logs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    } catch {
+    } catch (error) {
+        if (!bypassLocalAuth) throw error;
         return [];
     }
 }

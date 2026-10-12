@@ -96,7 +96,7 @@ export function AppTopNav() {
             ) : null}
 
             <MobileNavDrawer open={mobileNavOpen} activeToolSlug={activeToolSlug} onClose={() => setMobileNavOpen(false)} />
-            {bypassLocalAuth ? <AppConfigModal /> : null}
+            <AppConfigModal />
         </>
     );
 }

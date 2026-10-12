@@ -3,15 +3,15 @@ import { z } from "zod";
 
 export const capabilities = ["image", "video", "text", "audio"] as const;
 export type Capability = typeof capabilities[number];
-export const adapterIds = ["openai-chat", "openai-images", "openai-speech", "openai-videos", "minimax-videos"] as const;
+export const adapterIds = ["openai-chat", "openai-images", "openai-speech", "openai-videos"] as const;
 export type AdapterId = typeof adapterIds[number];
 // Each adapter serves exactly one capability; a mismatch is a configuration error, not a runtime surprise.
 const adapterCapabilities: Record<AdapterId, Capability> = {
-    "openai-chat": "text", "openai-images": "image", "openai-speech": "audio", "openai-videos": "video", "minimax-videos": "video",
+    "openai-chat": "text", "openai-images": "image", "openai-speech": "audio", "openai-videos": "video",
 };
 const modelSchema = z.strictObject({
     id: z.string().min(1), name: z.string().min(1), upstreamModel: z.string().min(1), adapter: z.enum(adapterIds),
-    capability: z.enum(capabilities), enabled: z.boolean(), baseUrl: z.string().trim().min(1), apiKey: z.string().trim().min(1),
+    capability: z.enum(capabilities), enabled: z.boolean(), baseUrl: z.string().trim().min(1),
 });
 const schema = z.strictObject({ models: z.array(modelSchema) });
 export type CatalogModel = z.infer<typeof modelSchema>;
@@ -23,13 +23,56 @@ export async function loadCatalog(path?: string, production = false): Promise<Ca
         const input = schema.parse(JSON.parse(await readFile(path, "utf8")));
         for (const model of input.models) {
             const url = new URL(model.baseUrl);
-            if (url.username || url.password || url.search || url.hash || (production && url.protocol !== "https:") || (!production && !["http:", "https:"].includes(url.protocol))) throw new Error();
+            // 上游与上线环境一致允许 http/https，不再区分生产强制 https。
+            if (url.username || url.password || url.search || url.hash || !["http:", "https:"].includes(url.protocol)) throw new Error();
             if (adapterCapabilities[model.adapter] !== model.capability) throw new Error();
         }
         if (new Set(input.models.map(model => model.id)).size !== input.models.length) throw new Error();
-        return { models: input.models.map(model => ({ ...model, baseUrl: new URL(model.baseUrl).toString().replace(/\/$/, "") })) };
+        const models = input.models.map(model => ({ ...model, baseUrl: new URL(model.baseUrl).toString().replace(/\/+$/, "") }));
+        if (new Set(models.map(model => model.baseUrl)).size > 1) throw new Error();
+        return { models };
     } catch {
         throw new Error("Invalid catalog configuration");
+    }
+}
+
+const upstreamModelsSchema = z.object({ data: z.array(z.object({
+    id: z.string().min(1), capability: z.unknown().optional(), capabilities: z.unknown().optional(),
+})) });
+const capabilitySchema = z.enum(capabilities);
+const capabilityAdapters: Record<Capability, AdapterId> = {
+    text: "openai-chat", image: "openai-images", audio: "openai-speech", video: "openai-videos",
+};
+
+function guessCapability(name: string): Capability {
+    const value = name.toLowerCase();
+    if (["video", "sora", "veo", "kling", "wan", "hailuo", "seedance", "minimax-h"].some(keyword => value.includes(keyword))) return "video";
+    if (["audio", "tts", "speech", "voice", "music", "sound"].some(keyword => value.includes(keyword))) return "audio";
+    if (["seedream", "gpt-image", "image", "dall-e", "dalle", "imagen", "flux", "sdxl", "stable-diffusion", "midjourney"].some(keyword => value.includes(keyword))) return "image";
+    return "text";
+}
+
+export async function accountModels(catalog: Catalog, apiKey: string): Promise<CatalogModel[]> {
+    try {
+        const baseUrl = catalog.models[0]?.baseUrl;
+        if (!baseUrl) throw new Error();
+        const response = await fetch(`${baseUrl}/models`, {
+            method: "GET", headers: { authorization: `Bearer ${apiKey}` }, redirect: "error",
+        });
+        if (!response.ok) throw new Error();
+        const upstream = upstreamModelsSchema.parse(await response.json());
+        return upstream.data.map(model => {
+            const override = catalog.models.find(configured => configured.upstreamModel === model.id || configured.id === model.id);
+            const metadata = capabilitySchema.safeParse(model.capability);
+            const metadataList = z.array(capabilitySchema).nonempty().safeParse(model.capabilities);
+            const capability = override?.capability || (metadata.success ? metadata.data : metadataList.success ? metadataList.data[0] : guessCapability(model.id));
+            return {
+                id: override?.id || model.id, name: override?.name || model.id, upstreamModel: model.id,
+                capability, adapter: override?.adapter || capabilityAdapters[capability], enabled: override?.enabled ?? true, baseUrl,
+            };
+        });
+    } catch {
+        throw new Error("Upstream model discovery failed");
     }
 }
 

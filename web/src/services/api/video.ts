@@ -20,13 +20,6 @@ type ApiEnvelope<T> = T | { code?: number | string; data?: T | null; msg?: strin
 type RequestOptions = { signal?: AbortSignal };
 type VideoMediaOptions = RequestOptions & { videos?: ReferenceVideo[]; audios?: ReferenceAudio[] };
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
-// Development-only direct route for the verified Codex2API MiniMax-H3 provider.
-const devVideoKey = import.meta.env.VITE_DEV_VIDEO_API_KEY;
-const DEV_VIDEO = import.meta.env.DEV && devVideoKey ? {
-    baseUrl: "https://www.codex2api.com/v1",
-    apiKey: devVideoKey,
-    model: "MiniMax-H3",
-} : null;
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
 export type VideoGenerationTask = { id: string; provider: "openai" | "gemini" | "plugin"; model: string };
@@ -81,11 +74,10 @@ function videoTaskFailed(message: string) {
 
 export async function createVideoGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[] = [], options?: VideoMediaOptions): Promise<VideoGenerationTask> {
     const selectedModel = (config.model || config.videoModel).trim();
-    if (DEV_VIDEO) return createDevVideoTask(config, prompt, references, options);
     if (!bypassLocalAuth) {
         await useCatalogStore.getState().load();
         const model = catalogModel("video", selectedModel);
-        if (!model) throw new Error("暂无可用视频模型");
+        if (!model) throw new Error(useCatalogStore.getState().error || "暂无可用视频模型");
         const images = await Promise.all(references.map((image) => imageToDataUrl(image, options)));
         const mediaData = async (items: ReferenceVideo[] | ReferenceAudio[], name: string) => Promise.all(items.map(async (item) => readFileAsDataUrl(await referenceMediaToFile(item, name, "invalidReferenceVideo", options))));
         const payload = await requestServerGeneration("video", model.id, {
@@ -108,13 +100,11 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
 }
 
 export async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
-    if (DEV_VIDEO && task.model === "minimax-h3") return pollDevVideoTask(task, options);
     if (!bypassLocalAuth) {
         const payload = unwrapVideoResponse(await pollServerGeneration(task.id, options?.signal) as ApiVideoResponse);
         if (["failed", "cancelled"].includes(payload.status || "")) return { status: "failed", error: payload.error?.message || apiText("videoGenerationFailed") };
-        const url = videoResultUrl(payload);
-        if (url) return { status: "completed", result: await videoResultFromUrl(url, options) };
-        if (payload.status === "completed") return { status: "completed", result: { blob: await fetchServerGenerationContent(task.id, options?.signal) } };
+        // 上游完成态可能是 completed、done 或 succeeded，统一视为完成并经服务端代理下载。
+        if (["completed", "done", "succeeded"].includes(payload.status || "") || videoResultUrl(payload)) return { status: "completed", result: { blob: await fetchServerGenerationContent(task.id, options?.signal) } };
         return { status: "pending" };
     }
     if (task.provider === "plugin") {
@@ -174,6 +164,7 @@ function videoPluginResult(result: unknown): VideoGenerationResult {
 export async function storeGeneratedVideo(result: VideoGenerationResult): Promise<UploadedFile> {
     if (result.blob) return uploadMediaFile(result.blob, "video");
     if (result.url) {
+        if (!bypassLocalAuth) return uploadMediaFile(result.url, "video");
         try {
             return await uploadMediaFile(result.url, "video");
         } catch {
@@ -181,39 +172,6 @@ export async function storeGeneratedVideo(result: VideoGenerationResult): Promis
         }
     }
     throw new Error(apiText("noPlayableVideo"));
-}
-
-async function createDevVideoTask(config: AiConfig, prompt: string, references: ReferenceImage[], options?: VideoMediaOptions): Promise<VideoGenerationTask> {
-    if (!DEV_VIDEO) throw new Error("视频模型不可用");
-    const images = await Promise.all(references.map((image) => imageToDataUrl(image, options)));
-    const duration = Math.min(15, Math.max(4, Number(normalizeVideoSeconds(config.videoSeconds)) || 6));
-    const response = await fetch(`${DEV_VIDEO.baseUrl}/videos`, {
-        method: "POST",
-        signal: options?.signal,
-        headers: { Authorization: `Bearer ${DEV_VIDEO.apiKey}`, "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-            model: DEV_VIDEO.model, prompt, duration, resolution: "768P", ratio: devVideoRatio(config.size),
-            ...(images[0] ? { image: images[0] } : {}),
-        }),
-    });
-    const payload = await response.json().catch(() => null) as { id?: string; error?: { message?: string } } | null;
-    if (!response.ok || !payload?.id) throw new Error(payload?.error?.message || apiText("videoTaskCreateFailed"));
-    return { id: payload.id, provider: "openai", model: "minimax-h3" };
-}
-
-async function pollDevVideoTask(task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
-    if (!DEV_VIDEO) return { status: "failed", error: "视频模型不可用" };
-    const headers = { Authorization: `Bearer ${DEV_VIDEO.apiKey}`, Accept: "application/json" };
-    const response = await fetch(`${DEV_VIDEO.baseUrl}/videos/${encodeURIComponent(task.id)}`, { headers, signal: options?.signal });
-    const payload = await response.json().catch(() => null) as { status?: string; error?: { message?: string } } | null;
-    if (!response.ok) return { status: "failed", error: payload?.error?.message || apiText("videoGenerationFailed") };
-    if (payload?.status === "completed") {
-        const content = await fetch(`${DEV_VIDEO.baseUrl}/videos/${encodeURIComponent(task.id)}/content`, { headers, signal: options?.signal });
-        if (!content.ok) return { status: "failed", error: apiText("videoGenerationFailed") };
-        return { status: "completed", result: { blob: await content.blob(), mimeType: "video/mp4" } };
-    }
-    if (payload?.status === "failed" || payload?.status === "cancelled") return { status: "failed", error: payload.error?.message || apiText("videoGenerationFailed") };
-    return { status: "pending" };
 }
 
 async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: VideoMediaOptions): Promise<VideoGenerationTask> {
@@ -352,11 +310,6 @@ function geminiOperationUrl(config: Pick<AiConfig, "baseUrl">, name: string) {
 
 function geminiVideoHeaders(config: Pick<AiConfig, "apiKey">) {
     return { "x-goog-api-key": config.apiKey, "Content-Type": "application/json" };
-}
-
-function devVideoRatio(size: string) {
-    const ratio = videoAspectRatio(size);
-    return ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"].includes(ratio) ? ratio : "16:9";
 }
 
 function videoAspectRatio(size: string) {

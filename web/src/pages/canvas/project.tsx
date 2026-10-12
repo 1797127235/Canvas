@@ -57,6 +57,8 @@ import {
     buildGenerationConfig,
     findRetrySourceNode,
     generationReferenceUrls,
+    generationOutputNode,
+    nodeGenerationPrompt,
     getGenerationCount,
     getInputSummary,
     hasResumableVideoTask,
@@ -319,8 +321,8 @@ function InfiniteCanvasPage() {
             videoPollIdsRef.current.add(node.id);
             let controller: AbortController | undefined;
             try {
-                const generationConfig = { ...buildGenerationConfig(effectiveConfig, node, "video"), ...(import.meta.env.DEV ? { model: "minimax-h3" } : {}) };
-                if (!import.meta.env.DEV && !isAiConfigReady(generationConfig, generationConfig.model)) {
+                const generationConfig = buildGenerationConfig(effectiveConfig, node, "video");
+                if (!isAiConfigReady(generationConfig, generationConfig.model)) {
                     if (silent) {
                         setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: t("workbench.configFirst") } } : item)));
                         return;
@@ -516,6 +518,10 @@ function InfiniteCanvasPage() {
 
     useEffect(() => {
         if (!projectLoaded) return;
+        if (effectiveConfig.channelMode === "remote") {
+            updateProject(projectId, { viewport });
+            return;
+        }
         if (viewportSaveTimerRef.current) clearTimeout(viewportSaveTimerRef.current);
         viewportSaveTimerRef.current = setTimeout(() => {
             updateProject(projectId, { viewport: viewportRef.current });
@@ -524,7 +530,7 @@ function InfiniteCanvasPage() {
         return () => {
             if (viewportSaveTimerRef.current) clearTimeout(viewportSaveTimerRef.current);
         };
-    }, [projectId, projectLoaded, updateProject, viewport]);
+    }, [effectiveConfig.channelMode, projectId, projectLoaded, updateProject, viewport]);
 
     useLayoutEffect(() => {
         nodesRef.current = nodes;
@@ -2306,6 +2312,14 @@ function InfiniteCanvasPage() {
                 return;
             }
 
+            let fixedOutput: CanvasNodeData | undefined;
+            try {
+                fixedOutput = generationOutputNode(sourceNode, mode, nodesRef.current, connectionsRef.current);
+            } catch (error) {
+                message.error(error instanceof Error ? error.message : t("canvas.projectPage.generationFailed"));
+                return;
+            }
+
             // useBuiltinPanel.writeBackToSelf reuses built-in generation while writing the result back to the plugin node.
             // Image mode currently supports display-only nodes such as panoramas, with a useBuiltinPanel.promptPrefix.
             const builtinPanel = sourceNode ? getNodeDefinition(sourceNode.type)?.useBuiltinPanel : undefined;
@@ -2377,20 +2391,23 @@ function InfiniteCanvasPage() {
                     const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : isImageNode ? CanvasNodeType.Image : CanvasNodeType.Text];
                     const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
                     const parentPosition = sourceNode?.position || { x: 0, y: 0 };
-                    const rootId = isEmptyImageNode ? nodeId : nanoid();
+                    const rootId = fixedOutput?.id || (isEmptyImageNode ? nodeId : nanoid());
                     const imageIds = Array.from({ length: count }, () => nanoid());
                     pendingChildIds = [rootId];
                     const rootNode: CanvasNodeData = {
                         id: rootId,
                         type: CanvasNodeType.Image,
-                        title: effectivePrompt.slice(0, 32) || "Generated Image",
-                        position: {
+                        title: fixedOutput?.title || effectivePrompt.slice(0, 32) || "Generated Image",
+                        position: fixedOutput?.position || {
                             x: isEmptyImageNode ? parentPosition.x : parentPosition.x + parentConfig.width + 96,
                             y: parentPosition.y + parentConfig.height / 2 - imageConfig.height / 2,
                         },
-                        width: isEmptyImageNode ? sourceNode?.width || imageConfig.width : imageConfig.width,
-                        height: isEmptyImageNode ? sourceNode?.height || imageConfig.height : imageConfig.height,
+                        width: fixedOutput?.width || (isEmptyImageNode ? sourceNode?.width || imageConfig.width : imageConfig.width),
+                        height: fixedOutput?.height || (isEmptyImageNode ? sourceNode?.height || imageConfig.height : imageConfig.height),
                         metadata: {
+                            ...fixedOutput?.metadata,
+                            primaryImageId: undefined,
+                            errorDetails: undefined,
                             prompt: effectivePrompt,
                             status: NODE_STATUS_LOADING,
                             images: imageIds.map((id) => ({ id, status: NODE_STATUS_LOADING, content: "", naturalWidth: 0, naturalHeight: 0, bytes: 0, mimeType: "" })),
@@ -2428,11 +2445,11 @@ function InfiniteCanvasPage() {
                                               height: parentConfig.height,
                                               metadata: { ...node.metadata, content: prompt, prompt, status: NODE_STATUS_SUCCESS, fontSize: 14, errorDetails: undefined },
                                           }
-                                : node,
+                                : node.id === fixedOutput?.id ? rootNode : node,
                         ),
-                        ...(isEmptyImageNode ? [] : [rootNode]),
+                        ...(isEmptyImageNode || fixedOutput ? [] : [rootNode]),
                     ]);
-                    if (!isEmptyImageNode) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: rootId }]);
+                    if (!isEmptyImageNode && !fixedOutput) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: rootId }]);
                     setSelectedNodeIds(new Set([nodeId]));
                     setSelectedConnectionId(null);
                     setDialogNodeId(nodeId);
@@ -2510,16 +2527,20 @@ function InfiniteCanvasPage() {
                 if (mode === "video") {
                     const spec = nodeSizeFromRatio(generationConfig.size, NODE_DEFAULT_SIZE[CanvasNodeType.Video].width, NODE_DEFAULT_SIZE[CanvasNodeType.Video].height) || NODE_DEFAULT_SIZE[CanvasNodeType.Video];
                     const isEmptyVideoNode = sourceNode?.type === CanvasNodeType.Video && !sourceNode.metadata?.content;
-                    const videoId = isEmptyVideoNode ? nodeId : nanoid();
+                    const videoId = fixedOutput?.id || (isEmptyVideoNode ? nodeId : nanoid());
                     const parent = sourceNode?.position || { x: 0, y: 0 };
                     const videoNode: CanvasNodeData = {
                         id: videoId,
                         type: CanvasNodeType.Video,
-                        title: effectivePrompt.slice(0, 32) || "Generated Video",
-                        position: isEmptyVideoNode ? sourceNode.position : { x: parent.x + (sourceNode?.width || spec.width) + 96, y: parent.y },
-                        width: isEmptyVideoNode ? sourceNode.width : spec.width,
-                        height: isEmptyVideoNode ? sourceNode.height : spec.height,
+                        title: fixedOutput?.title || effectivePrompt.slice(0, 32) || "Generated Video",
+                        position: fixedOutput?.position || (isEmptyVideoNode ? sourceNode.position : { x: parent.x + (sourceNode?.width || spec.width) + 96, y: parent.y }),
+                        width: fixedOutput?.width || (isEmptyVideoNode ? sourceNode.width : spec.width),
+                        height: fixedOutput?.height || (isEmptyVideoNode ? sourceNode.height : spec.height),
                         metadata: {
+                            ...fixedOutput?.metadata,
+                            videoTaskId: undefined,
+                            videoTaskProvider: undefined,
+                            errorDetails: undefined,
                             prompt: effectivePrompt,
                             status: NODE_STATUS_LOADING,
                             model: generationConfig.model,
@@ -2534,11 +2555,11 @@ function InfiniteCanvasPage() {
                     };
                     pendingChildIds = [videoId];
                     setNodes((prev) =>
-                        isEmptyVideoNode
-                            ? prev.map((node) => (node.id === nodeId ? { ...node, ...videoNode } : node))
+                        isEmptyVideoNode || fixedOutput
+                            ? prev.map((node) => node.id === videoId ? { ...node, ...videoNode } : node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS } } : node)
                             : [...prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS } } : node)), videoNode],
                     );
-                    if (!isEmptyVideoNode) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: videoId }]);
+                    if (!isEmptyVideoNode && !fixedOutput) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: videoId }]);
                     const controller = startGenerationRequest(videoId, nodeId, nodeId, runController);
                     try {
                         await completeVideoNodeTask(videoId, generationConfig, effectivePrompt, generationContext.referenceImages, controller.signal, {
@@ -2741,7 +2762,7 @@ function InfiniteCanvasPage() {
             }
             const sourceNode = findRetrySourceNode(node.id, nodesRef.current, connectionsRef.current) || node;
             const savedImageMetadata = node.type === CanvasNodeType.Image ? node.metadata : undefined;
-            const hasSavedImageMetadata = Boolean(savedImageMetadata?.generationType);
+            const hasSavedImageMetadata = sourceNode.type !== CanvasNodeType.Config && Boolean(savedImageMetadata?.generationType);
             const generationConfig =
                 hasSavedImageMetadata && savedImageMetadata
                     ? {
@@ -2758,13 +2779,13 @@ function InfiniteCanvasPage() {
                 return;
             }
 
-            const context = hasSavedImageMetadata ? null : await hydrateNodeGenerationContext(buildNodeGenerationContext(sourceNode.id, nodesRef.current, connectionsRef.current, sourceNode.metadata?.prompt || node.metadata?.prompt || ""));
-            const prompt = (savedImageMetadata?.prompt || context?.prompt || "").trim();
+            const context = hasSavedImageMetadata ? null : await hydrateNodeGenerationContext(buildNodeGenerationContext(sourceNode.id, nodesRef.current, connectionsRef.current, nodeGenerationPrompt(sourceNode) || nodeGenerationPrompt(node)));
+            const prompt = (hasSavedImageMetadata ? savedImageMetadata?.prompt || "" : context?.prompt || "").trim();
             if (!prompt) {
                 message.warning(t("canvas.projectPage.retryPromptMissing"));
                 return;
             }
-            const generationType = savedImageMetadata?.generationType;
+            const generationType = hasSavedImageMetadata ? savedImageMetadata?.generationType : undefined;
             const useReferenceImages = generationType ? generationType === "edit" : Boolean(context?.referenceImages.length);
             const retryReferenceImages =
                 hasSavedImageMetadata && savedImageMetadata ? await resolveMetadataReferences(savedImageMetadata) : useReferenceImages ? (context?.referenceImages.length ? context.referenceImages : sourceNodeReferenceImages(sourceNode)) : [];
@@ -2827,7 +2848,7 @@ function InfiniteCanvasPage() {
                     bytes: uploadedImage.bytes,
                     mimeType: uploadedImage.mimeType,
                 };
-                const generationMetadata = savedImageMetadata?.generationType
+                const generationMetadata = hasSavedImageMetadata && savedImageMetadata?.generationType
                     ? {
                           generationType: savedImageMetadata.generationType,
                           model: generationConfig.model,

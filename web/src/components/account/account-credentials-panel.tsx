@@ -1,28 +1,46 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Input, Space } from "antd";
+import { Alert, Button, Input, Select, Space } from "antd";
 
 import { clearCredential, getCredential, saveCredential } from "@/services/api/account";
 import { useCatalogStore } from "@/stores/use-catalog-store";
+import { useConfigStore, type ModelCapability } from "@/stores/use-config-store";
+
+const modelFields = [
+    { capability: "image", field: "imageModel", label: "图片模型" },
+    { capability: "video", field: "videoModel", label: "视频模型" },
+    { capability: "text", field: "textModel", label: "文本模型" },
+    { capability: "audio", field: "audioModel", label: "音频模型" },
+] as const satisfies ReadonlyArray<{ capability: ModelCapability; field: string; label: string }>;
 
 export function AccountCredentialsPanel() {
     const [key, setKey] = useState("");
     const [status, setStatus] = useState<{ configured: boolean; masked: string | null } | null>(null);
-    const models = useCatalogStore((state) => state.models);
-    const [message, setMessage] = useState("");
+    const { models, status: catalogStatus, error: catalogError, load, reset } = useCatalogStore();
+    const config = useConfigStore((state) => state.config);
+    const updateConfig = useConfigStore((state) => state.updateConfig);
+    const [notice, setNotice] = useState<{ text: string; type: "success" | "error" } | null>(null);
     const [busy, setBusy] = useState(false);
     useEffect(() => {
-        void getCredential().then(setStatus).catch((error) => setMessage(error instanceof Error ? error.message : "账号配置读取失败"));
+        let active = true;
+        void getCredential().then((value) => {
+            if (active) setStatus(value);
+        }).catch((error) => {
+            if (active) setNotice({ text: error instanceof Error ? error.message : "账号配置读取失败", type: "error" });
+        });
+        return () => { active = false; };
     }, []);
     const save = async () => {
         if (!key.trim()) return;
         setBusy(true);
         try {
-            await saveCredential(key);
-            setStatus({ configured: true, masked: `${key.slice(0, 4)}••••${key.slice(-4)}` });
+            await saveCredential(key.trim());
             setKey("");
-            setMessage("API Key 已保存");
+            setStatus(await getCredential());
+            reset();
+            await load();
+            setNotice({ text: "API Key 已保存", type: "success" });
         } catch (error) {
-            setMessage(error instanceof Error ? error.message : "API Key 保存失败");
+            setNotice({ text: error instanceof Error ? error.message : "API Key 保存失败", type: "error" });
         } finally {
             setBusy(false);
         }
@@ -31,28 +49,41 @@ export function AccountCredentialsPanel() {
         setBusy(true);
         try {
             await clearCredential();
+            reset();
+            setKey("");
             setStatus({ configured: false, masked: null });
-            setMessage("API Key 已清除");
+            setNotice({ text: "API Key 已清除", type: "success" });
         } catch (error) {
-            setMessage(error instanceof Error ? error.message : "API Key 清除失败");
+            setNotice({ text: error instanceof Error ? error.message : "API Key 清除失败", type: "error" });
         } finally {
             setBusy(false);
         }
     };
     return <section className="max-w-xl space-y-5">
-        {message ? <Alert message={message} type={message.includes("失败") ? "error" : "success"} showIcon /> : null}
+        {notice ? <Alert title={notice.text} type={notice.type} showIcon /> : null}
         <div>
             <h2 className="text-base font-semibold">账号 API Key</h2>
-            <p className="mt-1 text-sm text-stone-500">Key 只在服务端加密保存，页面不会重新显示完整内容。</p>
+            <p className="mt-1 text-sm text-muted-foreground">Key 在服务端加密保存。所有生成使用这一把 Key，可用模型从上游读取。</p>
         </div>
         <Space.Compact block>
-            <Input.Password value={key} onChange={(event) => setKey(event.target.value)} placeholder={status?.configured ? `当前：${status.masked}` : "输入 API Key"} />
+            <Input.Password disabled={busy} value={key} onChange={(event) => setKey(event.target.value)} placeholder={status?.configured ? `当前：${status.masked}` : "输入 API Key"} onPressEnter={() => void save()} />
             <Button type="primary" loading={busy} disabled={!key.trim()} onClick={() => void save()}>保存</Button>
         </Space.Compact>
         <Button danger disabled={!status?.configured || busy} onClick={() => void clear()}>清除 API Key</Button>
-        <div>
-            <h2 className="text-base font-semibold">服务端模型</h2>
-            {models.length ? <ul className="mt-2 space-y-1 text-sm text-stone-600 dark:text-stone-300">{models.map((model) => <li key={model.id}>{model.name} · {model.capability}</li>)}</ul> : <p className="mt-2 text-sm text-stone-500">管理员尚未配置可用模型。</p>}
+        <div className="space-y-3">
+            <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold">上游模型</h2>
+                <Button type="text" loading={catalogStatus === "loading"} disabled={!status?.configured || busy} onClick={() => { reset(); void load(); }}>刷新模型</Button>
+            </div>
+            {status?.configured && catalogError ? <Alert title={catalogError} type="error" showIcon /> : null}
+            {modelFields.map(({ capability, field, label }) => {
+                const options = models.filter((model) => model.capability === capability).map((model) => ({ value: model.id, label: model.name }));
+                return <label key={field} className="block space-y-1">
+                    <span className="text-sm">{label}</span>
+                    <Select className="w-full" showSearch optionFilterProp="label" value={options.some((item) => item.value === config[field]) ? config[field] : options[0]?.value} options={options} placeholder="上游暂无此类模型" disabled={busy || !options.length} onChange={(value) => updateConfig(field, value)} />
+                </label>;
+            })}
+            <p className="text-xs text-muted-foreground">视频继续使用原生清晰度、比例、时长、参考模式、声音和水印设置，实际支持范围由所选上游模型决定。</p>
         </div>
     </section>;
 }

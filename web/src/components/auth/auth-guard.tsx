@@ -1,12 +1,17 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 
 import { bypassLocalAuth } from "@/lib/auth-access";
 import { useUserStore } from "@/stores/use-user-store";
+import { useWorkspaceStore } from "@/stores/use-workspace-store";
 
 export function AuthGuard({ children, localData = false }: { children: ReactNode; localData?: boolean }) {
     const location = useLocation();
     const status = useUserStore((state) => state.status);
+    const userId = useUserStore((state) => state.user?.id);
+    const workspaceOwner = useWorkspaceStore((state) => state.owner);
+    const workspaceStatus = useWorkspaceStore((state) => state.status);
+    const workspaceError = useWorkspaceStore((state) => state.error);
 
     if (bypassLocalAuth) return <>{children}</>;
     if (status === "loading") return <div className="grid h-full place-items-center bg-background text-sm text-stone-500">正在确认登录状态…</div>;
@@ -21,5 +26,7 @@ export function AuthGuard({ children, localData = false }: { children: ReactNode
             </section>
         </main>
     );
-    return <>{children}</>;
+    if (location.pathname !== "/config" && (workspaceOwner !== userId || workspaceStatus === "loading")) return <div className="grid h-full place-items-center text-sm text-muted-foreground">正在读取账号工作区…</div>;
+    if (location.pathname !== "/config" && workspaceStatus === "error" && !useWorkspaceStore.getState().flush) return <div className="grid h-full place-items-center text-sm text-muted-foreground">{workspaceError}，请刷新重试。</div>;
+    return <Fragment key={userId}>{children}</Fragment>;
 }

@@ -31,9 +31,11 @@ test("rejects invalid origins and development origins outside localhost", () => 
     }
 });
 
-test("requires HTTPS in production", () => {
-    assert.throws(() => readConfig({ ...environment, NODE_ENV: "production" }));
+test("allows HTTP and HTTPS origins in production", () => {
+    assert.equal(readConfig({ ...environment, NODE_ENV: "production" }).appOrigin, "http://localhost:3000");
+    assert.equal(readConfig({ ...environment, NODE_ENV: "production", APP_ORIGIN: "http://example.com:3015" }).appOrigin, "http://example.com:3015");
     assert.equal(readConfig({ ...environment, NODE_ENV: "production", APP_ORIGIN: "https://example.com" }).appOrigin, "https://example.com");
+    assert.throws(() => readConfig({ ...environment, NODE_ENV: "production", APP_ORIGIN: "ftp://example.com" }));
 });
 
 test("rejects invalid ports and non-PostgreSQL database URLs", () => {

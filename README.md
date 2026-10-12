@@ -9,13 +9,15 @@
 ## 核心功能
 
 - 无限画布：多画布项目、节点拖拽缩放、连线、小地图、撤销重做、导入导出。
-- AI 创作：浏览器前台直连你配置的 OpenAI 兼容接口，支持文生图、图生图、参考图编辑、文本问答、音频和视频生成。
+- AI 创作：支持文生图、图生图、参考图编辑、文本问答、音频和视频生成；账号模式由服务端使用用户 Key 代发，模型从上游获取。
 - 画布助手：围绕选中节点和上游节点对话、生图，并把结果插回画布。
 - 插件系统：支持通过 URL 动态安装 / 启用 / 更新 / 卸载远程节点插件，并提供 TypeScript SDK 自行开发画布节点插件。
 - 自定义接口调用：可自定义生图 / 视频接口的调用方式，灵活适配各类中转站与自建服务。
 
 
 ### 本地开发
+
+本地默认使用真实账号后端。先按[本地开发文档](docs/content/docs/development/local-development.mdx)配置 PostgreSQL、后端环境和唯一上游，并启动 `server/`，再启动前端：
 
 ```bash
 git clone git@github.com:basketikun/infinite-canvas.git
@@ -28,15 +30,11 @@ bun run dev
 ### Docker 运行
 
 ```bash
-cd infinite-canvas
-docker compose up -d
+cp .env.example .env   # 填写数据库密码、加密密钥等，见配置内注释
+docker compose up -d --build
 ```
 
-运行后默认端口3000，可访问 `http://localhost:3000`。
-
-首次打开后进入右上角配置，填入自己的 OpenAI 兼容 `Base URL` 和 `API Key`。
-
-如果默认的OpenAI接口调用方式与您的API不同，可自定义生图/视频脚本调用。
+默认端口 3015，访问 `http://localhost:3015`。登录后在账号配置保存自己的上游 API Key。完整部署、备份与回滚说明见 [Docker 部署](docs/content/docs/overview/docker.zh-CN.mdx)。
 
 
 ## 开源协议

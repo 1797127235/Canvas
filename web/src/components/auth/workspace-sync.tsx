@@ -1,64 +1,85 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
-import { getWorkspace, saveWorkspace, type WorkspaceData } from "@/services/api/workspace";
+import { getWorkspace, saveWorkspace } from "@/services/api/workspace";
 import { useUserStore } from "@/stores/use-user-store";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useAssetStore } from "@/stores/use-asset-store";
+import { useWorkspaceStore } from "@/stores/use-workspace-store";
 import { bypassLocalAuth } from "@/lib/auth-access";
 
 export function WorkspaceSync() {
-    const status = useUserStore((state) => state.status);
     const userId = useUserStore((state) => state.user?.id);
-    const versionRef = useRef("0");
-    const readyRef = useRef(false);
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
-        if (bypassLocalAuth || status !== "authenticated" || !userId) {
-            readyRef.current = false;
-            versionRef.current = "0";
-            useCanvasStore.getState().replaceProjects([]);
-            useAssetStore.getState().replaceAssets([]);
-            return;
-        }
+        if (bypassLocalAuth) return;
         let cancelled = false;
-        readyRef.current = false;
+        let ready = false;
+        let dirty = false;
+        let failed = false;
+        let conflicted = false;
+        let version = "0";
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let pending: Promise<void> | null = null;
+        const current = () => !cancelled && userId === useUserStore.getState().user?.id;
+        useWorkspaceStore.setState({ owner: userId || null, status: "loading", error: "", flush: null });
+        useCanvasStore.getState().replaceProjects([]);
+        useAssetStore.getState().replaceAssets([]);
+        if (!userId) return;
+        const flush = (): Promise<void> => {
+            if (timer) clearTimeout(timer);
+            if (pending) return pending;
+            if (conflicted) return Promise.reject(new Error("工作区版本冲突，请先导出当前画布"));
+            failed = false;
+            pending = (async () => {
+                while (dirty && ready && current() && !failed) {
+                    dirty = false;
+                    const data = { projects: useCanvasStore.getState().projects, assets: useAssetStore.getState().assets };
+                    try {
+                        const result = await saveWorkspace(version, data, userId);
+                        if (current()) {
+                            version = result.version;
+                            useWorkspaceStore.setState({ status: "ready", error: "" });
+                        }
+                    } catch (error) {
+                        failed = true;
+                        conflicted = error instanceof Error && error.message === "WORKSPACE_CONFLICT";
+                        dirty = true;
+                        if (current()) useWorkspaceStore.setState({ status: "error", error: error instanceof Error && error.message === "WORKSPACE_CONFLICT" ? "工作区已在其他页面更新。当前编辑已保留，请刷新前先导出画布。" : "工作区保存失败，当前编辑已保留，请检查网络后重试。" });
+                        throw error;
+                    }
+                }
+            })().finally(() => { pending = null; });
+            return pending;
+        };
+        const persist = () => {
+            if (!ready || !current()) return;
+            dirty = true;
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => { void flush().catch(() => undefined); }, 400);
+        };
         void getWorkspace().then((remote) => {
-            if (cancelled) return;
-            versionRef.current = remote.version;
+            if (!current()) return;
+            version = remote.version;
             useCanvasStore.getState().replaceProjects(remote.data.projects);
             useAssetStore.getState().replaceAssets(remote.data.assets);
-            readyRef.current = true;
-        }).catch(() => {
-            readyRef.current = false;
+            ready = true;
+            useWorkspaceStore.setState({ status: "ready", flush });
+        }).catch((error) => {
+            if (current()) useWorkspaceStore.setState({ status: "error", error: error instanceof Error ? error.message : "工作区读取失败" });
         });
+        const unsubscribeCanvas = useCanvasStore.subscribe((state, previous) => { if (state.projects !== previous.projects) persist(); });
+        const unsubscribeAssets = useAssetStore.subscribe((state, previous) => { if (state.assets !== previous.assets) persist(); });
+        const unload = (event: BeforeUnloadEvent) => { if (dirty || pending) { event.preventDefault(); event.returnValue = ""; } };
+        window.addEventListener("beforeunload", unload);
         return () => {
             cancelled = true;
-            readyRef.current = false;
-        };
-    }, [status, userId]);
-
-    useEffect(() => {
-        if (bypassLocalAuth || status !== "authenticated" || !userId) return;
-        const persist = () => {
-            if (!readyRef.current) return;
-            if (timerRef.current) clearTimeout(timerRef.current);
-            timerRef.current = setTimeout(() => {
-                timerRef.current = null;
-                const data: WorkspaceData = { projects: useCanvasStore.getState().projects, assets: useAssetStore.getState().assets };
-                void saveWorkspace(versionRef.current, data).then((result) => {
-                    versionRef.current = result.version;
-                }).catch(() => undefined);
-            }, 400);
-        };
-        const unsubscribeCanvas = useCanvasStore.subscribe(persist);
-        const unsubscribeAssets = useAssetStore.subscribe(persist);
-        return () => {
+            ready = false;
+            if (timer) clearTimeout(timer);
             unsubscribeCanvas();
             unsubscribeAssets();
-            if (timerRef.current) clearTimeout(timerRef.current);
+            window.removeEventListener("beforeunload", unload);
         };
-    }, [status, userId]);
+    }, [userId]);
 
     return null;
 }

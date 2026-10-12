@@ -7,12 +7,27 @@ description: Implemented changes that still need manual verification
 
 The current release needs manual verification in these areas:
 
-- 开发阶段视频刷新：MiniMax H3 视频提交后刷新画布，节点应继续显示生成中并自动取回结果，不应提示「页面刷新后生成已中断」。
-- 开发阶段模型分流：配置页显示原来的本地渠道，不显示账号 API Key。图像工作台使用当前本地生图渠道和模型；视频工作台固定显示 MiniMax H3，生成请求发往 Codex2API，参考图随请求发送，不再使用账号 API Key 或旧视频渠道。
-- 本地开发免登录：Vite 开发模式默认不查询身份服务、不显示登录/注册入口，画布、素材、图像/视频工作台、模板克隆、Agent、插件/快捷键及原本地渠道配置应在未启动身份后端时正常使用。`web/.env.local` 设置 `VITE_AUTH_BYPASS=false` 并重启后应恢复路由与操作入口的登录限制；生产构建和预览即使设置 `VITE_AUTH_BYPASS=true` 也不能开启豁免。该开发例外不是已登录会话，真实身份仍需服务端校验。
-- 身份中间阶段边界：关闭开发豁免后，游客触发模板克隆/保存素材需登录；登录后返回原模板预览且不自动操作。登录后的画布、素材和生成记录按账号工作区读写，不读取、不迁移、不删除旧 IndexedDB。Agent 和旧本地渠道配置仅免登录开发模式开放。
-- 本地代理：Vite `/api` 默认转发至 `http://127.0.0.1:4100`，可设置 `VITE_API_PROXY_TARGET`；保留来源头，服务端 `APP_ORIGIN` 必须匹配实际浏览器地址。关闭开发免登录后，图片和视频生成改为服务端目录代发（服务端目录每个模型自带 Key 和上游地址），不再直连本地渠道；文本和音频仍直连本地渠道。
-- 登录后图片与视频生成：使用 `http://localhost:3001` 打开并登录，图像工作台、视频工作台和画布应只显示服务端目录中的图片、视频模型。图片生成和参考图编辑应返回图片；视频应创建任务、刷新后继续查询，完成后得到视频。文本和音频生成仍应使用本地渠道配置。模型不可用时不应回退到旧的本地模型地址或 Key。服务端 `catalog.json` 格式已改为每模型带 `baseUrl` 和 `apiKey`，旧格式需按 `catalog.example.json` 重写。
+- 视频生成链路修复（线上 3015 已部署并实测）：服务端视频请求从 multipart 表单改为 JSON 协议（`prompt`、`duration`、`resolution`、`aspect_ratio`（由尺寸就近折算）、参考图），任务创建响应兼容 `request_id` 字段，轮询完成态识别 `done`/`succeeded`，上游真实错误信息透传到画布错误提示；参考图超过上游字节数上限（实测 2.5MB 拒、137KB 全尺寸过）时服务端自动压到 512KB 内 JPEG，小图原样透传；多张参考图走实测可用的 `reference_images` 字段（`images` 数组被上游拒绝），单张走 `image`。已在线上用接口实测：50KB 小图、2.5MB 真实照片、三图工作流形态（人物+场景+商品，抽帧确认三张参考均被采纳）均创建并出片下载成功。待用户浏览器确认：强刷后画布选 grok-imagine-video-1.5 跑「口播广告」工作流能出片、失败节点点「重试」可清掉旧状态、刷新后进行中任务自动续查。已知上游限制：MiniMax-H3-Max 站内暂无可用账号（503）；doubao-seedance 不在该 Key 模型列表；视频/音频参考仍被忽略。MiniMax-H3 已于站内配置价格后实测可用：文生视频（720p/768p）、单图/多图参考、应用完整参数（aspect_ratio/generate_audio/watermark）均创建并快速出片，`vid_…` 任务号与 `in_progress→completed` 状态与现有解析兼容，画布可直接选用，约 0.18 CNY/秒。
+
+- 牛仔裤换装图片工作流：模板库「工作流」新增「牛仔裤换装图片工作流」卡片和封面；26 个节点、24 条连线、17 张原图（1 张商品裤装图 + 8 张模特参考图 + 8 张成品示例），输入按「替换商品裤装图」「替换参考图N」命名，八条分支统一用引用式提示词、2K 方形 2048×2048，并附使用说明。提示词明确只替换裤子、保留人物身份姿势背景光线和鞋子，与原始工作流「只换裤子、其他不变」的意图一致。媒体统一压缩为 webp（输入最长边 1600、成品最长边 1280），单模板约 1.6MB。模型跟随当前账号默认图片模型，不携带原平台模型标识。已校验全部 storageKey 引用有效、模板索引结构不变量和既有工作流回归 4/4 通过；未执行浏览器预览/克隆验证、付费生成、构建或类型检查。待用户确认替换素材后八条分支的实际换装效果。
+
+- 换装视频与口播广告模板：模板库「工作流」加入「换装视频工作流」（24 节点、26 连线、14 个原始媒体）和「口播广告 Grok 工作流」（9 节点、7 连线、5 个原始媒体），均有成果封面和悬停视频。换装分为人物形象、五套换装图、8 秒多图/视频参考三个阶段，口播分离三张参考图、台词和表演要求，保留 5 秒有声参数和两段示例。独立浏览器验证两者完整媒体预览、克隆、参考图和视频归属、生成上下文、服务端保存与刷新恢复，无未捕获异常。未执行构建/类型检查或新付费生成，原微信目录未修改；待用户确认替换素材后实际生成与悬停视频体验。按用户要求模型下拉框逻辑暂缓处理。
+
+- 电商服装图片工作流：模板库「工作流」新增图片模板卡片和服装成果封面；15 个节点、20 条连线、7 张原图，输入按模特/服装 A/服装 B、两种姿势、共享场景命名，四条分支统一用引用式提示词、2K 竖幅 1152×2048，并附使用说明。模型跟随当前账号默认图片模型，不携带旧渠道标识。独立浏览器已验证图片预览、克隆、四条分支各 2 图/2 文本、参考图账号归属、服务端保存与刷新恢复，无未捕获异常；未再次执行付费生成、构建或类型检查。待用户确认替换素材、修改共享文案、选择图片编辑模型后四条分支的实际生成效果。原桌面目录保持不变。
+
+当前开发环境按实际运行环境交付。已执行：后端账号专项 14/14、前端账号生成 5/5、两端类型检查；真实 PostgreSQL 双账号注册、工作区保存恢复/版本冲突、历史隔离、Key 加密掩码、媒体上传/Range 和换号迟到请求均通过。独立 Chrome 验证配置、画布、图片/视频页面、新建画布入库和换号隔离，无未捕获异常。真实上游返回 65 个模型（11 个视频、13 个图片），文本生成、图片生成并上传账号媒体、视频创建/查询/下载/保存及重启恢复已通过。独立浏览器验证导入包图片重新上传到 B 账号并替换 key/URL，B 可读且 A 被拒绝；完整 ZIP 多媒体互导仍待逐项确认。没有执行构建，没有清理用户手动账号或旧浏览器数据。测试使用独立验收账号。
+
+仍需逐项确认的行为包括下面清单中的断网/双标签冲突交互、参考图编辑、多模态视频参数和跨账号 ZIP 互导。音频接口已通过模拟上游测试，当前 Key 没有音频模型，未执行真实音频生成。用户确认前继续保留本清单，不将整项记成用户验收通过。
+
+- 默认多用户：Vite 默认需要注册登录；仅显式 `VITE_AUTH_BYPASS=true` 才打开旧本地工作区，不迁移或删除原 IndexedDB。游客可浏览模板，真实克隆或保存仍需登录。
+- 单一 Key 与上游目录：账号配置页和画布配置弹窗都能保存、清除 Key，服务端加密保存且只返回掩码。模型列表由账号 Key 请求固定上游 `/models`；更换或清除 Key 后旧列表失效，迟到请求不能恢复旧列表，失败不回退本地渠道。目录不含 `apiKey`，全部配置项使用同一 `baseUrl`。
+- 原生视频：工作台和画布可选择上游视频模型，不再固定 MiniMax H3。逐项提交 480p/720p/1080p、自定义比例和秒数、首尾帧/全能参考、声音、水印及图片/视频/音频素材；请求带原生字段，不被服务端改成 768P 或截断时长。实际支持范围由上游决定。
+- 四类生成：图片生成、参考图编辑、视频创建与续查、文本流式问答、音频生成都走 `/api/generations`，用账号 Key，不请求旧本地渠道；没有 Key 或模型目录失败显示实际错误。
+- 账号历史：A 账号的图片、视频记录及 pending 任务刷新后仍在；B 登录后不见 A 的记录，不会恢复 A 的任务，B 不能读写 A 的媒体或任务。退出或切换账号取消旧页面请求。
+- 工作区保存：读取完成才开放画布和素材；断网读取不会显示可写空工作区。保存串行，编辑期间继续保存最新快照。另一标签页造成 409 时保留当前编辑并提示先导出；网络错误显示保存失败；退出前等待 flush，失败保留登录状态。切换账号的迟到保存不得写入新账号。
+- 媒体与互导：默认磁盘存储上传不设单文件、账号或画布数量额度，已配置 MinIO 也可使用。视频/音频支持拖动定位、单段 Range 206、越界 416 和 HEAD；跨账号读取返回不存在。图片素材和画布导出含实际媒体，ZIP 导入会重新上传到当前账号并替换旧 key/URL，可在另一账号播放与生成。
+- 本地启动：Vite `/api` 代理到后端，`APP_ORIGIN` 匹配浏览器地址。启动补建工作区、凭证、媒体、任务和历史表，不清理账号业务数据。生产代理、备份等不属于本轮本地开发验收。生产环境允许直接 http 访问：`APP_ORIGIN` 填 http 地址即可启动，登录会话正常保持，Cookie 不带 Secure 标志；https 部署时 Cookie 自动带 Secure。
+- 生产 Docker 部署：复制 `.env.example` 为 `.env`，填写数据库密码、限流签名和 32 字节加密密钥后 `docker compose up -d --build`。`db-init` 创建身份表（已存在则跳过），后端启动自动补建 003~005；`/api/health` 返回 `{"ok":true}`，前端端口可注册登录并生成；`scripts/backup.ps1` 每日备份数据库、媒体和 `.env`，保留最近 7 份。上游目录 `server/config/catalog.json` 挂载进 api 容器，账号保存 Key 后「刷新模型」应从该文件配置的唯一 baseUrl（当前为 `http://openai2api.com:3000/v1`）发现模型。
 
 - Agent status removal: the canvas top bar no longer shows the external Agent connection indicator (such as "Codex not connected") next to the title; the Agent button on the right still opens the panel, and connecting a local Agent keeps chat and other features working.
 - Workflow templates: the Template Library Workflow kind lists built-in workflow templates with cover, author, and tags; keyword and tag filters apply to them too. For templates with a result video, hovering a card lazily loads and plays the video muted in a loop, and leaving the card stops playback back to the cover. Clicking a card opens a modal preview titled with the template name and a "clone to edit materials, copy, and node params" hint, with Clone & edit at the top right. The preview fits all nodes, pans and zooms, renders images and plays the bundled video, and hovering nodes never reveals titles (prompts), download buttons, connection dots, or any other tools. Clone & edit closes the modal, writes the bundled media into local storage, and opens a new canvas where the prompts, params, connections, and media all work and can be regenerated, while the template itself stays unchanged.
@@ -23,7 +38,7 @@ The current release needs manual verification in these areas:
 - WebDAV removal: Settings no longer shows a WebDAV tab, connection test, or sync action. Canvases, assets, and generation records stay in the browser, and exported settings no longer include WebDAV credentials.
 - Interface language: the top bar no longer shows a Chinese/English switch, and pages, settings, Ant Design components, and dates stay in Simplified Chinese.
 - Local channel file: after writing provider addresses, keys, and models into `web/public/local-channels.json` and refreshing, Settings should show those providers. An existing provider with the same address and key should only gain missing models, not be duplicated. A missing or invalid file should leave the current settings unchanged.
-- 本地 H3 渠道配置：刷新后应显示 `minimax-h3`、`minimax-h3-fl2va`、`minimax-h3-ref2va` 三个视频模型；本地配置的 `removeModels` 应从已有渠道中移除 Grok 视频模型及变为空的专用视频渠道，保留 Grok 生图模型和 Seedance 模型，原默认视频模型被移除时优先选择 `minimax-h3`。H3 服务的 CORS 预检、模型查询、已有任务查询和下载响应已验证通过；画布请求仍遇到 `Unsupported mode`，服务端对 multipart 模式与素材字段的兼容仍待验证，配置完成不代表画布生成已可用。
+- 本地 H3 渠道配置：刷新后应显示 `minimax-h3`、`minimax-h3-fl2va`、`minimax-h3-ref2va` 三个视频模型；本地配置的 `removeModels` 应从已有渠道中移除 Grok 视频模型及变为空的专用视频渠道，保留 Grok 生图模型和 Seedance 模型，原默认视频模型被移除时选择已有的可用视频模型，不指定模型名。H3 服务的 CORS 预检、模型查询、已有任务查询和下载响应已验证通过；画布请求仍遇到 `Unsupported mode`，服务端对 multipart 模式与素材字段的兼容仍待验证，配置完成不代表画布生成已可用。
 - 顶部导航入口移除：工作台与画布页面不再显示版本号、GitHub 图标和文档图标，画布菜单也不再显示文档站入口，不再打开版本更新弹窗或跳转项目仓库、文档站；页面加载时不再请求原仓库的 VERSION 和 CHANGELOG.md。配置、主题、语言、插件和快捷键入口应保持正常。
 - Analytics and upstream cleanup: the app loads no GA4/Baidu analytics scripts and sends no analytics requests; the Docker image no longer generates config.js and `ANALYTICS_*` variables have no effect; the docs site drops the business, sponsor, and Render pages, and the repo no longer carries upstream publishing GitHub Actions, Render/Vercel configs, or sponsor assets.
 

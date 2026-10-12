@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ChannelEditorDrawer } from "@/components/layout/channel-editor-drawer";
+import { AccountCredentialsPanel } from "@/components/account/account-credentials-panel";
+import { bypassLocalAuth } from "@/lib/auth-access";
 import { ConfigPromptSources } from "@/components/layout/config-prompt-sources";
 import { ConfigLocalStorage } from "@/components/layout/config-local-storage";
+import { useUserStore } from "@/stores/use-user-store";
 import { exportAppConfig, importAppConfig } from "@/services/config-file";
 import {
     createModelChannel,
@@ -154,6 +157,7 @@ export function AppConfigPanel({ showDoneButton = false, initialTab = "channels"
 export function AppConfigModal() {
     const { t } = useTranslation();
     const isConfigOpen = useConfigStore((state) => state.isConfigOpen);
+    const userId = useUserStore((state) => state.user?.id);
     const configTab = useConfigStore((state) => state.configTab);
     const setConfigDialogOpen = useConfigStore((state) => state.setConfigDialogOpen);
     return (
@@ -164,14 +168,14 @@ export function AppConfigModal() {
                     <div className="mt-1 text-xs font-normal text-stone-500">{t("config.modalDescription")}</div>
                 </div>
             }
-            open={isConfigOpen}
+            open={isConfigOpen && (bypassLocalAuth || Boolean(userId))}
             width={980}
             centered
             onCancel={() => setConfigDialogOpen(false)}
             styles={{ body: { maxHeight: "72vh", overflowY: "auto", paddingRight: 12 } }}
             footer={null}
         >
-            <AppConfigPanel showDoneButton initialTab={configTab} />
+            {bypassLocalAuth ? <AppConfigPanel showDoneButton initialTab={configTab} /> : userId ? <AccountCredentialsPanel key={userId} /> : null}
         </Modal>
     );
 }

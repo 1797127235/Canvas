@@ -15,3 +15,14 @@ test("returns a generic JSON error without exposing internal details", async () 
         await testServer.close();
     }
 });
+
+test("health endpoint responds without authentication", async () => {
+    const testServer = await startTestServer(createApp({ appOrigin: "http://localhost:3000" }));
+    try {
+        const result = await requestJson<{ ok: boolean }>(testServer.baseUrl, "/api/health");
+        assert.equal(result.response.status, 200);
+        assert.deepEqual(result.body, { ok: true });
+    } finally {
+        await testServer.close();
+    }
+});

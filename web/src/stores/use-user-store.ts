@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { publishAuthEvent } from "@/lib/auth-tab-sync";
+import { useWorkspaceStore } from "@/stores/use-workspace-store";
 
 import {
     getSession,
@@ -81,6 +82,7 @@ export const useUserStore = create<UserStore>()((set, get) => ({
         const requestRevision = ++revision;
         pendingChanges++;
         try {
+            await useWorkspaceStore.getState().flush?.();
             await logoutRequest();
             if (requestRevision !== revision) return;
             set({ status: "guest", user: null, expiresAt: null, error: null });

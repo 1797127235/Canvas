@@ -35,8 +35,9 @@ export async function resolveMetadataReferences(metadata: CanvasNodeMetadata) {
     if (!metadata.references?.length) return null;
     const references = await Promise.all(
         metadata.references.map(async (url, index) => {
-            const dataUrl = url.startsWith("image:") ? await resolveImageUrl(url, "") : url;
-            return dataUrl ? { id: `${index}`, name: `reference-${index}.png`, type: "image/png", dataUrl, storageKey: url.startsWith("image:") ? url : undefined } : null;
+            const stored = url.startsWith("image:") || url.startsWith("remote:");
+            const dataUrl = stored ? await resolveImageUrl(url, "") : url;
+            return dataUrl ? { id: `${index}`, name: `reference-${index}.png`, type: "image/png", dataUrl, storageKey: stored ? url : undefined } : null;
         }),
     );
     return references.every(Boolean) ? (references as ReferenceImage[]) : null;
@@ -121,6 +122,18 @@ export function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | u
         audioInstructions: node?.metadata?.audioInstructions || config.audioInstructions || defaultConfig.audioInstructions,
         count: String(node?.metadata?.count || (mode === "image" ? config.canvasImageCount || config.count : config.count) || defaultConfig.count),
     };
+}
+
+export function generationOutputNode(source: CanvasNodeData | undefined, mode: CanvasNodeGenerationMode, nodes: CanvasNodeData[], connections: CanvasConnection[]) {
+    const id = source?.type === CanvasNodeType.Config ? source.metadata?.outputNodeId : undefined;
+    if (!id) return undefined;
+    const output = nodes.find((node) => node.id === id && node.type === mode);
+    if (!output || !connections.some((connection) => connection.fromNodeId === source?.id && connection.toNodeId === id)) throw new Error("模板输出节点缺失，请重新连接或克隆模板");
+    return output;
+}
+
+export function nodeGenerationPrompt(node: CanvasNodeData | undefined) {
+    return node?.metadata?.composerContent ?? node?.metadata?.prompt ?? "";
 }
 
 export function hasResumableVideoTask(node: CanvasNodeData) {

@@ -1,11 +1,86 @@
+# 多用户生产栈：PostgreSQL + 后端 + 前端。首次使用复制 .env.example 为 .env 并填写密钥。
 services:
-  app:
-    image: ghcr.io/basketikun/infinite-canvas:latest
-    container_name: infinite-canvas
-    ports:
-      - "3000:3000"
+  db:
+    image: postgres:16-alpine
     restart: unless-stopped
-    # 统计分析（可选，默认关闭）。每家一个独立变量，填了谁就启用谁，可同时启用多家：
-    # environment:
-    #   ANALYTICS_GA4_ID: G-XXXXXXXXXX                    # Google Analytics 4 衡量 ID
-    #   ANALYTICS_BAIDU_ID: xxxxxxxxxxxxxxxxxxxxxxxxxxxx   # 百度统计站点 ID
+    environment:
+      POSTGRES_DB: infinite_canvas
+      POSTGRES_USER: infinite_canvas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infinite_canvas -d infinite_canvas"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    logging: &default-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 一次性初始化：001/002 身份表无 IF NOT EXISTS，已存在时跳过；003~005 由后端启动时自动补建。
+  db-init:
+    image: postgres:16-alpine
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./server/sql:/sql:ro
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        if psql -h db -U infinite_canvas -d infinite_canvas -tAc "SELECT to_regclass('public.users')" | grep -q users; then
+          echo "identity schema already exists, skip 001/002"
+        else
+          psql -h db -U infinite_canvas -d infinite_canvas -v ON_ERROR_STOP=1 -f /sql/001-identity.sql
+          psql -h db -U infinite_canvas -d infinite_canvas -v ON_ERROR_STOP=1 -f /sql/002-identity-rate-limits.sql
+        fi
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: infinite-canvas-api:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    env_file: .env
+    environment:
+      # 容器内固定连接同栈数据库；APP_ORIGIN、密钥等其余变量来自 .env。
+      DATABASE_URL: postgresql://infinite_canvas:${POSTGRES_PASSWORD}@db:5432/infinite_canvas
+    volumes:
+      - media_data:/app/server/dist/data/media
+      # 上游目录：全部模型共用同一 baseUrl，账号 Key 只在这里配置的上游做模型发现。
+      - ./server/config/catalog.json:/app/server/config/catalog.json:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4100/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging: *default-logging
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: infinite-canvas-web:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-3015}:80"
+    logging: *default-logging
+
+volumes:
+  db_data:
+  media_data:

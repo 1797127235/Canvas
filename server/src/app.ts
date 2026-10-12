@@ -15,12 +15,17 @@ export function createApp(options: AppOptions) {
     app.use(noStore);
     app.use(rejectUnsupportedEncoding);
     app.use(rejectCrossOriginStateChanges(options.appOrigin));
-    app.use(express.json({ limit: "10mb", type: "application/json", verify: rejectLargeIdentityBody }));
+    // 媒体走原始上传流；业务 JSON 不设容量额度，身份请求保留原有 4 KiB 校验。
+    app.use(express.json({ limit: Infinity, type: (request) => !request.url?.startsWith("/api/media") && Boolean(request.headers["content-type"]?.startsWith("application/json")), verify: rejectLargeIdentityBody }));
     app.use((request, response, next) => {
         if (request.path.startsWith("/api/") && !request.path.startsWith("/api/media") && ["POST", "PUT", "PATCH"].includes(request.method) && !request.is("application/json")) {
             return response.status(415).json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "请求必须使用 JSON" } });
         }
         return next();
+    });
+    // 健康检查置于业务路由之前：credentials 等子路由在自身根上统一挂鉴权，会拦住未匹配路径。
+    app.get("/api/health", (_request, response) => {
+        response.json({ ok: true });
     });
     if (options.apiRouter) app.use("/api", options.apiRouter);
     app.use((_request, response) => {

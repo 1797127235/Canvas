@@ -1,3 +1,5 @@
+import { useUserStore } from "@/stores/use-user-store";
+
 export type CredentialStatus = { configured: boolean; masked: string | null };
 
 export async function getCredential() {
@@ -7,11 +9,17 @@ export async function getCredential() {
 }
 
 export async function saveCredential(apiKey: string) {
-    const response = await fetch("/api/credentials", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ apiKey }) });
+    const userId = useUserStore.getState().user?.id;
+    if (!userId) throw new Error("请先登录");
+    const response = await fetch("/api/credentials", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Account-Id": userId, Accept: "application/json" }, body: JSON.stringify({ apiKey }) });
+    if (userId !== useUserStore.getState().user?.id) throw new Error("账号已切换");
     if (!response.ok) throw new Error("API Key 保存失败");
 }
 
 export async function clearCredential() {
-    const response = await fetch("/api/credentials", { method: "DELETE", credentials: "same-origin", headers: { Accept: "application/json" } });
+    const userId = useUserStore.getState().user?.id;
+    if (!userId) throw new Error("请先登录");
+    const response = await fetch("/api/credentials", { method: "DELETE", credentials: "same-origin", headers: { "X-Account-Id": userId, Accept: "application/json" } });
+    if (userId !== useUserStore.getState().user?.id) throw new Error("账号已切换");
     if (!response.ok) throw new Error("API Key 清除失败");
 }

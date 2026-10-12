@@ -22,6 +22,8 @@ export function requireUser(database: Pool): RequestHandler {
     return async (request, response, next) => {
         const session = await readCurrentUser(request, database);
         if (!session) return response.status(401).json({ error: { code: "UNAUTHENTICATED", message: "请先登录" } });
+        const accountId = request.headers["x-account-id"];
+        if (accountId && accountId !== session.user.id) return response.status(409).json({ error: { code: "ACCOUNT_CHANGED", message: "账号已切换，请刷新后重试" } });
         response.locals.user = session.user;
         return next();
     };

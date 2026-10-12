@@ -4,7 +4,8 @@ import { nanoid } from "nanoid";
 import i18n from "@/i18n";
 import { createImageThumbnail } from "@/lib/image-thumbnail";
 import { bypassLocalAuth } from "@/lib/auth-access";
-import { uploadAccountMedia, accountMediaUrl } from "@/services/api/media";
+import { useUserStore } from "@/stores/use-user-store";
+import { uploadAccountMedia, accountMediaUrl, fetchAccountMedia } from "@/services/api/media";
 
 export type UploadedImage = {
     url: string;
@@ -36,7 +37,8 @@ type StoredImagePreview = { version: number; blob?: Blob };
 type ImageReadOptions = { signal?: AbortSignal };
 
 export async function uploadImage(input: string | Blob, options?: ImageReadOptions): Promise<UploadedImage> {
-    if (typeof input !== "string") return storeImage(input, options);
+    const userId = useUserStore.getState().user?.id;
+    if (typeof input !== "string") return storeImage(input, options, userId);
 
     let blob: Blob;
     try {
@@ -47,14 +49,23 @@ export async function uploadImage(input: string | Blob, options?: ImageReadOptio
         if (!meta) throw error;
         return { url: input, width: meta.width, height: meta.height, bytes: 0, mimeType: "" };
     }
-    return storeImage(blob, options);
+    return storeImage(blob, options, userId);
 }
 
-async function storeImage(blob: Blob, options?: ImageReadOptions): Promise<UploadedImage> {
+async function storeImage(blob: Blob, options?: ImageReadOptions, userId?: string): Promise<UploadedImage> {
     if (!bypassLocalAuth) {
-        const remote = await uploadAccountMedia(blob);
-        const meta = await loadImageMeta(remote.url, options);
+        throwIfAborted(options?.signal);
+        const url = URL.createObjectURL(blob);
+        let meta: { width: number; height: number } | null;
+        try {
+            meta = await loadImageMeta(url, options);
+        } finally {
+            URL.revokeObjectURL(url);
+        }
         if (!meta) throw new Error(i18n.t("common.imageReadFailed"));
+        throwIfAborted(options?.signal);
+        if (!userId || userId !== useUserStore.getState().user?.id) throw new Error("账号已切换，上传已取消");
+        const remote = await uploadAccountMedia(blob, options);
         return { ...remote, width: meta.width, height: meta.height };
     }
     const storageKey = `image:${nanoid()}`;
@@ -160,17 +171,19 @@ export async function resolveImageUrl(storageKey?: string, fallback = "") {
     return url;
 }
 
-export async function getImageBlob(storageKey: string) {
+export async function getImageBlob(storageKey: string, options?: ImageReadOptions) {
+    if (storageKey.startsWith("remote:")) return fetchAccountMedia(storageKey, options);
     return store.getItem<Blob>(storageKey);
 }
 
 // 缩略图按图片的 storageKey 另存一份 WebP，只放在本地 IndexedDB 里，不写进节点数据，也不参与导出。
 export function previewUrlFor(storageKey?: string) {
-    return storageKey ? previewUrls.get(storageKey) : undefined;
+    return storageKey && !storageKey.startsWith("remote:") ? previewUrls.get(storageKey) : undefined;
 }
 
 // 模板预览等场景把不在本地 IndexedDB 的媒体 URL 直接注册进内存映射，不落盘；url 由调用方负责 revoke。
 export function registerMediaUrl(storageKey: string, url: string) {
+    if (storageKey.startsWith("remote:")) return;
     objectUrls.set(storageKey, url);
     const previous = previewUrls.get(storageKey);
     if (previous && previous !== url) URL.revokeObjectURL(previous);
@@ -192,7 +205,7 @@ export function getImagePreviewRevision() {
 }
 
 export async function ensureImagePreview(storageKey?: string) {
-    if (!storageKey) return undefined;
+    if (!storageKey || storageKey.startsWith("remote:")) return undefined;
     const cached = previewUrls.get(storageKey);
     if (cached) return cached;
     const stored = await previewStore.getItem<StoredImagePreview>(storageKey).catch(() => null);
@@ -242,6 +255,7 @@ export async function setImageBlob(storageKey: string, blob: Blob) {
 }
 
 export async function imageToDataUrl(image: { url?: string; dataUrl?: string; storageKey?: string }, options?: ImageReadOptions) {
+    if (!image.dataUrl && image.storageKey?.startsWith("remote:")) return blobToDataUrl(await fetchAccountMedia(image.storageKey, options));
     const url = image.dataUrl || (await resolveImageUrl(image.storageKey, image.url || ""));
     if (!url || url.startsWith("data:")) return url;
     return blobToDataUrl(await fetchImageBlob(url, options));
@@ -260,6 +274,7 @@ export async function deleteStoredImages(keys: Iterable<string>) {
 }
 
 export async function cleanupUnusedImages(usedData: unknown) {
+    if (!bypassLocalAuth) return;
     const usedKeys = collectImageStorageKeys(usedData);
     await Promise.all([
         imageLogStore.iterate((value) => {

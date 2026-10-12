@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { useConfigStore, type LocalChannelEntry } from "@/stores/use-config-store";
 import { usePromptSourceScheduler } from "@/hooks/use-prompt-source-scheduler";
+import { bypassLocalAuth } from "@/lib/auth-access";
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
     const { message } = App.useApp();
@@ -17,6 +18,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     usePromptSourceScheduler();
 
     useEffect(() => {
+        if (!bypassLocalAuth) return;
         let cancelled = false;
         void fetch("/local-channels.json")
             .then((response) => (response.ok ? response.json() : null))
@@ -41,6 +43,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         searchParams.delete("apiKey");
         searchParams.delete("apikey");
         window.history.replaceState(null, "", `${window.location.pathname}${searchParams.size ? `?${searchParams}` : ""}${window.location.hash}`);
+        if (!bypassLocalAuth) return;
         const result = importChannelCredentials({ baseUrl, apiKey });
         openConfigDialog(false, "channels");
         if (result.status === "created") message.success(t("config.importedChannelCreated", { name: result.channelName }));

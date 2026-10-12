@@ -1,19 +1,30 @@
 import localforage from "localforage";
 import { nanoid } from "nanoid";
 import { bypassLocalAuth } from "@/lib/auth-access";
-import { accountMediaUrl, uploadAccountMedia } from "@/services/api/media";
+import { useUserStore } from "@/stores/use-user-store";
+import { accountMediaUrl, uploadAccountMedia, fetchAccountMedia } from "@/services/api/media";
 
 export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
 
 const store = localforage.createInstance({ name: "infinite-canvas", storeName: "media_files" });
 const objectUrls = new Map<string, string>();
 
-export async function uploadMediaFile(input: string | Blob, prefix = "file"): Promise<UploadedFile> {
-    const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
+export async function uploadMediaFile(input: string | Blob, prefix = "file", options?: { signal?: AbortSignal }): Promise<UploadedFile> {
+    const userId = useUserStore.getState().user?.id;
+    options?.signal?.throwIfAborted();
+    const blob = typeof input === "string" ? await (await fetch(input, { signal: options?.signal })).blob() : input;
     if (!bypassLocalAuth) {
-        const remote = await uploadAccountMedia(blob);
-        const meta = blob.type.startsWith("video/") ? await readVideoMeta(remote.url) : blob.type.startsWith("audio/") ? await readAudioMeta(remote.url) : {};
-        return { url: remote.url, storageKey: remote.storageKey, bytes: remote.bytes, mimeType: remote.mimeType, ...meta };
+        const url = URL.createObjectURL(blob);
+        let meta: { width?: number; height?: number; durationMs?: number };
+        try {
+            meta = blob.type.startsWith("video/") ? await readVideoMeta(url) : blob.type.startsWith("audio/") ? await readAudioMeta(url) : {};
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+        options?.signal?.throwIfAborted();
+        if (!userId || userId !== useUserStore.getState().user?.id) throw new Error("账号已切换，上传已取消");
+        const remote = await uploadAccountMedia(blob, options);
+        return { ...remote, ...meta };
     }
     const storageKey = `${prefix}:${nanoid()}`;
     await store.setItem(storageKey, blob);
@@ -36,22 +47,9 @@ export async function resolveMediaUrl(storageKey?: string, fallback = "") {
     return url;
 }
 
-export async function getMediaBlob(storageKey: string) {
-    const remoteId = storageKey.startsWith("remote:") ? storageKey.slice("remote:".length) : "";
-    if (remoteId) return requestAccountMedia(remoteId);
+export async function getMediaBlob(storageKey: string, options?: { signal?: AbortSignal }) {
+    if (storageKey.startsWith("remote:")) return fetchAccountMedia(storageKey, options);
     return store.getItem<Blob>(storageKey);
-}
-
-function requestAccountMedia(id: string) {
-    if (!/^[0-9a-f-]{36}$/i.test(id)) return Promise.reject(new Error("媒体标识无效"));
-    return new Promise<Blob>((resolve, reject) => {
-        const request = new XMLHttpRequest();
-        request.open("GET", `/api/media/${encodeURIComponent(id)}`);
-        request.responseType = "blob";
-        request.onload = () => (request.status >= 200 && request.status < 300 ? resolve(request.response) : reject(new Error("媒体读取失败")));
-        request.onerror = () => reject(new Error("媒体读取失败"));
-        request.send();
-    });
 }
 
 export async function setMediaBlob(storageKey: string, blob: Blob) {
@@ -73,6 +71,7 @@ export async function deleteStoredMedia(keys: Iterable<string>) {
 }
 
 export async function cleanupUnusedMedia(usedData: unknown) {
+    if (!bypassLocalAuth) return;
     const usedKeys = collectMediaStorageKeys(usedData);
     const unused: string[] = [];
     await store.iterate((_value, key) => {

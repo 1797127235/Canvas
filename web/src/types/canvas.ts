@@ -52,6 +52,7 @@ export type CanvasNodeMetadata = {
     errorDetails?: string;
     fontSize?: number;
     generationMode?: CanvasGenerationMode;
+    outputNodeId?: string; // 模板生成配置的固定输出节点，保持下游引用不变。
     generationType?: CanvasImageGenerationType;
     model?: string;
     reasoningEffort?: "auto" | "low" | "medium" | "high" | "xhigh";

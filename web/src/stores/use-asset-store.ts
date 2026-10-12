@@ -102,6 +102,7 @@ export const useAssetStore = create<AssetStore>()(
                 }),
             replaceAssets: (assets) => set({ assets }),
             cleanupImages: (extra) => {
+                if (!bypassLocalAuth) return;
                 window.setTimeout(async () => {
                     const { useCanvasStore } = await import("@/stores/canvas/use-canvas-store");
                     await cleanupUnusedImages({ assets: get().assets, projects: useCanvasStore.getState().projects, extra });
