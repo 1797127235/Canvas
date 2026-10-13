@@ -2,7 +2,7 @@ import localforage from "localforage";
 import { nanoid } from "nanoid";
 import { bypassLocalAuth } from "@/lib/auth-access";
 import { useUserStore } from "@/stores/use-user-store";
-import { accountMediaUrl, uploadAccountMedia, fetchAccountMedia } from "@/services/api/media";
+import { accountMediaUrl, accountMediaPosterUrl, uploadAccountMedia, fetchAccountMedia } from "@/services/api/media";
 
 export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
 
@@ -32,6 +32,10 @@ export async function uploadMediaFile(input: string | Blob, prefix = "file", opt
     objectUrls.set(storageKey, url);
     const meta = blob.type.startsWith("video/") ? await readVideoMeta(url) : blob.type.startsWith("audio/") ? await readAudioMeta(url) : {};
     return { url, storageKey, bytes: blob.size, mimeType: blob.type || "application/octet-stream", ...meta };
+}
+
+export function mediaPosterUrl(storageKey?: string) {
+    return accountMediaPosterUrl(storageKey) || undefined;
 }
 
 export async function resolveMediaUrl(storageKey?: string, fallback = "") {

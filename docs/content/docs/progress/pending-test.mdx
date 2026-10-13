@@ -7,6 +7,8 @@ description: 当前版本已实现但仍需人工验证的变更项
 
 ## 本轮新增与修复
 
+- 账号视频首帧 poster（本轮新增，待用户确认）：视频媒体新增服务端 `video-poster-canvas-v1` poster，首次访问使用 ffmpeg 抽取首帧并转为 WebP，按媒体持久保存；账号视频在画布节点、画布引用栏、画布资源侧栏和视频资产卡片优先使用 poster，原视频仍用于播放、下载和生成参考。API 镜像已加入 ffmpeg 运行依赖。已通过：后端类型检查、媒体专项测试（真实有效 MP4 抽帧、poster ETag/304、跨账号 404、非视频 415、删除联动）、前端类型检查和前端 31/31 测试。待用户确认：打开含视频的画布时不再为缩略展示预先加载完整视频；点击播放仍正常加载原视频，原视频下载、编辑和生成参考不受影响。当前未实现视频转码、多分辨率视频流、HLS/DASH。
+
 - 账号媒体画布预览（本轮新增，待用户确认）：图片媒体新增服务端 `canvas-preview-v1` 预览 profile，首次访问按需生成最长边 768px、WebP quality 82 的展示图并持久保存；账号图片在画布、侧栏、参考栏和工作台缩略图优先使用预览，原图仍用于下载、编辑、导出和生成参考。预览接口继续校验账号归属，支持 `private, no-cache` 与 ETag `304`，删除原媒体时删除派生预览。已通过：后端类型检查、媒体专项测试（原图 Range/HEAD、预览生成、304、跨账号 404、非图片 415、删除联动）、前端类型检查和前端 31/31 测试。待用户确认：登录账号打开包含多张大图的画布时，预览先出现且网络传输量下降；放大、下载、编辑、导出、AI 参考仍使用原图；切换账号不会显示上一账号图片。具体 profile 尺寸、质量和后续多档缩放仍需根据实际网络与画布数据评估。
 
 - 镜像化发布（本轮新增，待用户确认）：前后端镜像改由 GitHub Actions（`.github/workflows/publish-images.yml`）构建并推送到 GHCR，服务器只 `docker compose pull && docker compose up -d`，不再本地构建。workflow 先跑质量门禁（前端类型检查 + 31 项测试、后端类型检查 + 77 项测试；后端用 postgres:16 服务容器，先把 `server/sql/*.sql` 应用到 `infinite_canvas_test`），通过后才构建。镜像标签：分支名、`sha-<短哈希>`（回滚用）、`v*` 版本号，main 同时更新 `latest`。`.env` 新增 `IMAGE_API` / `IMAGE_WEB`，`IMAGE_TAG` 默认由 `local` 改为 `latest`；本地自行构建时叠加 `docker-compose.build.yml`。已在本机验证：两端 typecheck 通过、前端 31/31、后端 77/77（临时 PostgreSQL + 建表脚本）、`docker compose config` 在基础与构建覆盖两种模式下均正确解析出 GHCR 镜像与 `IMAGE_TAG`。待用户确认：Actions 首次运行通过并产出两个 GHCR 包、服务器 `docker login ghcr.io` 后能拉取启动、把 `IMAGE_TAG` 改回旧 `sha-` 标签可回滚。另需在 GitHub 仓库设置里把该 workflow 设为必需检查（手工步骤）。首次切换时服务器 `.env` 的 `IMAGE_TAG` 必须先改成仓库里存在的标签（`latest` 或 `sha-<短哈希>`），原来的 `dc131b4` / `local` 在 GHCR 中不存在，否则 `docker compose pull` 报 manifest unknown。

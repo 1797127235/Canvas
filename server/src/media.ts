@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { Readable, Transform } from "node:stream";import { pipeline } from "node:stream/promises";
@@ -20,6 +21,11 @@ const CANVAS_PREVIEW_PROFILE = {
     quality: 82,
 } as const;
 const previewJobs = new Map<string, Promise<Buffer>>();
+const posterJobs = new Map<string, Promise<Buffer>>();
+const VIDEO_POSTER_PROFILE = {
+    version: "video-poster-canvas-v1",
+    quality: 82,
+} as const;
 const MAX_IMAGE_INPUT_PIXELS = 40_000_000;
 
 async function createCanvasPreview(input: Readable) {
@@ -53,6 +59,45 @@ function previewObjectKey(objectKey: string) {
     return `${objectKey}.preview.${CANVAS_PREVIEW_PROFILE.version}.webp`;
 }
 
+function posterObjectKey(objectKey: string) {
+    return `${objectKey}.poster.${VIDEO_POSTER_PROFILE.version}.webp`;
+}
+
+async function createVideoPoster(input: Readable) {
+    const process = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-frames:v", "1", "-f", "image2pipe", "-vcodec", "png", "pipe:1"], { stdio: ["pipe", "pipe", "pipe"] });
+    const outputPromise = readStreamBytes(process.stdout);
+    const errorPromise = readStreamBytes(process.stderr);
+    try {
+        await pipeline(input, process.stdin);
+        const [png, errorOutput] = await Promise.all([outputPromise, errorPromise]);
+        const exitCode = await new Promise<number | null>((resolve) => process.once("close", resolve));
+        if (exitCode !== 0 || !png.length) throw new Error(`视频海报生成失败${errorOutput.length ? `: ${errorOutput.toString("utf8").trim()}` : ""}`);
+        return sharp(png, { limitInputPixels: MAX_IMAGE_INPUT_PIXELS })
+            .resize({ width: CANVAS_PREVIEW_PROFILE.maxLongEdge, height: CANVAS_PREVIEW_PROFILE.maxLongEdge, fit: "inside", withoutEnlargement: true })
+            .webp({ quality: VIDEO_POSTER_PROFILE.quality })
+            .toBuffer();
+    } catch (error) {
+        process.kill();
+        throw error;
+    }
+}
+
+async function createStoredPoster(store: MediaStore, objectKey: string, input: () => Promise<Readable>) {
+    const key = posterObjectKey(objectKey);
+    let job = posterJobs.get(key);
+    if (!job) {
+        job = input().then(createVideoPoster);
+        posterJobs.set(key, job);
+    }
+    try {
+        const poster = await job;
+        await store.put(key, Readable.from(poster), "image/webp");
+        return poster;
+    } finally {
+        if (posterJobs.get(key) === job) posterJobs.delete(key);
+    }
+}
+
 // 供生成任务等服务端流程落盘媒体：写入与 /api/media 上传相同的存储和 user_media 表。
 export async function storeAccountMedia(database: Pool, options: MediaOptions, userId: string, bytes: Buffer, mimeType: string) {
     const store = mediaStore(options);
@@ -69,6 +114,7 @@ export function createMediaRouter(database: Pool, options: MediaOptions) {
     router.use(requireUser(database));
     router.post("/media", (request, response) => uploadMedia(request, response, database, options));
     router.get("/media/:id/preview", (request, response) => readPreview(request, response, database, options));
+    router.get("/media/:id/poster", (request, response) => readPoster(request, response, database, options));
     router.get("/media/:id", (request, response) => readMedia(request, response, database, options));
     router.delete("/media/:id", (request, response) => deleteMedia(request, response, database, options));
     return router;
@@ -156,6 +202,30 @@ async function readPreview(request: Request, response: Response, database: Pool,
     return response.set("Content-Length", String(bytes.length)).send(bytes);
 }
 
+async function readPoster(request: Request, response: Response, database: Pool, options: MediaOptions) {
+    const store = mediaStore(options);
+    if (!store) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
+    const result = await database.query<{ object_key: string; mime_type: string }>("SELECT object_key, mime_type FROM user_media WHERE id = $1 AND user_id = $2", [request.params.id, response.locals.user.id]);
+    const row = result.rows[0];
+    if (!row) return response.status(404).json({ error: { code: "MEDIA_NOT_FOUND", message: "媒体不存在" } });
+    if (!row.mime_type.startsWith("video/")) return response.status(415).json({ error: { code: "MEDIA_POSTER_UNSUPPORTED", message: "该媒体不支持视频海报" } });
+
+    let bytes: Buffer;
+    try {
+        bytes = await readStreamBytes(await store.get(posterObjectKey(row.object_key)));
+    } catch {
+        try {
+            bytes = await createStoredPoster(store, row.object_key, () => store.get(row.object_key));
+        } catch {
+            return response.status(503).json({ error: { code: "MEDIA_POSTER_UNAVAILABLE", message: "视频海报暂时不可用" } });
+        }
+    }
+    const etag = `"${request.params.id}-${VIDEO_POSTER_PROFILE.version}"`;
+    response.type("image/webp").set({ "Cache-Control": "private, no-cache", ETag: etag });
+    if (request.header("if-none-match") === etag) return response.status(304).end();
+    return response.set("Content-Length", String(bytes.length)).send(bytes);
+}
+
 async function readMedia(request: Request, response: Response, database: Pool, options: MediaOptions) {
     const store = mediaStore(options);
     if (!store) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
@@ -199,6 +269,7 @@ async function deleteMedia(request: Request, response: Response, database: Pool,
     if (row) {
         await store.remove(row.object_key);
         await store.remove(previewObjectKey(row.object_key)).catch(() => undefined);
+        await store.remove(posterObjectKey(row.object_key)).catch(() => undefined);
     }
     return response.status(204).end();
 }

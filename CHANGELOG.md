@@ -2,6 +2,7 @@
 
 ## Unreleased
 
++ [新增] 账号视频新增服务端首帧 poster：使用版本化 `video-poster-canvas-v1` 通过 ffmpeg 按需抽帧并输出 WebP，画布和资源缩略图优先使用 poster，原视频仍用于播放、下载和生成参考。
 + [优化] 账号图片媒体新增服务端画布预览图：按版本化预览 profile 按需生成 768px WebP，画布及图片缩略图优先使用预览，原图继续用于下载、编辑、导出和生成参考；预览接口保持账号鉴权并支持 ETag 校验。
 + [优化] 仓库配置清理与统一：删掉已废弃的单服务 `docker-compose.local.yml`、空 `plugins/` 目录、文档站被移除后遗留的 12 个导航元数据 `meta.json` 和图表 QA 产物；根目录的 `CAPABILITY-MAP.md`、`SPEC-identity.md`、`SPEC-catalog.md` 和 `tasks/` 下的计划/任务清单统一搬到 `docs/specs/`（英文小写短横线命名）并修正全部交叉引用；`docs/index.md` 改用仓库内真实相对路径，修掉失效的文档站路由链接和指向已删除 changelog 页的死链；`.dockerignore` 清掉不存在的条目并补上真实需要排除的目录；`web/components.json` 修正为 Vite 实际路径（`src/styles/globals.css`、`rsc: false`）；Bun 版本统一为 `1.3.14`（Dockerfile、Dockerfile.api、workflow、`web/package.json`）。
 + [调整] 文档统一为简体中文单份：`docs/content/docs/` 下 12 篇正文原先每篇都有一个 `.zh-CN` 重复副本（其中 4 篇的副本还是过时子集），现每篇只保留一份中文文档，`docs/index.zh-CN.md` 同理删除；`pending-test.mdx` 此前是中英混排，已与中文副本合并成一份完整中文清单。

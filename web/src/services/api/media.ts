@@ -67,3 +67,7 @@ export function accountMediaUrl(storageKey?: string) {
 export function accountMediaPreviewUrl(storageKey?: string) {
     return storageKey?.startsWith("remote:") ? `/api/media/${storageKey.slice("remote:".length)}/preview` : "";
 }
+
+export function accountMediaPosterUrl(storageKey?: string) {
+    return storageKey?.startsWith("remote:") ? `/api/media/${storageKey.slice("remote:".length)}/poster` : "";
+}
