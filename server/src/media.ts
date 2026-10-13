@@ -142,7 +142,10 @@ async function readPreview(request: Request, response: Response, database: Pool,
     } catch {
         bytes = await createStoredPreview(store, row.object_key, () => store.get(row.object_key));
     }
-    return response.type("image/webp").set({ "Cache-Control": "private, no-store", "Content-Length": String(bytes.length) }).send(bytes);
+    const etag = `"${request.params.id}-${CANVAS_PREVIEW_PROFILE.version}"`;
+    response.type("image/webp").set({ "Cache-Control": "private, no-cache", ETag: etag });
+    if (request.header("if-none-match") === etag) return response.status(304).end();
+    return response.set("Content-Length", String(bytes.length)).send(bytes);
 }
 
 async function readMedia(request: Request, response: Response, database: Pool, options: MediaOptions) {

@@ -62,7 +62,14 @@ test("account media streams raw uploads and isolates Range, HEAD and stale-accou
         assert.equal(preview.status, 200);
         assert.equal(preview.headers.get("content-type")?.split(";", 1)[0], "image/webp");
         assert.ok((await preview.arrayBuffer()).byteLength > 0);
+        assert.equal(preview.headers.get("cache-control"), "private, no-cache");
+        assert.match(preview.headers.get("etag") || "", /^"[0-9a-f-]+-canvas-preview-v1"$/);
+        const cachedPreview = await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: { ...headers(sidA), "if-none-match": preview.headers.get("etag") || "" } });
+        assert.equal(cachedPreview.status, 304);
         assert.equal((await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: headers(sidB) })).status, 404);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${id}/preview`, { headers: headers(sidA) })).status, 415);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${imageId}`, { method: "DELETE", headers: { ...headers(sidA), origin } })).status, 204);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: headers(sidA) })).status, 404);
 
         const json = '{"raw":true}';
         const jsonUpload = await fetch(`${api.baseUrl}/api/media`, { method: "POST", headers: { ...headers(sidA), origin, "content-type": "application/json" }, body: json });
