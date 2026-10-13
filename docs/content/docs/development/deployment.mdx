@@ -48,6 +48,18 @@ description: 生产服务器地址、发布流程与注意事项
 
 6. 验证：`/api/health` 返回 `{"ok":true}`；`/templates/templates.json` 模板数量正确；随机抽一个模板封面或媒体文件返回 200。涉及生成链路的发布，再登录跑一单真实生成。
 
+## 接口审计日志
+
+api 对每个 `/api` 请求输出一行 JSON 日志（pino，stdout），包含方法、路径、状态码、耗时、账号 id、脱敏后的请求体和截断后的响应体；登录密码输出为 `[redacted]`，账号 API Key 只留前 6 位，请求体超过 16KiB、响应体超过 4KiB 截断，媒体接口只记元信息，`/api/health` 不记。查看与排查：
+
+```powershell
+docker logs --tail 100 infinite-canvas-v2-api-1
+# 按路径过滤
+docker logs --since 1h infinite-canvas-v2-api-1 | Select-String "POST /api/generations"
+```
+
+api 容器日志轮转单独放大为 50MB × 10 个文件（约 500MB），其余容器仍为 10MB × 3；`LOG_LEVEL` 环境变量可调日志级别（默认 `info`）。注意日志含用户提示词等业务内容，属敏感数据，不要外发原始日志。
+
 ## 注意事项
 
 - **`APP_ORIGIN` 必须和浏览器实际访问的来源一致**（协议 + 域名 + 端口，只支持一个值）。换域名或端口访问时，同步改服务器 `.env` 里的 `APP_ORIGIN` 并 `docker compose up -d` 重建 api，否则所有写操作（登录、保存、生成）都会被同源校验以 403「请求来源不受信任」拒绝；读操作和页面不受影响。

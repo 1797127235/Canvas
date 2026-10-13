@@ -1,7 +1,7 @@
 import express, { type ErrorRequestHandler, type Request, type RequestHandler, type Response, type Router } from "express";
 import helmet from "helmet";
 
-import { logError } from "./log.js";
+import { logError, logRequest, loggedJson, REQ_BODY_LIMIT, RES_BODY_LIMIT } from "./log.js";
 
 type AppOptions = {
     appOrigin: string;
@@ -13,6 +13,7 @@ export function createApp(options: AppOptions) {
     app.disable("x-powered-by");
     app.use(helmet());
     app.use(noStore);
+    app.use(logRequests());
     app.use(rejectUnsupportedEncoding);
     app.use(rejectCrossOriginStateChanges(options.appOrigin));
     // 媒体走原始上传流；业务 JSON 不设容量额度，身份请求保留原有 4 KiB 校验。
@@ -46,6 +47,39 @@ const noStore: RequestHandler = (_request, response, next) => {
     response.setHeader("Cache-Control", "no-store");
     next();
 };
+
+// 每个 /api 请求输出一行审计日志：方法、路径、状态码、耗时、账号，加上脱敏请求体与截断响应体；
+// 媒体是二进制流，只记元信息；健康检查被容器高频轮询，不记。
+function logRequests(): RequestHandler {
+    return (request, response, next) => {
+        if (!request.path.startsWith("/api/") || request.path === "/api/health") return next();
+        const media = request.path.startsWith("/api/media");
+        const start = Date.now();
+        let resBody: unknown;
+        if (!media) {
+            const json = response.json.bind(response) as (body?: unknown) => Response;
+            response.json = (body?: unknown) => {
+                resBody = body;
+                return json(body);
+            };
+        }
+        response.on("finish", () => {
+            // 中间件先于 body 解析挂载，请求体留到响应结束时读取。
+            const reqBody = !media && request.body !== undefined ? loggedJson(request.body, REQ_BODY_LIMIT) : undefined;
+            logRequest({
+                method: request.method,
+                path: request.originalUrl,
+                status: response.statusCode,
+                durationMs: Date.now() - start,
+                userId: response.locals.user?.id as string | undefined,
+                media: media || undefined,
+                reqBody,
+                resBody: media ? undefined : loggedJson(resBody, RES_BODY_LIMIT),
+            });
+        });
+        return next();
+    };
+}
 
 const rejectUnsupportedEncoding: RequestHandler = (request, response, next) => {
     if (request.headers["content-encoding"] && request.headers["content-encoding"] !== "identity") {
