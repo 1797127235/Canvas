@@ -2652,5 +2652,1639 @@
         "mimeType": "image/webp"
       }
     ]
+  },
+  {
+    "id": "electronics-ad",
+    "title": "3C产品宣传广告",
+    "description": "一张 3C 产品图延伸出电商海报、直播间场景图和 15 秒竖版宣传视频：先生成风格海报与场景图，再让文本模型写分镜脚本、图生成分镜图，最后按脚本与分镜图生成视频。",
+    "tags": [
+      "3C数码",
+      "产品广告",
+      "图生视频"
+    ],
+    "author": "官方",
+    "cover": "/templates/covers/electronics-ad.webp",
+    "previewVideo": "/templates/electronics-ad/media/video_XuR5hqT3EMSxYEPMBGjxp.mp4",
+    "project": {
+      "title": "3C产品宣传广告",
+      "backgroundMode": "lines",
+      "viewport": {
+        "k": 0.4413717549225852,
+        "x": 7.966111881544535,
+        "y": 90.23998219483592
+      },
+      "nodes": [
+        {
+          "id": "electronics-instructions",
+          "type": "text",
+          "title": "使用说明",
+          "position": {
+            "x": 194.928955078125,
+            "y": -45.85699462890625
+          },
+          "width": 2400,
+          "height": 180,
+          "metadata": {
+            "content": "3C 产品宣传广告｜1 张产品图 → 海报 / 直播间场景图 / 15 秒竖版宣传视频\n① 克隆后先替换「白色产品图」等参考素材，或修改「产品需求提示词」重新生成自己的产品图。\n② 按步骤依次生成海报、直播间图、分镜脚本和 3×3 分镜图；脚本与分镜图决定成片质量，可反复改提示词重出。\n③ 最后一步选择账号可用的视频模型，按脚本与分镜图生成 9:16 宣传视频。",
+            "status": "idle",
+            "fontSize": 16
+          }
+        },
+        {
+          "id": "text-1791798564931-e1zyc",
+          "type": "text",
+          "title": "产品需求提示词",
+          "position": {
+            "x": 194.928955078125,
+            "y": 234.14300537109375
+          },
+          "width": 310,
+          "height": 205,
+          "metadata": {
+            "content": "给出一个设计高级简约，白色背景，黑白双色两个鼠标",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "image-1791798573841-6kii5",
+          "type": "image",
+          "title": "产品渲染图 · 黑白双鼠标",
+          "position": {
+            "x": 632.6434326171875,
+            "y": 241.17989890702233
+          },
+          "width": 340,
+          "height": 191.35167464114832,
+          "metadata": {
+            "content": "/templates/electronics-ad/media/image_unu38nnlt_ghg3th2eQm3.webp",
+            "status": "success",
+            "prompt": "文本1 ",
+            "size": "2048x1152",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": false,
+            "generationType": "generation",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [],
+            "storageKey": "image:unu38nnlt_ghg3th2eQm3",
+            "naturalWidth": 1280,
+            "naturalHeight": 720,
+            "bytes": 13622,
+            "mimeType": "image/webp",
+            "primaryImageId": "image-1791798573841-6kii5"
+          }
+        },
+        {
+          "id": "image-1791798758530-001pw",
+          "type": "image",
+          "title": "替换白色产品图",
+          "position": {
+            "x": 630.9966758099724,
+            "y": 502.16871093750007
+          },
+          "width": 359.29411764705884,
+          "height": 203.60000000000002,
+          "metadata": {
+            "content": "/templates/electronics-ad/media/image_juOXofMgnDSFB-581-mKw.webp",
+            "status": "success",
+            "storageKey": "image:juOXofMgnDSFB-581-mKw",
+            "naturalWidth": 1600,
+            "naturalHeight": 907,
+            "bytes": 9798,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "text-1791799260965-rzi1u",
+          "type": "text",
+          "title": "海报风格提示词",
+          "position": {
+            "x": 1155.7798728731705,
+            "y": 509.85824281036093
+          },
+          "width": 420,
+          "height": 300,
+          "metadata": {
+            "content": "- **设计风格 (Overall Aesthetic)：**\\\n  **暗黑空间与光影美学 (Dark Space & Light Art)**。摒弃繁杂背景，利用强烈的聚光灯、星环发光或地平线光晕营造深邃的“失重悬浮感”与“无限空间感”，突出产品的几何雕塑感与未来科技属性。\n\n- **排版布局 (Layout & Typography)：**\\\n  **严格的中轴对称式构图 (Vertical Symmetry)**。采用“上文下图”结构：顶部居中排布无衬线体（Sans-serif）主副标题，字号对比强烈；画面中下部作为核心视觉区，产品呈悬浮或仰视姿态拔地而起。留黑（负空间）极大，视线高度聚焦于产品主体与核心光影。\n\n- **色调配色 (Color Palette & Tone)：**\\\n  整体基调为**深邃冷峻的曜石黑/深空灰 (Obsidian Black/Space Grey)**。以高对比度的\\*\\*冷色发光（如冰川蓝、霓虹青）**或**高饱和暖光（日落金、晨曦橙）\\*\\*作为环境渲染与产品轮廓光（Rim Light），形成极致的明暗冲突（Chiaroscuro），极具电影级的高级质感与能量爆发感。",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "config-1791799308714-9sq1z",
+          "type": "config",
+          "title": "步骤 1 · 生成产品海报",
+          "position": {
+            "x": 1735.9345170022832,
+            "y": 549.3340336047617
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "size": "2048x1152",
+            "count": 1,
+            "prompt": "- **设计风格 (Overall Aesthetic)：**\\\n  **暗黑空间与光影美学 (Dark Space & Light Art)**。摒弃繁杂背景，利用强烈的聚光灯、星环发光或地平线光晕营造深邃的“失重悬浮感”与“无限空间感”，突出产品的几何雕塑感与未来科技属性。\n\n- **排版布局 (Layout & Typography)：**\\\n  **严格的中轴对称式构图 (Vertical Symmetry)**。采用“上文下图”结构：顶部居中排布无衬线体（Sans-serif）主副标题，字号对比强烈；画面中下部作为核心视觉区，产品呈悬浮或仰视姿态拔地而起。留黑（负空间）极大，视线高度聚焦于产品主体与核心光影。\n\n- **色调配色 (Color Palette & Tone)：**\\\n  整体基调为**深邃冷峻的曜石黑/深空灰 (Obsidian Black/Space Grey)**。以高对比度的\\*\\*冷色发光（如冰川蓝、霓虹青）**或**高饱和暖光（日落金、晨曦橙）\\*\\*作为环境渲染与产品轮廓光（Rim Light），形成极致的明暗冲突（Chiaroscuro），极具电影级的高级质感与能量爆发感。",
+            "outputNodeId": "WWu-YaVobzwljSHeTtETm"
+          }
+        },
+        {
+          "id": "WWu-YaVobzwljSHeTtETm",
+          "type": "image",
+          "title": "成果 · 产品海报",
+          "position": {
+            "x": 2199.4620888119516,
+            "y": 563.4347451087488
+          },
+          "width": 407.31931799999995,
+          "height": 229.117116375,
+          "metadata": {
+            "prompt": "- **设计风格 (Overall Aesthetic)：**\\\n  **暗黑空间与光影美学 (Dark Space & Light Art)**。摒弃繁杂背景，利用强烈的聚光灯、星环发光或地平线光晕营造深邃的“失重悬浮感”与“无限空间感”，突出产品的几何雕塑感与未来科技属性。\n\n- **排版布局 (Layout & Typography)：**\\\n  **严格的中轴对称式构图 (Vertical Symmetry)**。采用“上文下图”结构：顶部居中排布无衬线体（Sans-serif）主副标题，字号对比强烈；画面中下部作为核心视觉区，产品呈悬浮或仰视姿态拔地而起。留黑（负空间）极大，视线高度聚焦于产品主体与核心光影。\n\n- **色调配色 (Color Palette & Tone)：**\\\n  整体基调为**深邃冷峻的曜石黑/深空灰 (Obsidian Black/Space Grey)**。以高对比度的\\*\\*冷色发光（如冰川蓝、霓虹青）**或**高饱和暖光（日落金、晨曦橙）\\*\\*作为环境渲染与产品轮廓光（Rim Light），形成极致的明暗冲突（Chiaroscuro），极具电影级的高级质感与能量爆发感。",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "2048x1152",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:unu38nnlt_ghg3th2eQm3",
+              "image:juOXofMgnDSFB-581-mKw"
+            ],
+            "content": "/templates/electronics-ad/media/image_KHsnv9nY48uN2bN_5gvz1.webp",
+            "storageKey": "image:KHsnv9nY48uN2bN_5gvz1",
+            "naturalWidth": 1280,
+            "naturalHeight": 720,
+            "bytes": 46710,
+            "mimeType": "image/webp",
+            "primaryImageId": "WWu-YaVobzwljSHeTtETm"
+          }
+        },
+        {
+          "id": "text-1791800713300-13aks",
+          "type": "text",
+          "title": "直播间风格提示词",
+          "position": {
+            "x": 1154.85307663223,
+            "y": 895.6570894736791
+          },
+          "width": 420,
+          "height": 300,
+          "metadata": {
+            "content": "- **整体设计风格 (Overall Aesthetic)：**\\\n  **高阶极简与建筑空间美学 (Advanced Minimalism & Architectural Space)**。摒弃了传统直播间繁杂的背景与装饰，采用类似现代高端美术馆或Apple Store的陈列逻辑。大量使用干净的几何线条（如圆柱体展台、巨大的圆形顶灯、利落的平直线条），强调材质的哑光质感与空间的呼吸感，传递出专业、纯粹、克制的高端科技品牌调性。\n\n- **空间布局与排版 (Spatial Layout & Composition)：**\\\n  **严格的中轴对称式构图 (Strict Central Axis Symmetry)**。\n\n  - **视觉锚点：** 画面以绝对居中的立柱发光带和正前方的几何展台构成强烈的中心视觉锚点，确保直播时的焦点完全锁定在主播与核心产品上。\n\n  - **两侧留白：** 左右两侧墙面采用大面积留白（负空间），仅辅以对称的极简悬浮一字隔板，形成视觉上的平衡与延伸。\n\n  - **纵深层级：** 通过“顶部环形灯带 - 背景发光立柱 - 前景立体展台”构建出清晰的Z轴空间景深，使平面的直播画面具有建筑级的立体感。\n\n- **色调与光影配色 (Color Palette & Lighting Tone)：**\\\n  **低饱和暖调中性色与漫反射光影 (Low-saturation Warm Neutrals & Diffuse Lighting)**。\n\n  - **色彩基调：** 整体摒弃了科技行业常见的暗黑或高饱和霓虹色，转而采用大面积的**暖灰色 (Warm Grey)、米白色 (Off-White) 与砂岩色 (Sandstone)**。这种低饱和的单色调（Monochromatic）营造出一种治愈、高级且不喧宾夺主的背景氛围。\n\n  - **光影设计：** 核心采用**无主灯设计的漫反射环境光 (Ambient Diffuse Light)**。利用背景的隐藏式发光带（柔和的奶油暖光）和顶部的洗墙灯，消除了生硬的物理阴影。品牌标识与核心区域采用自发光设计，以光线代替实体制轮廓，呈现出轻盈的未来科技质感。",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "config-1791800762178-4vyzn",
+          "type": "config",
+          "title": "步骤 2 · 生成直播间场景图",
+          "position": {
+            "x": 1737.092985076584,
+            "y": 932.8618844307174
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "size": "1152x2048",
+            "count": 1,
+            "prompt": "- **整体设计风格 (Overall Aesthetic)：**\\\n  **高阶极简与建筑空间美学 (Advanced Minimalism & Architectural Space)**。摒弃了传统直播间繁杂的背景与装饰，采用类似现代高端美术馆或Apple Store的陈列逻辑。大量使用干净的几何线条（如圆柱体展台、巨大的圆形顶灯、利落的平直线条），强调材质的哑光质感与空间的呼吸感，传递出专业、纯粹、克制的高端科技品牌调性。\n\n- **空间布局与排版 (Spatial Layout & Composition)：**\\\n  **严格的中轴对称式构图 (Strict Central Axis Symmetry)**。\n\n  - **视觉锚点：** 画面以绝对居中的立柱发光带和正前方的几何展台构成强烈的中心视觉锚点，确保直播时的焦点完全锁定在主播与核心产品上。\n\n  - **两侧留白：** 左右两侧墙面采用大面积留白（负空间），仅辅以对称的极简悬浮一字隔板，形成视觉上的平衡与延伸。\n\n  - **纵深层级：** 通过“顶部环形灯带 - 背景发光立柱 - 前景立体展台”构建出清晰的Z轴空间景深，使平面的直播画面具有建筑级的立体感。\n\n- **色调与光影配色 (Color Palette & Lighting Tone)：**\\\n  **低饱和暖调中性色与漫反射光影 (Low-saturation Warm Neutrals & Diffuse Lighting)**。\n\n  - **色彩基调：** 整体摒弃了科技行业常见的暗黑或高饱和霓虹色，转而采用大面积的**暖灰色 (Warm Grey)、米白色 (Off-White) 与砂岩色 (Sandstone)**。这种低饱和的单色调（Monochromatic）营造出一种治愈、高级且不喧宾夺主的背景氛围。\n\n  - **光影设计：** 核心采用**无主灯设计的漫反射环境光 (Ambient Diffuse Light)**。利用背景的隐藏式发光带（柔和的奶油暖光）和顶部的洗墙灯，消除了生硬的物理阴影。品牌标识与核心区域采用自发光设计，以光线代替实体制轮廓，呈现出轻盈的未来科技质感。",
+            "outputNodeId": "n8PuCXT24TwG-DiHvz_6p"
+          }
+        },
+        {
+          "id": "text-1791801081726-bob6q",
+          "type": "text",
+          "title": "视频广告策划提示词",
+          "position": {
+            "x": 576.773382079966,
+            "y": 685.9185082482129
+          },
+          "width": 420,
+          "height": 300,
+          "metadata": {
+            "content": "你现在是世界顶级的3C数码短片导演及视觉策划专家。你的任务是根据我提供的产品图片，构思并策划一支15秒的视频广告，高端的创意产品展示。包含9个关键镜头。请严格按照以下两个步骤执行：第一步：策划与分镜设计基于产品卖点、风格及视觉特征，设计一个引人入胜的视觉叙事逻辑。请输出一个包含9个镜头的Markdown分镜表格，表头需包含：镜头序号(1-9) 景别与运镜(如：特写/推镜头低角度) 画面详细描述(需精确描述产品在画面中的状态，确保与原产品一致) 时长(总计15秒) 旁白/音效。第二步：编写nano banana pro绘画提示词。我需要你编写一段专门用于nanobananapro模型的提示词，生成一张3x3网格的分镜设计图(即一张大图里包含9个按顺序排列的16:9画面)。提示词编写要求：结构：必须以英文编写。核心指令：开头必须包含3x3 grid storyboard sheet, 9 panels sequence, 16:9 aspect ratio per panel, consistent visual style",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "config-1791801093509-6igf4",
+          "type": "config",
+          "title": "步骤 3 · 生成分镜脚本",
+          "position": {
+            "x": 591.8860845408924,
+            "y": 1317.4949927525374
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "text",
+            "size": "9:16",
+            "count": 1,
+            "prompt": "你现在是世界顶级的3C数码短片导演及视觉策划专家。你的任务是根据我提供的产品图片，构思并策划一支15秒的视频广告，高端的创意产品展示。包含9个关键镜头。请严格按照以下两个步骤执行：第一步：策划与分镜设计基于产品卖点、风格及视觉特征，设计一个引人入胜的视觉叙事逻辑。请输出一个包含9个镜头的Markdown分镜表格，表头需包含：镜头序号(1-9) 景别与运镜(如：特写/推镜头低角度) 画面详细描述(需精确描述产品在画面中的状态，确保与原产品一致) 时长(总计15秒) 旁白/音效。第二步：编写nano banana pro绘画提示词。我需要你编写一段专门用于nanobananapro模型的提示词，生成一张3x3网格的分镜设计图(即一张大图里包含9个按顺序排列的16:9画面)。提示词编写要求：结构：必须以英文编写。核心指令：开头必须包含3x3 grid storyboard sheet, 9 panels sequence, 16:9 aspect ratio per panel, consistent visual style",
+            "outputNodeId": "2hTE5DrIeXWXdLtWQJSyb"
+          }
+        },
+        {
+          "id": "2hTE5DrIeXWXdLtWQJSyb",
+          "type": "text",
+          "title": "成果 · 分镜脚本",
+          "position": {
+            "x": 1154.6527555090763,
+            "y": 1293.2156307221278
+          },
+          "width": 420,
+          "height": 300,
+          "metadata": {
+            "prompt": "你现在是世界顶级的3C数码短片导演及视觉策划专家。你的任务是根据我提供的产品图片，构思并策划一支15秒的视频广告，高端的创意产品展示。包含9个关键镜头。请严格按照以下两个步骤执行：第一步：策划与分镜设计基于产品卖点、风格及视觉特征，设计一个引人入胜的视觉叙事逻辑。请输出一个包含9个镜头的Markdown分镜表格，表头需包含：镜头序号(1-9) 景别与运镜(如：特写/推镜头低角度) 画面详细描述(需精确描述产品在画面中的状态，确保与原产品一致) 时长(总计15秒) 旁白/音效。第二步：编写nano banana pro绘画提示词。我需要你编写一段专门用于nanobananapro模型的提示词，生成一张3x3网格的分镜设计图(即一张大图里包含9个按顺序排列的16:9画面)。提示词编写要求：结构：必须以英文编写。核心指令：开头必须包含3x3 grid storyboard sheet, 9 panels sequence, 16:9 aspect ratio per panel, consistent visual style",
+            "status": "success",
+            "fontSize": 14,
+            "reasoningEffort": "auto",
+            "content": "第一步：策划与分镜设计\n\n创意主题：**「黑白之间，自有秩序」**。让一道光成为贯穿全片的视觉线索：从黑色鼠标的轮廓出发，进入滚轮与壳体细节，再由白色鼠标接住光线，最终汇成黑白双款的完整展示。15秒内完成“引起好奇—看清细节—记住产品”的视觉叙事。\n\n基于图片，重点呈现**黑白双色、圆润低矮轮廓、简洁按键分区、细密滚轮纹理**。整体采用高端微距产品摄影与黑白极简布景；功能文案仅围绕可见设计，不加入未经确认的静音、续航或连接性能。\n\n| 镜头序号(1-9) | 景别与运镜 | 画面详细描述 | 时长(总计15秒) | 旁白/音效 |\n|---|---|---|---|---|\n| 1 | 近景／低机位缓推 | 深炭灰背景中，黑色鼠标静置于同色台面，前端朝画面左下、尾部朝右上。一道窄长柔光沿顶部圆弧掠过，逐渐显露低矮的圆润外形与壳体接缝；保持完整原型，无发光结构。 | 1.5秒（0–1.5秒） | 低频氛围音渐入，轻微空气掠过声。 |\n| 2 | 微距特写／沿中轴短距离推进 | 靠近黑色鼠标前部，黑色滚轮成为视觉中心。侧上方柔光照出滚轮的细密横向齿纹、深色轮槽与前后相接的按键分割线，背景自然虚化。鼠标静止，滚轮不变形。 | 1.5秒（1.5–3秒） | 一次清脆、轻量的电子节拍，与滚轮细节亮起同步。 |\n| 3 | 大特写／贴近侧缘横移 | 镜头沿黑色鼠标可见侧面的上壳与下壳接缝滑动，掠过前端圆角。细长高光依附真实壳体曲面，展示均匀缝隙及深灰黑色表面的柔和反光。构图让接缝形成左下至右上的斜线。 | 1.5秒（3–4.5秒） | 细腻的滑动拟音，氛围音乐节奏开始建立。 |\n| 4 | 大特写／匹配剪辑后轻拉远 | 承接上一镜斜线位置，切换为白色鼠标同一侧缘。背景同步变成浅灰白，白色上壳、浅灰接缝与圆润下壳依次显现。通过剪辑完成黑白切换，不表现外壳变色。 | 1.5秒（4.5–6秒） | 明亮短音落点，衔接轻柔的高频空气声。 |\n| 5 | 特写至中近景／小幅弧线环绕 | 白色鼠标完整出现在浅灰台面，保持前左、后右的三分之四视角。镜头小幅环绕，展示左右按键、浅银白色齿纹滚轮、饱满尾部和低矮侧廓。光影随观察角度自然变化，产品稳固落在台面上。 | 2秒（6–8秒） | 旁白：“简于形。”音乐加入简洁脉冲节拍。 |\n| 6 | 微距特写／微俯视与焦点转移 | 聚焦白色鼠标前部，先让浅银白色滚轮纹理清晰，再将焦点转移到轮槽旁的白色按键边缘。保留原图中的中央分割线与壳体比例，不增加按键、灯光或标识。 | 1.5秒（8–9.5秒） | 两个轻微节奏音对应焦点转换；声音作为配乐，不暗示实际按键声。 |\n| 7 | 双产品中景／斜俯视缓降 | 黑白双款首次同框：白色位于左侧浅色区域，黑色位于右侧深色区域，两只鼠标均前端朝左下。台面明暗分界呼应前面接缝的斜线，形成图形上的延续；产品大小一致，互不遮挡。 | 2秒（9.5–11.5秒） | 旁白：“精于细节。”低频与明亮音色汇合。 |\n| 8 | 双产品近景／横向滑轨 | 黑白双款保持静止，镜头低角度横移，借视差呈现两只鼠标相同的圆弧轮廓、前缘和滚轮。一道宽柔光同时扫过两款表面，背景从明暗分区过渡为均匀浅灰。 | 1.5秒（11.5–13秒） | 一次短促柔和的上扬转场声，音乐向收束推进。 |\n| 9 | 全景产品定帧／轻拉远后停稳 | 浅灰白背景上，白色在左、黑色在右，并排呈现与参考图一致的三分之四视角，前端朝左下。保留柔和接触阴影与足够留白，两款产品均完整可见。上方后期叠加广告语“黑白之间，自有秩序”，不添加虚构品牌。 | 2秒（13–15秒） | 旁白：“自有秩序。”最后一个干净音符落下，余音结束。 |\n\n第二步：nano banana pro绘画提示词\n\n将产品原图作为参考图上传，再使用以下英文提示词。九宫格只生成分镜画面，广告语留待后期排版。\n\n```text\n3x3 grid storyboard sheet, 9 panels sequence, 16:9 aspect ratio per panel, consistent visual style.\n\nCreate one premium photorealistic storyboard image for a 15-second computer mouse commercial, using the attached product photograph as the authoritative reference for product identity. Arrange exactly nine rectangular panels in three equal columns and three equal rows, read left to right and top to bottom. Every panel must have a true 16:9 composition. Use a 16:9 overall canvas with edge-to-edge equal cells and hairline internal dividers, no outer border, no extra caption strips. Target 5760 x 3240 pixels if supported.\n\nCreative concept: “Order Between Black and White.” Build a coherent visual progression from a dark silhouette, through precise surface details, into a bright white reveal, and finally a balanced composition of both color variants. Light is the connecting visual motif. Each panel is one representative cinematic keyframe from a distinct shot, not a collage of multiple moments.\n\nPRODUCT IDENTITY:\nReproduce the exact two mouse variants shown in the reference: one white mouse and one charcoal-black mouse, both sharing the same geometry and proportions. Preserve the low rounded body, gently domed top, broad curved rear, rounded front, two main click surfaces divided by the reference center seam, a single recessed ridged scroll wheel near the front, and the narrow seam between the upper shell and lower body. Follow the exact length and placement of the center seam visible in the reference; do not extend it across the entire rear shell. The white variant has a pale silver-white ridged wheel. The black variant has a dark ridged wheel. Match the reference surface finish, with soft controlled reflections and no exaggerated gloss.\n\nIn all full-product views, the front and scroll-wheel end point toward the lower left, and the rounded rear points toward the upper right, matching the reference photograph. Keep both variants identical in size and shape. Products rest naturally on a surface with believable contact shadows. Use only viewpoints supported by the visible top and side geometry in the reference.\n\nVISUAL DIRECTION:\nLuxury consumer electronics advertising, restrained monochrome palette, sculptural studio lighting, realistic product photography, precise macro detail, clean negative space, subtle tonal gradients, controlled highlights, physically plausible shadows, and consistent neutral color grading. Maintain sharp product silhouettes. Use shallow depth of field for macro panels and sufficient depth of field for complete product views. The connecting light must read as an external studio reflection on the shell, never as an illuminated strip built into the mouse.\n\nPANEL 1 — TOP LEFT — 0.0–1.5 seconds:\nA close, low three-quarter view of the black mouse resting on a charcoal surface against a charcoal background. Front points lower left, rear upper right. A narrow soft reflection reveals the curved top and a small portion of the shell seam, while much of the body remains in shadow. The outline is recognizable and faithful to the reference. Frame the moment of initial reveal, suggesting a slow camera push-in.\n\nPANEL 2 — TOP CENTER — 1.5–3.0 seconds:\nAn extreme macro view of the black mouse scroll wheel and the immediately surrounding click surfaces, photographed from slightly above the front. Reveal the fine transverse wheel ridges, recessed wheel opening, and adjoining center seam. Use a narrow soft highlight and dark tonal separation. The wheel and shell remain physically intact and stationary.\n\nPANEL 3 — TOP RIGHT — 3.0–4.5 seconds:\nAn extreme close-up of the black mouse side seam near the rounded front corner. The actual shell seam runs diagonally from lower left toward upper right. A delicate reflected highlight describes the rounded top shell above the darker lower body. Suggest a lateral macro tracking shot. Preserve the exact shell construction with no added controls or decorative parts.\n\nPANEL 4 — MIDDLE LEFT — 4.5–6.0 seconds:\nA match-cut composition of the same visible side seam and front corner on the white mouse. Match the diagonal line placement and camera angle of Panel 3. Change the environment to soft off-white and pale gray. Show the white upper shell, subtle gray seam, and softly rounded lower body. This is a separate white product photographed in a separate shot, with no material transformation effect.\n\nPANEL 5 — MIDDLE CENTER — 6.0–8.0 seconds:\nA complete three-quarter hero view of the white mouse on a pale gray studio surface. Front lower left, rear upper right. Clearly show both click surfaces, the pale silver-white ridged scroll wheel, gently domed rear, and low curved side profile. Use a broad softbox reflection, a clean contact shadow, and generous negative space. Choose a frame suggesting a restrained camera orbit around the stationary product.\n\nPANEL 6 — MIDDLE RIGHT — 8.0–9.5 seconds:\nA slightly overhead macro of the white mouse front section. Place the ridged scroll wheel and the adjacent white click-surface edge within the same composition. Render the near edge beside the wheel crisply, with the farther wheel ridges becoming gently softer, suggesting the endpoint of a subtle focus pull. Maintain the exact reference wheel opening, center seam, and body proportions.\n\nPANEL 7 — BOTTOM LEFT — 9.5–11.5 seconds:\nA balanced elevated three-quarter view of both mice, fully visible and separated by a clear gap. White mouse on the left, black mouse on the right; both fronts point lower left. The studio surface has a flat diagonal pale-to-charcoal tonal division between the products, visually echoing the seam direction in Panels 3 and 4. This division is a graphic lighting or backdrop treatment, not a raised platform. Keep both products equally scaled and clearly readable.\n\nPANEL 8 — BOTTOM CENTER — 11.5–13.0 seconds:\nA closer, lower three-quarter view of both mice, white left and black right, arranged with a slight depth offset so neither product obscures the other’s scroll wheel or front edge. A broad soft studio reflection touches both curved shells simultaneously. The background is now nearly uniform light gray. Suggest lateral camera movement through perspective and composition, with crisp stationary products and no motion blur.\n\nPANEL 9 — BOTTOM RIGHT — 13.0–15.0 seconds:\nThe final clean product hero composition, closely matching the supplied reference: complete white mouse on the left, complete black mouse on the right, both front ends pointing lower left and rounded rear ends pointing upper right. Equal product scale, balanced spacing, soft off-white background, subtle contact shadows, and sharp visible scroll-wheel details. Leave generous clear space above the products for a tagline to be added later. Render no tagline or other text in the image.\n\nCONTINUITY AND EXCLUSIONS:\nPreserve the same product identity across all nine panels. Only the specified two color variants may appear. Do not redesign the mouse, alter its proportions, enlarge the scroll wheel, or invent unseen technical details. No extra buttons, side buttons, logos, branding, cables, charging ports, RGB lighting, glowing seams, transparent shells, internal components, exploded views, floating products, hands, computers, decorative props, or metallic body finishes. No text, letters, panel numbers, timestamps, watermarks, or interface elements. Exactly nine panels with nine distinct shot compositions, maintaining the specified reading order and consistent premium photographic treatment.\n```"
+          }
+        },
+        {
+          "id": "n8PuCXT24TwG-DiHvz_6p",
+          "type": "image",
+          "title": "成果 · 直播间场景图",
+          "position": {
+            "x": 2279.078493499458,
+            "y": 848.3257872041787
+          },
+          "width": 242.17944049999966,
+          "height": 430.54122755555494,
+          "metadata": {
+            "prompt": "- **整体设计风格 (Overall Aesthetic)：**\\\n  **高阶极简与建筑空间美学 (Advanced Minimalism & Architectural Space)**。摒弃了传统直播间繁杂的背景与装饰，采用类似现代高端美术馆或Apple Store的陈列逻辑。大量使用干净的几何线条（如圆柱体展台、巨大的圆形顶灯、利落的平直线条），强调材质的哑光质感与空间的呼吸感，传递出专业、纯粹、克制的高端科技品牌调性。\n\n- **空间布局与排版 (Spatial Layout & Composition)：**\\\n  **严格的中轴对称式构图 (Strict Central Axis Symmetry)**。\n\n  - **视觉锚点：** 画面以绝对居中的立柱发光带和正前方的几何展台构成强烈的中心视觉锚点，确保直播时的焦点完全锁定在主播与核心产品上。\n\n  - **两侧留白：** 左右两侧墙面采用大面积留白（负空间），仅辅以对称的极简悬浮一字隔板，形成视觉上的平衡与延伸。\n\n  - **纵深层级：** 通过“顶部环形灯带 - 背景发光立柱 - 前景立体展台”构建出清晰的Z轴空间景深，使平面的直播画面具有建筑级的立体感。\n\n- **色调与光影配色 (Color Palette & Lighting Tone)：**\\\n  **低饱和暖调中性色与漫反射光影 (Low-saturation Warm Neutrals & Diffuse Lighting)**。\n\n  - **色彩基调：** 整体摒弃了科技行业常见的暗黑或高饱和霓虹色，转而采用大面积的**暖灰色 (Warm Grey)、米白色 (Off-White) 与砂岩色 (Sandstone)**。这种低饱和的单色调（Monochromatic）营造出一种治愈、高级且不喧宾夺主的背景氛围。\n\n  - **光影设计：** 核心采用**无主灯设计的漫反射环境光 (Ambient Diffuse Light)**。利用背景的隐藏式发光带（柔和的奶油暖光）和顶部的洗墙灯，消除了生硬的物理阴影。品牌标识与核心区域采用自发光设计，以光线代替实体制轮廓，呈现出轻盈的未来科技质感。",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "1152x2048",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:unu38nnlt_ghg3th2eQm3"
+            ],
+            "content": "/templates/electronics-ad/media/image_OzkxI6SvAftoXylR2vccR.webp",
+            "storageKey": "image:OzkxI6SvAftoXylR2vccR",
+            "naturalWidth": 720,
+            "naturalHeight": 1280,
+            "bytes": 24890,
+            "mimeType": "image/webp",
+            "primaryImageId": "n8PuCXT24TwG-DiHvz_6p"
+          }
+        },
+        {
+          "id": "config-1791801242963-tuebv",
+          "type": "config",
+          "title": "步骤 4 · 生成分镜图",
+          "position": {
+            "x": 1746.5267156570349,
+            "y": 1326.9050986870207
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "size": "2048x1152",
+            "count": 1,
+            "composerContent": "根据产品@[node:image-1791798573841-6kii5] @[node:2hTE5DrIeXWXdLtWQJSyb] 我需要你编写一段专门用于 GPT模型的提示词，生成一张3x3网格的分镜设计图(即一张大图里包含9个按顺序排列的16:9画面)。",
+            "outputNodeId": "g2FOE2MyoEFcYq0vhuhDh"
+          }
+        },
+        {
+          "id": "g2FOE2MyoEFcYq0vhuhDh",
+          "type": "image",
+          "title": "成果 · 分镜图 3×3",
+          "position": {
+            "x": 2203.984153824776,
+            "y": 1353.4161856836363
+          },
+          "width": 385.6498672977598,
+          "height": 216.9280503549899,
+          "metadata": {
+            "prompt": "根据产品图片1 【文本1】 我需要你编写一段专门用于 GPT模型的提示词，生成一张3x3网格的分镜设计图(即一张大图里包含9个按顺序排列的16:9画面)。\n\n【文本1】\n第一步：策划与分镜设计\n\n创意主题：**「黑白之间，自有秩序」**。让一道光成为贯穿全片的视觉线索：从黑色鼠标的轮廓出发，进入滚轮与壳体细节，再由白色鼠标接住光线，最终汇成黑白双款的完整展示。15秒内完成“引起好奇—看清细节—记住产品”的视觉叙事。\n\n基于图片，重点呈现**黑白双色、圆润低矮轮廓、简洁按键分区、细密滚轮纹理**。整体采用高端微距产品摄影与黑白极简布景；功能文案仅围绕可见设计，不加入未经确认的静音、续航或连接性能。\n\n| 镜头序号(1-9) | 景别与运镜 | 画面详细描述 | 时长(总计15秒) | 旁白/音效 |\n|---|---|---|---|---|\n| 1 | 近景／低机位缓推 | 深炭灰背景中，黑色鼠标静置于同色台面，前端朝画面左下、尾部朝右上。一道窄长柔光沿顶部圆弧掠过，逐渐显露低矮的圆润外形与壳体接缝；保持完整原型，无发光结构。 | 1.5秒（0–1.5秒） | 低频氛围音渐入，轻微空气掠过声。 |\n| 2 | 微距特写／沿中轴短距离推进 | 靠近黑色鼠标前部，黑色滚轮成为视觉中心。侧上方柔光照出滚轮的细密横向齿纹、深色轮槽与前后相接的按键分割线，背景自然虚化。鼠标静止，滚轮不变形。 | 1.5秒（1.5–3秒） | 一次清脆、轻量的电子节拍，与滚轮细节亮起同步。 |\n| 3 | 大特写／贴近侧缘横移 | 镜头沿黑色鼠标可见侧面的上壳与下壳接缝滑动，掠过前端圆角。细长高光依附真实壳体曲面，展示均匀缝隙及深灰黑色表面的柔和反光。构图让接缝形成左下至右上的斜线。 | 1.5秒（3–4.5秒） | 细腻的滑动拟音，氛围音乐节奏开始建立。 |\n| 4 | 大特写／匹配剪辑后轻拉远 | 承接上一镜斜线位置，切换为白色鼠标同一侧缘。背景同步变成浅灰白，白色上壳、浅灰接缝与圆润下壳依次显现。通过剪辑完成黑白切换，不表现外壳变色。 | 1.5秒（4.5–6秒） | 明亮短音落点，衔接轻柔的高频空气声。 |\n| 5 | 特写至中近景／小幅弧线环绕 | 白色鼠标完整出现在浅灰台面，保持前左、后右的三分之四视角。镜头小幅环绕，展示左右按键、浅银白色齿纹滚轮、饱满尾部和低矮侧廓。光影随观察角度自然变化，产品稳固落在台面上。 | 2秒（6–8秒） | 旁白：“简于形。”音乐加入简洁脉冲节拍。 |\n| 6 | 微距特写／微俯视与焦点转移 | 聚焦白色鼠标前部，先让浅银白色滚轮纹理清晰，再将焦点转移到轮槽旁的白色按键边缘。保留原图中的中央分割线与壳体比例，不增加按键、灯光或标识。 | 1.5秒（8–9.5秒） | 两个轻微节奏音对应焦点转换；声音作为配乐，不暗示实际按键声。 |\n| 7 | 双产品中景／斜俯视缓降 | 黑白双款首次同框：白色位于左侧浅色区域，黑色位于右侧深色区域，两只鼠标均前端朝左下。台面明暗分界呼应前面接缝的斜线，形成图形上的延续；产品大小一致，互不遮挡。 | 2秒（9.5–11.5秒） | 旁白：“精于细节。”低频与明亮音色汇合。 |\n| 8 | 双产品近景／横向滑轨 | 黑白双款保持静止，镜头低角度横移，借视差呈现两只鼠标相同的圆弧轮廓、前缘和滚轮。一道宽柔光同时扫过两款表面，背景从明暗分区过渡为均匀浅灰。 | 1.5秒（11.5–13秒） | 一次短促柔和的上扬转场声，音乐向收束推进。 |\n| 9 | 全景产品定帧／轻拉远后停稳 | 浅灰白背景上，白色在左、黑色在右，并排呈现与参考图一致的三分之四视角，前端朝左下。保留柔和接触阴影与足够留白，两款产品均完整可见。上方后期叠加广告语“黑白之间，自有秩序”，不添加虚构品牌。 | 2秒（13–15秒） | 旁白：“自有秩序。”最后一个干净音符落下，余音结束。 |\n\n第二步：nano banana pro绘画提示词\n\n将产品原图作为参考图上传，再使用以下英文提示词。九宫格只生成分镜画面，广告语留待后期排版。\n\n```text\n3x3 grid storyboard sheet, 9 panels sequence, 16:9 aspect ratio per panel, consistent visual style.\n\nCreate one premium photorealistic storyboard image for a 15-second computer mouse commercial, using the attached product photograph as the authoritative reference for product identity. Arrange exactly nine rectangular panels in three equal columns and three equal rows, read left to right and top to bottom. Every panel must have a true 16:9 composition. Use a 16:9 overall canvas with edge-to-edge equal cells and hairline internal dividers, no outer border, no extra caption strips. Target 5760 x 3240 pixels if supported.\n\nCreative concept: “Order Between Black and White.” Build a coherent visual progression from a dark silhouette, through precise surface details, into a bright white reveal, and finally a balanced composition of both color variants. Light is the connecting visual motif. Each panel is one representative cinematic keyframe from a distinct shot, not a collage of multiple moments.\n\nPRODUCT IDENTITY:\nReproduce the exact two mouse variants shown in the reference: one white mouse and one charcoal-black mouse, both sharing the same geometry and proportions. Preserve the low rounded body, gently domed top, broad curved rear, rounded front, two main click surfaces divided by the reference center seam, a single recessed ridged scroll wheel near the front, and the narrow seam between the upper shell and lower body. Follow the exact length and placement of the center seam visible in the reference; do not extend it across the entire rear shell. The white variant has a pale silver-white ridged wheel. The black variant has a dark ridged wheel. Match the reference surface finish, with soft controlled reflections and no exaggerated gloss.\n\nIn all full-product views, the front and scroll-wheel end point toward the lower left, and the rounded rear points toward the upper right, matching the reference photograph. Keep both variants identical in size and shape. Products rest naturally on a surface with believable contact shadows. Use only viewpoints supported by the visible top and side geometry in the reference.\n\nVISUAL DIRECTION:\nLuxury consumer electronics advertising, restrained monochrome palette, sculptural studio lighting, realistic product photography, precise macro detail, clean negative space, subtle tonal gradients, controlled highlights, physically plausible shadows, and consistent neutral color grading. Maintain sharp product silhouettes. Use shallow depth of field for macro panels and sufficient depth of field for complete product views. The connecting light must read as an external studio reflection on the shell, never as an illuminated strip built into the mouse.\n\nPANEL 1 — TOP LEFT — 0.0–1.5 seconds:\nA close, low three-quarter view of the black mouse resting on a charcoal surface against a charcoal background. Front points lower left, rear upper right. A narrow soft reflection reveals the curved top and a small portion of the shell seam, while much of the body remains in shadow. The outline is recognizable and faithful to the reference. Frame the moment of initial reveal, suggesting a slow camera push-in.\n\nPANEL 2 — TOP CENTER — 1.5–3.0 seconds:\nAn extreme macro view of the black mouse scroll wheel and the immediately surrounding click surfaces, photographed from slightly above the front. Reveal the fine transverse wheel ridges, recessed wheel opening, and adjoining center seam. Use a narrow soft highlight and dark tonal separation. The wheel and shell remain physically intact and stationary.\n\nPANEL 3 — TOP RIGHT — 3.0–4.5 seconds:\nAn extreme close-up of the black mouse side seam near the rounded front corner. The actual shell seam runs diagonally from lower left toward upper right. A delicate reflected highlight describes the rounded top shell above the darker lower body. Suggest a lateral macro tracking shot. Preserve the exact shell construction with no added controls or decorative parts.\n\nPANEL 4 — MIDDLE LEFT — 4.5–6.0 seconds:\nA match-cut composition of the same visible side seam and front corner on the white mouse. Match the diagonal line placement and camera angle of Panel 3. Change the environment to soft off-white and pale gray. Show the white upper shell, subtle gray seam, and softly rounded lower body. This is a separate white product photographed in a separate shot, with no material transformation effect.\n\nPANEL 5 — MIDDLE CENTER — 6.0–8.0 seconds:\nA complete three-quarter hero view of the white mouse on a pale gray studio surface. Front lower left, rear upper right. Clearly show both click surfaces, the pale silver-white ridged scroll wheel, gently domed rear, and low curved side profile. Use a broad softbox reflection, a clean contact shadow, and generous negative space. Choose a frame suggesting a restrained camera orbit around the stationary product.\n\nPANEL 6 — MIDDLE RIGHT — 8.0–9.5 seconds:\nA slightly overhead macro of the white mouse front section. Place the ridged scroll wheel and the adjacent white click-surface edge within the same composition. Render the near edge beside the wheel crisply, with the farther wheel ridges becoming gently softer, suggesting the endpoint of a subtle focus pull. Maintain the exact reference wheel opening, center seam, and body proportions.\n\nPANEL 7 — BOTTOM LEFT — 9.5–11.5 seconds:\nA balanced elevated three-quarter view of both mice, fully visible and separated by a clear gap. White mouse on the left, black mouse on the right; both fronts point lower left. The studio surface has a flat diagonal pale-to-charcoal tonal division between the products, visually echoing the seam direction in Panels 3 and 4. This division is a graphic lighting or backdrop treatment, not a raised platform. Keep both products equally scaled and clearly readable.\n\nPANEL 8 — BOTTOM CENTER — 11.5–13.0 seconds:\nA closer, lower three-quarter view of both mice, white left and black right, arranged with a slight depth offset so neither product obscures the other’s scroll wheel or front edge. A broad soft studio reflection touches both curved shells simultaneously. The background is now nearly uniform light gray. Suggest lateral camera movement through perspective and composition, with crisp stationary products and no motion blur.\n\nPANEL 9 — BOTTOM RIGHT — 13.0–15.0 seconds:\nThe final clean product hero composition, closely matching the supplied reference: complete white mouse on the left, complete black mouse on the right, both front ends pointing lower left and rounded rear ends pointing upper right. Equal product scale, balanced spacing, soft off-white background, subtle contact shadows, and sharp visible scroll-wheel details. Leave generous clear space above the products for a tagline to be added later. Render no tagline or other text in the image.\n\nCONTINUITY AND EXCLUSIONS:\nPreserve the same product identity across all nine panels. Only the specified two color variants may appear. Do not redesign the mouse, alter its proportions, enlarge the scroll wheel, or invent unseen technical details. No extra buttons, side buttons, logos, branding, cables, charging ports, RGB lighting, glowing seams, transparent shells, internal components, exploded views, floating products, hands, computers, decorative props, or metallic body finishes. No text, letters, panel numbers, timestamps, watermarks, or interface elements. Exactly nine panels with nine distinct shot compositions, maintaining the specified reading order and consistent premium photographic treatment.\n```",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "2048x1152",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:unu38nnlt_ghg3th2eQm3"
+            ],
+            "content": "/templates/electronics-ad/media/image_2EMcY9E8w6Yd8HmxY8dzo.webp",
+            "storageKey": "image:2EMcY9E8w6Yd8HmxY8dzo",
+            "naturalWidth": 1280,
+            "naturalHeight": 720,
+            "bytes": 25844,
+            "mimeType": "image/webp",
+            "primaryImageId": "g2FOE2MyoEFcYq0vhuhDh"
+          }
+        },
+        {
+          "id": "config-1791801772458-jevyr",
+          "type": "config",
+          "title": "步骤 5 · 生成宣传视频",
+          "position": {
+            "x": 2679.506058253472,
+            "y": 1345.3992418878145
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "video",
+            "size": "9:16",
+            "count": 1,
+            "seconds": "15",
+            "vquality": "480p",
+            "composerContent": "按照脚本@[node:2hTE5DrIeXWXdLtWQJSyb] 与分镜图@[node:g2FOE2MyoEFcYq0vhuhDh] ，，生成视频",
+            "outputNodeId": "JcXDvh0SCj5F6wbi8hNLa"
+          }
+        },
+        {
+          "id": "JcXDvh0SCj5F6wbi8hNLa",
+          "type": "video",
+          "title": "成果 · 产品宣传视频",
+          "position": {
+            "x": 3152.9249243656077,
+            "y": 1256.0474805074805
+          },
+          "width": 241.11111111111111,
+          "height": 420,
+          "metadata": {
+            "prompt": "按照脚本【文本1】 与分镜图图片1 ，，生成视频\n\n【文本1】\n第一步：策划与分镜设计\n\n创意主题：**「黑白之间，自有秩序」**。让一道光成为贯穿全片的视觉线索：从黑色鼠标的轮廓出发，进入滚轮与壳体细节，再由白色鼠标接住光线，最终汇成黑白双款的完整展示。15秒内完成“引起好奇—看清细节—记住产品”的视觉叙事。\n\n基于图片，重点呈现**黑白双色、圆润低矮轮廓、简洁按键分区、细密滚轮纹理**。整体采用高端微距产品摄影与黑白极简布景；功能文案仅围绕可见设计，不加入未经确认的静音、续航或连接性能。\n\n| 镜头序号(1-9) | 景别与运镜 | 画面详细描述 | 时长(总计15秒) | 旁白/音效 |\n|---|---|---|---|---|\n| 1 | 近景／低机位缓推 | 深炭灰背景中，黑色鼠标静置于同色台面，前端朝画面左下、尾部朝右上。一道窄长柔光沿顶部圆弧掠过，逐渐显露低矮的圆润外形与壳体接缝；保持完整原型，无发光结构。 | 1.5秒（0–1.5秒） | 低频氛围音渐入，轻微空气掠过声。 |\n| 2 | 微距特写／沿中轴短距离推进 | 靠近黑色鼠标前部，黑色滚轮成为视觉中心。侧上方柔光照出滚轮的细密横向齿纹、深色轮槽与前后相接的按键分割线，背景自然虚化。鼠标静止，滚轮不变形。 | 1.5秒（1.5–3秒） | 一次清脆、轻量的电子节拍，与滚轮细节亮起同步。 |\n| 3 | 大特写／贴近侧缘横移 | 镜头沿黑色鼠标可见侧面的上壳与下壳接缝滑动，掠过前端圆角。细长高光依附真实壳体曲面，展示均匀缝隙及深灰黑色表面的柔和反光。构图让接缝形成左下至右上的斜线。 | 1.5秒（3–4.5秒） | 细腻的滑动拟音，氛围音乐节奏开始建立。 |\n| 4 | 大特写／匹配剪辑后轻拉远 | 承接上一镜斜线位置，切换为白色鼠标同一侧缘。背景同步变成浅灰白，白色上壳、浅灰接缝与圆润下壳依次显现。通过剪辑完成黑白切换，不表现外壳变色。 | 1.5秒（4.5–6秒） | 明亮短音落点，衔接轻柔的高频空气声。 |\n| 5 | 特写至中近景／小幅弧线环绕 | 白色鼠标完整出现在浅灰台面，保持前左、后右的三分之四视角。镜头小幅环绕，展示左右按键、浅银白色齿纹滚轮、饱满尾部和低矮侧廓。光影随观察角度自然变化，产品稳固落在台面上。 | 2秒（6–8秒） | 旁白：“简于形。”音乐加入简洁脉冲节拍。 |\n| 6 | 微距特写／微俯视与焦点转移 | 聚焦白色鼠标前部，先让浅银白色滚轮纹理清晰，再将焦点转移到轮槽旁的白色按键边缘。保留原图中的中央分割线与壳体比例，不增加按键、灯光或标识。 | 1.5秒（8–9.5秒） | 两个轻微节奏音对应焦点转换；声音作为配乐，不暗示实际按键声。 |\n| 7 | 双产品中景／斜俯视缓降 | 黑白双款首次同框：白色位于左侧浅色区域，黑色位于右侧深色区域，两只鼠标均前端朝左下。台面明暗分界呼应前面接缝的斜线，形成图形上的延续；产品大小一致，互不遮挡。 | 2秒（9.5–11.5秒） | 旁白：“精于细节。”低频与明亮音色汇合。 |\n| 8 | 双产品近景／横向滑轨 | 黑白双款保持静止，镜头低角度横移，借视差呈现两只鼠标相同的圆弧轮廓、前缘和滚轮。一道宽柔光同时扫过两款表面，背景从明暗分区过渡为均匀浅灰。 | 1.5秒（11.5–13秒） | 一次短促柔和的上扬转场声，音乐向收束推进。 |\n| 9 | 全景产品定帧／轻拉远后停稳 | 浅灰白背景上，白色在左、黑色在右，并排呈现与参考图一致的三分之四视角，前端朝左下。保留柔和接触阴影与足够留白，两款产品均完整可见。上方后期叠加广告语“黑白之间，自有秩序”，不添加虚构品牌。 | 2秒（13–15秒） | 旁白：“自有秩序。”最后一个干净音符落下，余音结束。 |\n\n第二步：nano banana pro绘画提示词\n\n将产品原图作为参考图上传，再使用以下英文提示词。九宫格只生成分镜画面，广告语留待后期排版。\n\n```text\n3x3 grid storyboard sheet, 9 panels sequence, 16:9 aspect ratio per panel, consistent visual style.\n\nCreate one premium photorealistic storyboard image for a 15-second computer mouse commercial, using the attached product photograph as the authoritative reference for product identity. Arrange exactly nine rectangular panels in three equal columns and three equal rows, read left to right and top to bottom. Every panel must have a true 16:9 composition. Use a 16:9 overall canvas with edge-to-edge equal cells and hairline internal dividers, no outer border, no extra caption strips. Target 5760 x 3240 pixels if supported.\n\nCreative concept: “Order Between Black and White.” Build a coherent visual progression from a dark silhouette, through precise surface details, into a bright white reveal, and finally a balanced composition of both color variants. Light is the connecting visual motif. Each panel is one representative cinematic keyframe from a distinct shot, not a collage of multiple moments.\n\nPRODUCT IDENTITY:\nReproduce the exact two mouse variants shown in the reference: one white mouse and one charcoal-black mouse, both sharing the same geometry and proportions. Preserve the low rounded body, gently domed top, broad curved rear, rounded front, two main click surfaces divided by the reference center seam, a single recessed ridged scroll wheel near the front, and the narrow seam between the upper shell and lower body. Follow the exact length and placement of the center seam visible in the reference; do not extend it across the entire rear shell. The white variant has a pale silver-white ridged wheel. The black variant has a dark ridged wheel. Match the reference surface finish, with soft controlled reflections and no exaggerated gloss.\n\nIn all full-product views, the front and scroll-wheel end point toward the lower left, and the rounded rear points toward the upper right, matching the reference photograph. Keep both variants identical in size and shape. Products rest naturally on a surface with believable contact shadows. Use only viewpoints supported by the visible top and side geometry in the reference.\n\nVISUAL DIRECTION:\nLuxury consumer electronics advertising, restrained monochrome palette, sculptural studio lighting, realistic product photography, precise macro detail, clean negative space, subtle tonal gradients, controlled highlights, physically plausible shadows, and consistent neutral color grading. Maintain sharp product silhouettes. Use shallow depth of field for macro panels and sufficient depth of field for complete product views. The connecting light must read as an external studio reflection on the shell, never as an illuminated strip built into the mouse.\n\nPANEL 1 — TOP LEFT — 0.0–1.5 seconds:\nA close, low three-quarter view of the black mouse resting on a charcoal surface against a charcoal background. Front points lower left, rear upper right. A narrow soft reflection reveals the curved top and a small portion of the shell seam, while much of the body remains in shadow. The outline is recognizable and faithful to the reference. Frame the moment of initial reveal, suggesting a slow camera push-in.\n\nPANEL 2 — TOP CENTER — 1.5–3.0 seconds:\nAn extreme macro view of the black mouse scroll wheel and the immediately surrounding click surfaces, photographed from slightly above the front. Reveal the fine transverse wheel ridges, recessed wheel opening, and adjoining center seam. Use a narrow soft highlight and dark tonal separation. The wheel and shell remain physically intact and stationary.\n\nPANEL 3 — TOP RIGHT — 3.0–4.5 seconds:\nAn extreme close-up of the black mouse side seam near the rounded front corner. The actual shell seam runs diagonally from lower left toward upper right. A delicate reflected highlight describes the rounded top shell above the darker lower body. Suggest a lateral macro tracking shot. Preserve the exact shell construction with no added controls or decorative parts.\n\nPANEL 4 — MIDDLE LEFT — 4.5–6.0 seconds:\nA match-cut composition of the same visible side seam and front corner on the white mouse. Match the diagonal line placement and camera angle of Panel 3. Change the environment to soft off-white and pale gray. Show the white upper shell, subtle gray seam, and softly rounded lower body. This is a separate white product photographed in a separate shot, with no material transformation effect.\n\nPANEL 5 — MIDDLE CENTER — 6.0–8.0 seconds:\nA complete three-quarter hero view of the white mouse on a pale gray studio surface. Front lower left, rear upper right. Clearly show both click surfaces, the pale silver-white ridged scroll wheel, gently domed rear, and low curved side profile. Use a broad softbox reflection, a clean contact shadow, and generous negative space. Choose a frame suggesting a restrained camera orbit around the stationary product.\n\nPANEL 6 — MIDDLE RIGHT — 8.0–9.5 seconds:\nA slightly overhead macro of the white mouse front section. Place the ridged scroll wheel and the adjacent white click-surface edge within the same composition. Render the near edge beside the wheel crisply, with the farther wheel ridges becoming gently softer, suggesting the endpoint of a subtle focus pull. Maintain the exact reference wheel opening, center seam, and body proportions.\n\nPANEL 7 — BOTTOM LEFT — 9.5–11.5 seconds:\nA balanced elevated three-quarter view of both mice, fully visible and separated by a clear gap. White mouse on the left, black mouse on the right; both fronts point lower left. The studio surface has a flat diagonal pale-to-charcoal tonal division between the products, visually echoing the seam direction in Panels 3 and 4. This division is a graphic lighting or backdrop treatment, not a raised platform. Keep both products equally scaled and clearly readable.\n\nPANEL 8 — BOTTOM CENTER — 11.5–13.0 seconds:\nA closer, lower three-quarter view of both mice, white left and black right, arranged with a slight depth offset so neither product obscures the other’s scroll wheel or front edge. A broad soft studio reflection touches both curved shells simultaneously. The background is now nearly uniform light gray. Suggest lateral camera movement through perspective and composition, with crisp stationary products and no motion blur.\n\nPANEL 9 — BOTTOM RIGHT — 13.0–15.0 seconds:\nThe final clean product hero composition, closely matching the supplied reference: complete white mouse on the left, complete black mouse on the right, both front ends pointing lower left and rounded rear ends pointing upper right. Equal product scale, balanced spacing, soft off-white background, subtle contact shadows, and sharp visible scroll-wheel details. Leave generous clear space above the products for a tagline to be added later. Render no tagline or other text in the image.\n\nCONTINUITY AND EXCLUSIONS:\nPreserve the same product identity across all nine panels. Only the specified two color variants may appear. Do not redesign the mouse, alter its proportions, enlarge the scroll wheel, or invent unseen technical details. No extra buttons, side buttons, logos, branding, cables, charging ports, RGB lighting, glowing seams, transparent shells, internal components, exploded views, floating products, hands, computers, decorative props, or metallic body finishes. No text, letters, panel numbers, timestamps, watermarks, or interface elements. Exactly nine panels with nine distinct shot compositions, maintaining the specified reading order and consistent premium photographic treatment.\n```",
+            "status": "success",
+            "size": "9:16",
+            "seconds": "15",
+            "vquality": "480p",
+            "generateAudio": "true",
+            "watermark": "false",
+            "references": [
+              "image:2EMcY9E8w6Yd8HmxY8dzo"
+            ],
+            "content": "/templates/electronics-ad/media/video_XuR5hqT3EMSxYEPMBGjxp.mp4",
+            "storageKey": "video:XuR5hqT3EMSxYEPMBGjxp",
+            "naturalWidth": 414,
+            "naturalHeight": 720,
+            "bytes": 392572,
+            "mimeType": "video/mp4",
+            "durationMs": 15104
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": "KTR_AZsfmnAHU3vhdgMtW",
+          "fromNodeId": "text-1791798564931-e1zyc",
+          "toNodeId": "image-1791798573841-6kii5"
+        },
+        {
+          "id": "pXwJHK79AvUi3a4H7y8qP",
+          "fromNodeId": "image-1791798573841-6kii5",
+          "toNodeId": "config-1791799308714-9sq1z"
+        },
+        {
+          "id": "conn-1791799311778",
+          "fromNodeId": "text-1791799260965-rzi1u",
+          "toNodeId": "config-1791799308714-9sq1z"
+        },
+        {
+          "id": "conn-1791799313684",
+          "fromNodeId": "image-1791798758530-001pw",
+          "toNodeId": "config-1791799308714-9sq1z"
+        },
+        {
+          "id": "a8NcAqBpis0f8IZy4jdP5",
+          "fromNodeId": "config-1791799308714-9sq1z",
+          "toNodeId": "WWu-YaVobzwljSHeTtETm"
+        },
+        {
+          "id": "r1W4CIrS56jngdEB-mxI0",
+          "fromNodeId": "image-1791798573841-6kii5",
+          "toNodeId": "config-1791800762178-4vyzn"
+        },
+        {
+          "id": "conn-1791800768193",
+          "fromNodeId": "text-1791800713300-13aks",
+          "toNodeId": "config-1791800762178-4vyzn"
+        },
+        {
+          "id": "49sJWgLbbNNi8U1pMqDbw",
+          "fromNodeId": "text-1791801081726-bob6q",
+          "toNodeId": "config-1791801093509-6igf4"
+        },
+        {
+          "id": "conn-1791801102441",
+          "fromNodeId": "image-1791798573841-6kii5",
+          "toNodeId": "config-1791801093509-6igf4"
+        },
+        {
+          "id": "RWW2xnb2iRkjauJc2jB5J",
+          "fromNodeId": "config-1791801093509-6igf4",
+          "toNodeId": "2hTE5DrIeXWXdLtWQJSyb"
+        },
+        {
+          "id": "pv5fo7B2tbevCpNaFLCJ8",
+          "fromNodeId": "config-1791800762178-4vyzn",
+          "toNodeId": "n8PuCXT24TwG-DiHvz_6p"
+        },
+        {
+          "id": "OUdS4z-wr0mezAEbe-mSY",
+          "fromNodeId": "2hTE5DrIeXWXdLtWQJSyb",
+          "toNodeId": "config-1791801242963-tuebv"
+        },
+        {
+          "id": "conn-1791801387038",
+          "fromNodeId": "image-1791798573841-6kii5",
+          "toNodeId": "config-1791801242963-tuebv"
+        },
+        {
+          "id": "a1LRhugUQ-RL8aDaivvAo",
+          "fromNodeId": "config-1791801242963-tuebv",
+          "toNodeId": "g2FOE2MyoEFcYq0vhuhDh"
+        },
+        {
+          "id": "kld7-O69B7JFHx8k-BJ5G",
+          "fromNodeId": "g2FOE2MyoEFcYq0vhuhDh",
+          "toNodeId": "config-1791801772458-jevyr"
+        },
+        {
+          "id": "conn-1791801793407",
+          "fromNodeId": "2hTE5DrIeXWXdLtWQJSyb",
+          "toNodeId": "config-1791801772458-jevyr"
+        },
+        {
+          "id": "t_2pDgBRz9UU47h_voAkI",
+          "fromNodeId": "config-1791801772458-jevyr",
+          "toNodeId": "JcXDvh0SCj5F6wbi8hNLa"
+        }
+      ]
+    },
+    "files": [
+      {
+        "storageKey": "image:unu38nnlt_ghg3th2eQm3",
+        "path": "/templates/electronics-ad/media/image_unu38nnlt_ghg3th2eQm3.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:juOXofMgnDSFB-581-mKw",
+        "path": "/templates/electronics-ad/media/image_juOXofMgnDSFB-581-mKw.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:KHsnv9nY48uN2bN_5gvz1",
+        "path": "/templates/electronics-ad/media/image_KHsnv9nY48uN2bN_5gvz1.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:OzkxI6SvAftoXylR2vccR",
+        "path": "/templates/electronics-ad/media/image_OzkxI6SvAftoXylR2vccR.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:2EMcY9E8w6Yd8HmxY8dzo",
+        "path": "/templates/electronics-ad/media/image_2EMcY9E8w6Yd8HmxY8dzo.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "video:XuR5hqT3EMSxYEPMBGjxp",
+        "path": "/templates/electronics-ad/media/video_XuR5hqT3EMSxYEPMBGjxp.mp4",
+        "mimeType": "video/mp4"
+      }
+    ]
+  },
+  {
+    "id": "apparel-showcase-video",
+    "title": "服装悬浮展示视频",
+    "description": "一张商品服装图先生成正视图和背视图，再让服装悬浮绕轴旋转展示正面、侧面和背面，生成 15 秒 16:9 商品展示视频。",
+    "tags": [
+      "电商服装",
+      "悬浮旋转",
+      "图生视频"
+    ],
+    "author": "官方",
+    "cover": "/templates/covers/apparel-showcase-video.webp",
+    "previewVideo": "/templates/apparel-showcase-video/media/video_ISXr-auUl8KIF43MQsLEE.mp4",
+    "project": {
+      "title": "服装悬浮展示视频",
+      "backgroundMode": "lines",
+      "viewport": {
+        "k": 0.611841785043631,
+        "x": 158.83706732061134,
+        "y": 362.7456359260226
+      },
+      "nodes": [
+        {
+          "id": "apparel-instructions",
+          "type": "text",
+          "title": "使用说明",
+          "position": {
+            "x": -161.5402375853803,
+            "y": -377.6984994542703
+          },
+          "width": 2400,
+          "height": 180,
+          "metadata": {
+            "content": "服装悬浮展示视频｜1 张商品服装图 → 正背视图 → 15 秒悬浮旋转展示视频\n① 克隆后替换「商品服装图」，先按步骤 1 生成服装正视图和背视图。\n② 再按步骤 2 用悬浮旋转提示词，以正背视图为参考生成 16:9 悬浮展示视频；生成前在生成配置中选好账号可用的模型。",
+            "status": "idle",
+            "fontSize": 16
+          }
+        },
+        {
+          "id": "text-1791802272578-lvjjn",
+          "type": "text",
+          "title": "正背视图提示词",
+          "position": {
+            "x": -161.35818941199307,
+            "y": -97.69849945427029
+          },
+          "width": 363,
+          "height": 231,
+          "metadata": {
+            "content": "帮我生成服装的正视图和背视图",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "image-1791802578724-l6svt",
+          "type": "image",
+          "title": "替换商品服装图",
+          "position": {
+            "x": -161.5402375853803,
+            "y": 187.26983523105864
+          },
+          "width": 384.8798758732591,
+          "height": 475.6473799333694,
+          "metadata": {
+            "content": "/templates/apparel-showcase-video/media/image_3zO5wc6SWbmAp2yrZz3jq.webp",
+            "status": "success",
+            "storageKey": "image:3zO5wc6SWbmAp2yrZz3jq",
+            "naturalWidth": 1200,
+            "naturalHeight": 1483,
+            "bytes": 51754,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "config-1791802618863-jzwhe",
+          "type": "config",
+          "title": "步骤 1 · 生成正背视图",
+          "position": {
+            "x": 472.4459495978193,
+            "y": 371.40862637125724
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "size": "2048x1152",
+            "count": 1,
+            "composerContent": "@[node:image-1791802578724-l6svt] @[node:text-1791802272578-lvjjn] ",
+            "outputNodeId": "1ZbgzNsBIh8T31P0JK6a0"
+          }
+        },
+        {
+          "id": "1ZbgzNsBIh8T31P0JK6a0",
+          "type": "image",
+          "title": "成果 · 服装正背视图",
+          "position": {
+            "x": 893.2039484729939,
+            "y": 408.62872513272896
+          },
+          "width": 340,
+          "height": 191.35167464114832,
+          "metadata": {
+            "prompt": "图片1 【文本1】\n\n【文本1】\n帮我生成服装的正视图和背视图",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "2048x1152",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:3zO5wc6SWbmAp2yrZz3jq"
+            ],
+            "content": "/templates/apparel-showcase-video/media/image_X7jr_Gs8sMjD1oCRd_KDc.webp",
+            "storageKey": "image:X7jr_Gs8sMjD1oCRd_KDc",
+            "naturalWidth": 1280,
+            "naturalHeight": 720,
+            "bytes": 29800,
+            "mimeType": "image/webp",
+            "primaryImageId": "1ZbgzNsBIh8T31P0JK6a0"
+          }
+        },
+        {
+          "id": "text-1791802685262-g1hr0",
+          "type": "text",
+          "title": "悬浮旋转提示词",
+          "position": {
+            "x": 492.79482797973725,
+            "y": -54.05317971764427
+          },
+          "width": 420,
+          "height": 300,
+          "metadata": {
+            "content": "固定机位。画面中的衣服保持悬浮，围绕自身竖直中心轴平滑旋转，依次展示正面、侧面、背面和另一侧，再回到正面。约5秒完成一轮，随后柔和反向转动，整体持续15秒。\n\n衣服中心、大小、颜色和设计结构始终一致。袖口与下摆随转动产生轻微、自然的滞后摆动，保持面料重量与垂坠感。背景、光源及相机位置固定，投影随衣服姿态自然变化。结尾回到接近首帧的姿态。",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "config-1791802712959-w46s0",
+          "type": "config",
+          "title": "步骤 2 · 生成悬浮展示视频",
+          "position": {
+            "x": 1361.4153237302846,
+            "y": 376.14514504720273
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "video",
+            "size": "16:9",
+            "count": 1,
+            "seconds": "15",
+            "composerContent": "以@[node:1ZbgzNsBIh8T31P0JK6a0] 为产品参考，按照提示词 @[node:text-1791802685262-g1hr0] 要求生成视频",
+            "vquality": "480p",
+            "outputNodeId": "-7HyZa64WHlweSE06SeVG"
+          }
+        },
+        {
+          "id": "-7HyZa64WHlweSE06SeVG",
+          "type": "video",
+          "title": "成果 · 悬浮展示视频",
+          "position": {
+            "x": 1837.3857595896243,
+            "y": 377.3018844776275
+          },
+          "width": 420,
+          "height": 241.11111111111111,
+          "metadata": {
+            "prompt": "以图片1 为产品参考，按照提示词 【文本1】 要求生成视频\n\n【文本1】\n固定机位。画面中的衣服保持悬浮，围绕自身竖直中心轴平滑旋转，依次展示正面、侧面、背面和另一侧，再回到正面。约5秒完成一轮，随后柔和反向转动，整体持续15秒。\n\n衣服中心、大小、颜色和设计结构始终一致。袖口与下摆随转动产生轻微、自然的滞后摆动，保持面料重量与垂坠感。背景、光源及相机位置固定，投影随衣服姿态自然变化。结尾回到接近首帧的姿态。",
+            "status": "success",
+            "size": "16:9",
+            "seconds": "15",
+            "vquality": "480p",
+            "generateAudio": "true",
+            "watermark": "false",
+            "references": [
+              "image:X7jr_Gs8sMjD1oCRd_KDc"
+            ],
+            "content": "/templates/apparel-showcase-video/media/video_ISXr-auUl8KIF43MQsLEE.mp4",
+            "storageKey": "video:ISXr-auUl8KIF43MQsLEE",
+            "naturalWidth": 720,
+            "naturalHeight": 414,
+            "bytes": 346025,
+            "mimeType": "video/mp4",
+            "durationMs": 15104
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": "4-sRxnP_j3xJn67NX0qi1",
+          "fromNodeId": "image-1791802578724-l6svt",
+          "toNodeId": "config-1791802618863-jzwhe"
+        },
+        {
+          "id": "conn-1791802629775",
+          "fromNodeId": "text-1791802272578-lvjjn",
+          "toNodeId": "config-1791802618863-jzwhe"
+        },
+        {
+          "id": "Xomx2MXrk6wc5Zcn-obeN",
+          "fromNodeId": "config-1791802618863-jzwhe",
+          "toNodeId": "1ZbgzNsBIh8T31P0JK6a0"
+        },
+        {
+          "id": "onYt4rMNEIXMZ2_yjg6wW",
+          "fromNodeId": "1ZbgzNsBIh8T31P0JK6a0",
+          "toNodeId": "config-1791802712959-w46s0"
+        },
+        {
+          "id": "conn-1791802727583",
+          "fromNodeId": "text-1791802685262-g1hr0",
+          "toNodeId": "config-1791802712959-w46s0"
+        },
+        {
+          "id": "91pbjjJsjPCFlnOkUBT3f",
+          "fromNodeId": "config-1791802712959-w46s0",
+          "toNodeId": "-7HyZa64WHlweSE06SeVG"
+        }
+      ]
+    },
+    "files": [
+      {
+        "storageKey": "image:3zO5wc6SWbmAp2yrZz3jq",
+        "path": "/templates/apparel-showcase-video/media/image_3zO5wc6SWbmAp2yrZz3jq.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:X7jr_Gs8sMjD1oCRd_KDc",
+        "path": "/templates/apparel-showcase-video/media/image_X7jr_Gs8sMjD1oCRd_KDc.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "video:ISXr-auUl8KIF43MQsLEE",
+        "path": "/templates/apparel-showcase-video/media/video_ISXr-auUl8KIF43MQsLEE.mp4",
+        "mimeType": "video/mp4"
+      }
+    ]
+  },
+  {
+    "id": "skincare-ad",
+    "title": "护肤广告宣传视频",
+    "description": "一张护肤品产品图配合模特形象提示词生成模特图，再汇总产品、模特和策划提示词生成分镜图，最后按分镜生成 15 秒 16:9 高端护肤广告成片。",
+    "tags": [
+      "护肤美妆",
+      "产品广告",
+      "图生视频"
+    ],
+    "author": "官方",
+    "cover": "/templates/covers/skincare-ad.webp",
+    "previewVideo": "/templates/skincare-ad/media/video_Beh4Y14mI5K0NKIchXEZV.mp4",
+    "project": {
+      "title": "护肤广告宣传视频",
+      "backgroundMode": "lines",
+      "viewport": {
+        "k": 0.43895164061979025,
+        "x": 236.52168510953476,
+        "y": 348.95968648212227
+      },
+      "nodes": [
+        {
+          "id": "skincare-instructions",
+          "type": "text",
+          "title": "使用说明",
+          "position": {
+            "x": -308.8579242526095,
+            "y": -635.5134841009757
+          },
+          "width": 2400,
+          "height": 180,
+          "metadata": {
+            "content": "护肤广告宣传视频｜1 张产品图 → 模特形象图 + 3×3 分镜图 → 15 秒广告成片\n① 克隆后替换「产品图」，可修改「模特形象提示词」重新生成符合品牌调性的模特图。\n② 步骤 1 汇总产品图、模特图和策划提示词生成 3×3 分镜图；步骤 2 选择视频模型，按分镜与提示词生成 16:9 成片。",
+            "status": "idle",
+            "fontSize": 16
+          }
+        },
+        {
+          "id": "image-1791804683765-3i2dg",
+          "type": "image",
+          "title": "替换产品图",
+          "position": {
+            "x": 88.61135376766718,
+            "y": 86.35942266949841
+          },
+          "width": 454.90875768661397,
+          "height": 454.90875768661397,
+          "metadata": {
+            "content": "/templates/skincare-ad/media/image_1tfBXAq40asvCy0qFrdmD.webp",
+            "status": "success",
+            "prompt": "",
+            "storageKey": "image:1tfBXAq40asvCy0qFrdmD",
+            "naturalWidth": 800,
+            "naturalHeight": 800,
+            "bytes": 15218,
+            "mimeType": "image/webp",
+            "freeResize": false
+          }
+        },
+        {
+          "id": "config-1791804758308-jz1mh",
+          "type": "config",
+          "title": "步骤 1 · 生成分镜图",
+          "position": {
+            "x": 923.8746888551755,
+            "y": 390.3702983684376
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "size": "2048x1152",
+            "count": 1,
+            "composerContent": "产品图为@[node:image-1791804683765-3i2dg] ，模特参考@[node:image-1791804928791-54d29] ，，请根据提示词，帮我生成一张3×3网格的分镜设计图（即一张大图里包含9个按顺序排列的16:9画面）。",
+            "outputNodeId": "McfD42Ex4GBZAAGyvUGsz"
+          }
+        },
+        {
+          "id": "text-1791804768403-coa0h",
+          "type": "text",
+          "title": "模特形象提示词",
+          "position": {
+            "x": -308.8579242526095,
+            "y": 766.2158351264682
+          },
+          "width": 324.9072516555081,
+          "height": 220.19001478230143,
+          "metadata": {
+            "content": "高端护肤品肖像，画面里只有一位二十多岁的东亚成年女性，纯白无缝背景。神情平静自信，皮肤水润有自然光泽，淡妆，头发整齐离开面部。柔和均匀的棚拍光线，真实皮肤纹理，干净简约，平视肩部以上近景，高端美妆摄影，85mm 镜头。不要产品、瓶子、手持物品、道具、文字、标志和水印。",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "image-1791804928791-54d29",
+          "type": "image",
+          "title": "成果 · 模特形象图",
+          "position": {
+            "x": 114.28352580869571,
+            "y": 672.4913750858964
+          },
+          "width": 423.3931575215205,
+          "height": 423.3931575215205,
+          "metadata": {
+            "content": "/templates/skincare-ad/media/image_W6H0vjiLsq3C1vZXaL0Ki.webp",
+            "status": "success",
+            "prompt": "文本1 ",
+            "size": "1:1",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": false,
+            "generationType": "generation",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [],
+            "storageKey": "image:W6H0vjiLsq3C1vZXaL0Ki",
+            "naturalWidth": 1254,
+            "naturalHeight": 1254,
+            "bytes": 60332,
+            "mimeType": "image/webp",
+            "primaryImageId": "image-1791804928791-54d29"
+          }
+        },
+        {
+          "id": "text-1791805131706-slw4f",
+          "type": "text",
+          "title": "广告策划提示词",
+          "position": {
+            "x": 129.8574117776499,
+            "y": -355.5134841009757
+          },
+          "width": 420,
+          "height": 300,
+          "metadata": {
+            "content": "你现在是世界顶级的护肤品广告导演、皮肤护理视觉策划师、产品摄影师和美容品牌创意总监。你的任务是根据我提供的护肤品图片、产品功效和目标人群，策划一支15秒的高端护肤品广告。\n\n本产品的核心功效是：[产品功效]\n目标人群是：[目标人群]\n主要使用场景是：[使用场景]\n品牌风格是：[品牌风格，例如：高级、自然、科技、温和、年轻、奢华]\n\n广告必须围绕产品功效展开，并且必须出现真实人物。人物不能只是背景装饰，而要通过人物的肤质、表情、使用动作、生活场景和肌肤状态，直观体现产品的使用目的与品牌氛围。\n\n第一步：分析产品与策划分镜\n\n请先仔细分析参考图片中的护肤品外观，包括：\n\n- 瓶身、罐体、软管或包装的形状和比例\n- 产品颜色、材质、透明度和表面质感\n- 瓶盖、泵头、滴管、喷头或涂抹器结构\n- Logo、标签、字体、文字排版和品牌细节\n- 产品的真实质地，例如乳霜、乳液、精华液、凝胶、油状液体或喷雾\n\n后续所有镜头必须保持产品外观一致，不得改变瓶身结构、颜色、包装设计、Logo位置、标签布局、产品容量比例或材质。\n\n请根据产品的真实功效设计人物和剧情：\n\n- 补水保湿：表现干燥肌肤被温和滋润后的水润光泽，人物肌肤自然、柔软、通透\n- 舒缓修护：表现肌肤不适、干燥或泛红状态下的温和护理过程，使用柔和光线和舒缓表情\n- 提亮肤色：表现肤色均匀、自然透亮和健康光泽，不要出现不自然的漂白效果\n- 抗老紧致：使用符合目标年龄的人物，表现成熟肌肤的精致纹理、护理过程和健康紧致感，不要制造不真实的瞬间逆龄\n- 控油清爽：表现人物在日常或城市环境中的清爽肤感、自然哑光质地和干净的T区状态\n- 防晒护理：表现人物在户外阳光环境中的涂抹动作、轻盈肤感和日常防护场景\n- 敏感肌护理：使用自然、克制、温和的画面，表现轻柔涂抹、舒缓触感和安心的护理氛围\n- 淡斑或痘肌护理：只表现规律护理、洁净肌肤和自然状态，不要制造夸张的瞬间祛痘或瞬间消除色斑效果\n\n请输出一个包含9个镜头的Markdown分镜表格，表头必须包含：\n\n- 镜头序号（1-9）\n- 人物设定与状态\n- 景别与运镜\n- 画面详细描述\n- 产品功效表达\n- 时长\n- 旁白/音效\n\n总时长必须为15秒，9个镜头应形成完整的广告叙事：\n\n1. 产品与人物共同亮相，建立品牌氛围\n2. 人物面部或肌肤状态特写，体现与产品功效相关的需求\n3. 产品包装和质地的微距特写\n4. 人物打开、按压、滴取或取用产品\n5. 人物将产品涂抹在脸部、手部或身体肌肤上\n6. 特写表现产品在肌肤上的延展性、吸收感或使用质感\n7. 人物在符合产品功效的真实生活场景中使用产品\n8. 人物状态与产品多角度展示结合，强化功效记忆点\n9. 产品最终定格，同时保留人物或人物局部，形成品牌广告结尾\n\n人物要求：\n\n- 使用同一位人物贯穿所有相关镜头\n- 保持人物的脸型、发型、肤色、年龄、五官和服装基本一致\n- 人物的肌肤必须真实自然，有正常皮肤纹理\n- 人物表情自然、高级、放松，不要夸张表演\n- 人物动作符合真实护肤流程\n- 人物应与产品功效和目标人群匹配\n- 不要出现多余人物、额外手指、畸形手部或不自然的面部结构\n- 产品在人物手中、脸旁或台面上必须保持正确比例\n\n第二步：编写 Nano Banana Pro 绘图提示词\n\n请根据前面设计的9个镜头，编写一段专门用于 Nano Banana Pro 模型的英文提示词，用于生成一张3×3网格分镜设计图。\n\n提示词必须使用英文，并且开头必须包含以下原文：\n\n3x3 grid storyboard sheet, 9 panels sequence, 16:9 aspect ratio per panel, consistent visual style\n\n英文提示词必须明确说明：\n\n- the product’s exact skincare benefit: [INSERT THE PRODUCT BENEFIT]\n- the target audience: [INSERT THE TARGET AUDIENCE]\n- the same person appears consistently across all human-centered panels\n- the person’s identity, facial features, skin tone, hairstyle, age, and clothing remain consistent\n- the human presence is essential, not decorative\n- the visual storytelling is built around the product’s actual benefit\n- the product packaging remains identical in every panel\n\n人物与功效必须根据产品实际定位呈现：\n\nFor hydration and moisturizing products:\nshow naturally hydrated, fresh, supple-looking skin, a soft dewy finish, gentle application, and a clean morning beauty environment.\n\nFor soothing and repairing products:\nshow a calm, relaxed person with natural skin texture, gentle application, warm diffused lighting, and a quiet self-care atmosphere.\n\nFor brightening products:\nshow an even, luminous, healthy-looking complexion under clean natural light, without bleaching effects or unnatural skin color changes.\n\nFor anti-aging and firming products:\nshow a mature or age-appropriate model, elegant skincare application, refined skin texture, healthy radiance, and a sophisticated luxury beauty atmosphere without instant age reversal.\n\nFor oil-control products:\nshow a fresh, balanced, naturally matte complexion, realistic urban or warm-weather conditions, and a clean, energetic lifestyle scene.\n\nFor sunscreen products:\nshow the person applying the product correctly before going outdoors, bright natural sunlight, a lightweight skincare feeling, and an active daily lifestyle.\n\nFor sensitive-skin products:\nshow a gentle touch, relaxed facial expression, soft neutral lighting, minimal styling, and a calm, reassuring skincare environment.\n\nFor blemish-care or spot-care products:\nshow a clean skincare routine, careful application, realistic skin texture, and a healthy-looking complexion without exaggerated instant transformation.\n\nThe nine panels must contain the following scenes:\n\nPanel 1: A premium hero shot showing the exact skincare product in the foreground and the same person softly visible in the background, establishing the product benefit and target audience through the person’s appearance and environment.\n\nPanel 2: A close-up portrait of the same person showing the natural skin condition or skincare concern related to the product benefit, realistic skin texture, subtle expression, elegant beauty lighting, and no exaggerated problem areas.\n\nPanel 3: An extreme macro close-up of the exact product packaging, including the bottle, jar, tube, cap, pump, dropper, logo, label, material, reflections, and surface finish, with the same person’s hand entering the frame naturally.\n\nPanel 4: The same person opening, pressing, dispensing, dropping, or applying the product, using the correct packaging mechanism, realistic hand anatomy, accurate product amount, and refined commercial composition.\n\nPanel 5: The same person applying the product to the face, cheek, forehead, hand, neck, or other appropriate area, depending on the product’s intended use, with a natural and believable skincare gesture.\n\nPanel 6: A macro close-up of the product spreading across the person’s skin, clearly showing the real texture of the cream, lotion, gel, serum, oil, or mist, realistic absorption and natural skin detail.\n\nPanel 7: The same person using the product in a lifestyle scene that matches its benefit, such as a morning bathroom routine, nighttime self-care, outdoor preparation, gym bag routine, office routine, travel routine, or relaxing spa environment.\n\nPanel 8: A premium beauty portrait of the same person together with the exact product, showing the person’s natural healthy-looking skin and confident relaxed expression, while preserving realistic skin texture and consistent identity.\n\nPanel 9: A final luxury product hero shot with the exact skincare product centered in the foreground and the same person softly present in the background or reflected in a mirror, creating a refined, emotionally clear brand ending.\n\nMaintain exact product consistency across all panels:\n\n- identical bottle, jar, tube, or container silhouette\n- identical proportions and dimensions\n- identical packaging color and finish\n- identical cap, pump, dropper, applicator, and closure\n- identical logo placement and label layout\n- identical visible brand details\n- identical material, transparency, reflections, and texture\n- no redesign\n- no deformation\n- no invented packaging elements\n- no fake product names\n- no fake ingredients\n- no fake certifications\n- no random logos\n- no altered product claims\n\nMaintain human consistency across all panels:\n\n- same person in every human-centered panel\n- same facial structure and identity\n- same skin tone and age\n- same hairstyle and hair color\n- same clothing or coordinated clothing\n- same realistic skin texture\n- natural facial expression\n- realistic hands and fingers\n- realistic skincare gestures\n- no extra people unless specifically requested\n- no facial distortion\n- no plastic-looking skin\n- no impossible beauty transformation\n\nComposition and grid requirements:\n\n- exactly 9 panels\n- 3 columns by 3 rows\n- panels arranged in numerical order from left to right, top to bottom\n- each panel is a separate cinematic 16:9 frame\n- thin clean gutters between panels\n- no overlapping panels\n- no missing panels\n- no extra panels\n- no collage confusion\n- consistent lighting, color grading, lens language, and commercial beauty style\n- the same person and the same skincare product remain recognizable throughout the storyboard\n- the product must be clearly visible in every relevant panel\n- the person must be clearly visible in the human-centered panels\n\nVisual style:\n\npremium skincare advertising, luxury beauty campaign, cinematic beauty film, photorealistic human portrait, realistic skin texture, realistic product packaging, elegant commercial lighting, soft diffused highlights, controlled reflections, subtle depth of field, clean beauty composition, refined color grading, high-end cosmetic campaign, natural human presence, sophisticated visual storytelling, realistic skincare application, emotionally engaging product narrative\n\nText requirements:\n\n- preserve visible packaging text only when it can be reproduced accurately\n- do not invent or alter brand names\n- do not generate random text\n- do not add medical claims\n- do not add guaranteed results\n- do not add subtitles, captions, slogans, promotional banners, watermarks, or UI elements\n- if panel labels are necessary, use only simple labels: 1, 2, 3, 4, 5, 6, 7, 8, 9\n\nNegative prompt:\n\ndifferent skincare product, inconsistent product identity, altered bottle shape, changed packaging color, wrong cap, wrong pump, wrong dropper, incorrect label, distorted logo, fake brand name, invented text, unreadable packaging, missing packaging details, extra packaging elements, duplicated product, floating product, deformed container, melted container, broken bottle, incorrect product texture, excessive cream, unrealistic liquid, inconsistent person, different face, different hairstyle, different skin tone, different age, extra people, distorted face, plastic skin, overly retouched skin, unnatural skin color, impossible skin transformation, instant whitening, instant wrinkle removal, instant acne removal, medical claim, guaranteed result, exaggerated before-and-after effect, malformed hands, extra fingers, distorted anatomy, unnatural application gesture, random text, subtitles, captions, watermark, UI elements, extra panels, missing panels, overlapping panels, inconsistent lighting, inconsistent perspective, low resolution, blurry details, cartoon style, illustration, cheap CGI appearance, oversaturated colors, cluttered background, poor composition",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "McfD42Ex4GBZAAGyvUGsz",
+          "type": "image",
+          "title": "成果 · 分镜图 3×3",
+          "position": {
+            "x": 1450.7149340655012,
+            "y": 425.513953265522
+          },
+          "width": 340,
+          "height": 191.35167464114832,
+          "metadata": {
+            "prompt": "产品图为图片1 ，模特参考图片2 ，，请根据提示词，帮我生成一张3×3网格的分镜设计图（即一张大图里包含9个按顺序排列的16:9画面）。",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "2048x1152",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:1tfBXAq40asvCy0qFrdmD",
+              "image:W6H0vjiLsq3C1vZXaL0Ki"
+            ],
+            "content": "/templates/skincare-ad/media/image_6v-qdyGbpShKfUaS5LNnx.webp",
+            "storageKey": "image:6v-qdyGbpShKfUaS5LNnx",
+            "naturalWidth": 1280,
+            "naturalHeight": 720,
+            "bytes": 80838,
+            "mimeType": "image/webp",
+            "primaryImageId": "McfD42Ex4GBZAAGyvUGsz"
+          }
+        },
+        {
+          "id": "config-1791805347160-cjnje",
+          "type": "config",
+          "title": "步骤 2 · 生成广告成片",
+          "position": {
+            "x": 1975.874916797704,
+            "y": 416.7021080232924
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "video",
+            "size": "16:9",
+            "count": 1,
+            "composerContent": "产品图参考@[node:image-1791804683765-3i2dg] ，模特图参考@[node:image-1791804928791-54d29] ，分镜图参考@[node:McfD42Ex4GBZAAGyvUGsz] ，，根据提示词@[node:text-1791805131706-slw4f] 生成视频。",
+            "seconds": "15",
+            "vquality": "480p",
+            "outputNodeId": "0UOla3a_KxfxnrtPkdKsG"
+          }
+        },
+        {
+          "id": "0UOla3a_KxfxnrtPkdKsG",
+          "type": "video",
+          "title": "成果 · 广告成片",
+          "position": {
+            "x": 2456.2401265145536,
+            "y": 418.4392596376737
+          },
+          "width": 420,
+          "height": 241.11111111111111,
+          "metadata": {
+            "prompt": "产品图参考图片1 ，模特图参考图片2 ，分镜图参考图片3 ，，根据提示词【文本1】 生成视频。\n\n【文本1】\n你现在是世界顶级的护肤品广告导演、皮肤护理视觉策划师、产品摄影师和美容品牌创意总监。你的任务是根据我提供的护肤品图片、产品功效和目标人群，策划一支15秒的高端护肤品广告。\n\n本产品的核心功效是：[产品功效]\n目标人群是：[目标人群]\n主要使用场景是：[使用场景]\n品牌风格是：[品牌风格，例如：高级、自然、科技、温和、年轻、奢华]\n\n广告必须围绕产品功效展开，并且必须出现真实人物。人物不能只是背景装饰，而要通过人物的肤质、表情、使用动作、生活场景和肌肤状态，直观体现产品的使用目的与品牌氛围。\n\n第一步：分析产品与策划分镜\n\n请先仔细分析参考图片中的护肤品外观，包括：\n\n- 瓶身、罐体、软管或包装的形状和比例\n- 产品颜色、材质、透明度和表面质感\n- 瓶盖、泵头、滴管、喷头或涂抹器结构\n- Logo、标签、字体、文字排版和品牌细节\n- 产品的真实质地，例如乳霜、乳液、精华液、凝胶、油状液体或喷雾\n\n后续所有镜头必须保持产品外观一致，不得改变瓶身结构、颜色、包装设计、Logo位置、标签布局、产品容量比例或材质。\n\n请根据产品的真实功效设计人物和剧情：\n\n- 补水保湿：表现干燥肌肤被温和滋润后的水润光泽，人物肌肤自然、柔软、通透\n- 舒缓修护：表现肌肤不适、干燥或泛红状态下的温和护理过程，使用柔和光线和舒缓表情\n- 提亮肤色：表现肤色均匀、自然透亮和健康光泽，不要出现不自然的漂白效果\n- 抗老紧致：使用符合目标年龄的人物，表现成熟肌肤的精致纹理、护理过程和健康紧致感，不要制造不真实的瞬间逆龄\n- 控油清爽：表现人物在日常或城市环境中的清爽肤感、自然哑光质地和干净的T区状态\n- 防晒护理：表现人物在户外阳光环境中的涂抹动作、轻盈肤感和日常防护场景\n- 敏感肌护理：使用自然、克制、温和的画面，表现轻柔涂抹、舒缓触感和安心的护理氛围\n- 淡斑或痘肌护理：只表现规律护理、洁净肌肤和自然状态，不要制造夸张的瞬间祛痘或瞬间消除色斑效果\n\n请输出一个包含9个镜头的Markdown分镜表格，表头必须包含：\n\n- 镜头序号（1-9）\n- 人物设定与状态\n- 景别与运镜\n- 画面详细描述\n- 产品功效表达\n- 时长\n- 旁白/音效\n\n总时长必须为15秒，9个镜头应形成完整的广告叙事：\n\n1. 产品与人物共同亮相，建立品牌氛围\n2. 人物面部或肌肤状态特写，体现与产品功效相关的需求\n3. 产品包装和质地的微距特写\n4. 人物打开、按压、滴取或取用产品\n5. 人物将产品涂抹在脸部、手部或身体肌肤上\n6. 特写表现产品在肌肤上的延展性、吸收感或使用质感\n7. 人物在符合产品功效的真实生活场景中使用产品\n8. 人物状态与产品多角度展示结合，强化功效记忆点\n9. 产品最终定格，同时保留人物或人物局部，形成品牌广告结尾\n\n人物要求：\n\n- 使用同一位人物贯穿所有相关镜头\n- 保持人物的脸型、发型、肤色、年龄、五官和服装基本一致\n- 人物的肌肤必须真实自然，有正常皮肤纹理\n- 人物表情自然、高级、放松，不要夸张表演\n- 人物动作符合真实护肤流程\n- 人物应与产品功效和目标人群匹配\n- 不要出现多余人物、额外手指、畸形手部或不自然的面部结构\n- 产品在人物手中、脸旁或台面上必须保持正确比例\n\n第二步：编写 Nano Banana Pro 绘图提示词\n\n请根据前面设计的9个镜头，编写一段专门用于 Nano Banana Pro 模型的英文提示词，用于生成一张3×3网格分镜设计图。\n\n提示词必须使用英文，并且开头必须包含以下原文：\n\n3x3 grid storyboard sheet, 9 panels sequence, 16:9 aspect ratio per panel, consistent visual style\n\n英文提示词必须明确说明：\n\n- the product’s exact skincare benefit: [INSERT THE PRODUCT BENEFIT]\n- the target audience: [INSERT THE TARGET AUDIENCE]\n- the same person appears consistently across all human-centered panels\n- the person’s identity, facial features, skin tone, hairstyle, age, and clothing remain consistent\n- the human presence is essential, not decorative\n- the visual storytelling is built around the product’s actual benefit\n- the product packaging remains identical in every panel\n\n人物与功效必须根据产品实际定位呈现：\n\nFor hydration and moisturizing products:\nshow naturally hydrated, fresh, supple-looking skin, a soft dewy finish, gentle application, and a clean morning beauty environment.\n\nFor soothing and repairing products:\nshow a calm, relaxed person with natural skin texture, gentle application, warm diffused lighting, and a quiet self-care atmosphere.\n\nFor brightening products:\nshow an even, luminous, healthy-looking complexion under clean natural light, without bleaching effects or unnatural skin color changes.\n\nFor anti-aging and firming products:\nshow a mature or age-appropriate model, elegant skincare application, refined skin texture, healthy radiance, and a sophisticated luxury beauty atmosphere without instant age reversal.\n\nFor oil-control products:\nshow a fresh, balanced, naturally matte complexion, realistic urban or warm-weather conditions, and a clean, energetic lifestyle scene.\n\nFor sunscreen products:\nshow the person applying the product correctly before going outdoors, bright natural sunlight, a lightweight skincare feeling, and an active daily lifestyle.\n\nFor sensitive-skin products:\nshow a gentle touch, relaxed facial expression, soft neutral lighting, minimal styling, and a calm, reassuring skincare environment.\n\nFor blemish-care or spot-care products:\nshow a clean skincare routine, careful application, realistic skin texture, and a healthy-looking complexion without exaggerated instant transformation.\n\nThe nine panels must contain the following scenes:\n\nPanel 1: A premium hero shot showing the exact skincare product in the foreground and the same person softly visible in the background, establishing the product benefit and target audience through the person’s appearance and environment.\n\nPanel 2: A close-up portrait of the same person showing the natural skin condition or skincare concern related to the product benefit, realistic skin texture, subtle expression, elegant beauty lighting, and no exaggerated problem areas.\n\nPanel 3: An extreme macro close-up of the exact product packaging, including the bottle, jar, tube, cap, pump, dropper, logo, label, material, reflections, and surface finish, with the same person’s hand entering the frame naturally.\n\nPanel 4: The same person opening, pressing, dispensing, dropping, or applying the product, using the correct packaging mechanism, realistic hand anatomy, accurate product amount, and refined commercial composition.\n\nPanel 5: The same person applying the product to the face, cheek, forehead, hand, neck, or other appropriate area, depending on the product’s intended use, with a natural and believable skincare gesture.\n\nPanel 6: A macro close-up of the product spreading across the person’s skin, clearly showing the real texture of the cream, lotion, gel, serum, oil, or mist, realistic absorption and natural skin detail.\n\nPanel 7: The same person using the product in a lifestyle scene that matches its benefit, such as a morning bathroom routine, nighttime self-care, outdoor preparation, gym bag routine, office routine, travel routine, or relaxing spa environment.\n\nPanel 8: A premium beauty portrait of the same person together with the exact product, showing the person’s natural healthy-looking skin and confident relaxed expression, while preserving realistic skin texture and consistent identity.\n\nPanel 9: A final luxury product hero shot with the exact skincare product centered in the foreground and the same person softly present in the background or reflected in a mirror, creating a refined, emotionally clear brand ending.\n\nMaintain exact product consistency across all panels:\n\n- identical bottle, jar, tube, or container silhouette\n- identical proportions and dimensions\n- identical packaging color and finish\n- identical cap, pump, dropper, applicator, and closure\n- identical logo placement and label layout\n- identical visible brand details\n- identical material, transparency, reflections, and texture\n- no redesign\n- no deformation\n- no invented packaging elements\n- no fake product names\n- no fake ingredients\n- no fake certifications\n- no random logos\n- no altered product claims\n\nMaintain human consistency across all panels:\n\n- same person in every human-centered panel\n- same facial structure and identity\n- same skin tone and age\n- same hairstyle and hair color\n- same clothing or coordinated clothing\n- same realistic skin texture\n- natural facial expression\n- realistic hands and fingers\n- realistic skincare gestures\n- no extra people unless specifically requested\n- no facial distortion\n- no plastic-looking skin\n- no impossible beauty transformation\n\nComposition and grid requirements:\n\n- exactly 9 panels\n- 3 columns by 3 rows\n- panels arranged in numerical order from left to right, top to bottom\n- each panel is a separate cinematic 16:9 frame\n- thin clean gutters between panels\n- no overlapping panels\n- no missing panels\n- no extra panels\n- no collage confusion\n- consistent lighting, color grading, lens language, and commercial beauty style\n- the same person and the same skincare product remain recognizable throughout the storyboard\n- the product must be clearly visible in every relevant panel\n- the person must be clearly visible in the human-centered panels\n\nVisual style:\n\npremium skincare advertising, luxury beauty campaign, cinematic beauty film, photorealistic human portrait, realistic skin texture, realistic product packaging, elegant commercial lighting, soft diffused highlights, controlled reflections, subtle depth of field, clean beauty composition, refined color grading, high-end cosmetic campaign, natural human presence, sophisticated visual storytelling, realistic skincare application, emotionally engaging product narrative\n\nText requirements:\n\n- preserve visible packaging text only when it can be reproduced accurately\n- do not invent or alter brand names\n- do not generate random text\n- do not add medical claims\n- do not add guaranteed results\n- do not add subtitles, captions, slogans, promotional banners, watermarks, or UI elements\n- if panel labels are necessary, use only simple labels: 1, 2, 3, 4, 5, 6, 7, 8, 9\n\nNegative prompt:\n\ndifferent skincare product, inconsistent product identity, altered bottle shape, changed packaging color, wrong cap, wrong pump, wrong dropper, incorrect label, distorted logo, fake brand name, invented text, unreadable packaging, missing packaging details, extra packaging elements, duplicated product, floating product, deformed container, melted container, broken bottle, incorrect product texture, excessive cream, unrealistic liquid, inconsistent person, different face, different hairstyle, different skin tone, different age, extra people, distorted face, plastic skin, overly retouched skin, unnatural skin color, impossible skin transformation, instant whitening, instant wrinkle removal, instant acne removal, medical claim, guaranteed result, exaggerated before-and-after effect, malformed hands, extra fingers, distorted anatomy, unnatural application gesture, random text, subtitles, captions, watermark, UI elements, extra panels, missing panels, overlapping panels, inconsistent lighting, inconsistent perspective, low resolution, blurry details, cartoon style, illustration, cheap CGI appearance, oversaturated colors, cluttered background, poor composition",
+            "status": "success",
+            "size": "16:9",
+            "seconds": "15",
+            "vquality": "480p",
+            "generateAudio": "true",
+            "watermark": "false",
+            "references": [
+              "image:1tfBXAq40asvCy0qFrdmD",
+              "image:W6H0vjiLsq3C1vZXaL0Ki",
+              "image:6v-qdyGbpShKfUaS5LNnx"
+            ],
+            "content": "/templates/skincare-ad/media/video_Beh4Y14mI5K0NKIchXEZV.mp4",
+            "storageKey": "video:Beh4Y14mI5K0NKIchXEZV",
+            "naturalWidth": 720,
+            "naturalHeight": 414,
+            "bytes": 495420,
+            "mimeType": "video/mp4",
+            "durationMs": 15104
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": "gSz3vWHfbKfnqaNYZ3vJc",
+          "fromNodeId": "image-1791804683765-3i2dg",
+          "toNodeId": "config-1791804758308-jz1mh"
+        },
+        {
+          "id": "74CsVcXnt3J9yHDGcNN9L",
+          "fromNodeId": "text-1791804768403-coa0h",
+          "toNodeId": "image-1791804928791-54d29"
+        },
+        {
+          "id": "conn-1791805156696",
+          "fromNodeId": "text-1791805131706-slw4f",
+          "toNodeId": "config-1791804758308-jz1mh"
+        },
+        {
+          "id": "conn-1791805158481",
+          "fromNodeId": "image-1791804928791-54d29",
+          "toNodeId": "config-1791804758308-jz1mh"
+        },
+        {
+          "id": "hQMcrEN-vLPBYdsY7tV6V",
+          "fromNodeId": "config-1791804758308-jz1mh",
+          "toNodeId": "McfD42Ex4GBZAAGyvUGsz"
+        },
+        {
+          "id": "ZxXnJZl3kveu7eCcBJSiY",
+          "fromNodeId": "McfD42Ex4GBZAAGyvUGsz",
+          "toNodeId": "config-1791805347160-cjnje"
+        },
+        {
+          "id": "conn-1791805355020",
+          "fromNodeId": "text-1791805131706-slw4f",
+          "toNodeId": "config-1791805347160-cjnje"
+        },
+        {
+          "id": "conn-1791805356601",
+          "fromNodeId": "image-1791804683765-3i2dg",
+          "toNodeId": "config-1791805347160-cjnje"
+        },
+        {
+          "id": "conn-1791805358042",
+          "fromNodeId": "image-1791804928791-54d29",
+          "toNodeId": "config-1791805347160-cjnje"
+        },
+        {
+          "id": "FE70TrW_866lG_AAdM1Nh",
+          "fromNodeId": "config-1791805347160-cjnje",
+          "toNodeId": "0UOla3a_KxfxnrtPkdKsG"
+        }
+      ]
+    },
+    "files": [
+      {
+        "storageKey": "image:1tfBXAq40asvCy0qFrdmD",
+        "path": "/templates/skincare-ad/media/image_1tfBXAq40asvCy0qFrdmD.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:W6H0vjiLsq3C1vZXaL0Ki",
+        "path": "/templates/skincare-ad/media/image_W6H0vjiLsq3C1vZXaL0Ki.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:6v-qdyGbpShKfUaS5LNnx",
+        "path": "/templates/skincare-ad/media/image_6v-qdyGbpShKfUaS5LNnx.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "video:Beh4Y14mI5K0NKIchXEZV",
+        "path": "/templates/skincare-ad/media/video_Beh4Y14mI5K0NKIchXEZV.mp4",
+        "mimeType": "video/mp4"
+      }
+    ]
+  },
+  {
+    "id": "shoes-ad-video",
+    "title": "鞋类广告宣传视频",
+    "description": "一张鞋子产品图先生成正面和背面多视角图，再生成 3×3 分镜设计图，最后按分镜与策划提示词生成 15 秒 16:9 高端产品广告视频。",
+    "tags": [
+      "鞋类",
+      "产品广告",
+      "图生视频"
+    ],
+    "author": "官方",
+    "cover": "/templates/covers/shoes-ad-video.webp",
+    "previewVideo": "/templates/shoes-ad-video/media/video_gkvo7Q4boeSq4vPgzujSy.mp4",
+    "project": {
+      "title": "鞋类广告宣传视频",
+      "backgroundMode": "lines",
+      "viewport": {
+        "k": 0.44175627612776297,
+        "x": 63.00495894498447,
+        "y": 469.8328799412708
+      },
+      "nodes": [
+        {
+          "id": "shoes-instructions",
+          "type": "text",
+          "title": "使用说明",
+          "position": {
+            "x": -6.8023005158513925,
+            "y": -575.8610466200175
+          },
+          "width": 2400,
+          "height": 180,
+          "metadata": {
+            "content": "鞋类广告宣传视频｜1 张鞋子产品图 → 多视角图 + 3×3 分镜图 → 15 秒广告成片\n① 克隆后替换「鞋子产品图」，按步骤 1 生成包含正面和背面的多视角图。\n② 步骤 2 参考产品图与多视角图生成 3×3 分镜图；步骤 3 选择视频模型，按产品图、多视角图、分镜图与策划提示词生成 16:9 成片。",
+            "status": "idle",
+            "fontSize": 16
+          }
+        },
+        {
+          "id": "image-1791803485779-shdx2",
+          "type": "image",
+          "title": "替换鞋子产品图",
+          "position": {
+            "x": -6.8023005158513925,
+            "y": 101.71013444137503
+          },
+          "width": 453.0764583506411,
+          "height": 384.3598621674605,
+          "metadata": {
+            "content": "/templates/shoes-ad-video/media/image_Iz6NXxQZSXLrgaYte2SGS.webp",
+            "status": "success",
+            "prompt": "",
+            "storageKey": "image:Iz6NXxQZSXLrgaYte2SGS",
+            "naturalWidth": 1200,
+            "naturalHeight": 1018,
+            "bytes": 80316,
+            "mimeType": "image/webp",
+            "freeResize": false
+          }
+        },
+        {
+          "id": "text-1791803512637-7d2em",
+          "type": "text",
+          "title": "广告策划提示词",
+          "position": {
+            "x": 2.717838797939745,
+            "y": -295.8610466200175
+          },
+          "width": 420,
+          "height": 300,
+          "metadata": {
+            "content": "你现在是世界顶级的鞋类广告导演、产品摄影师及视觉策划专家。你的任务是根据我提供的鞋子产品图片，构思并策划一支15秒的高端产品展示广告，突出鞋子的外观设计、材质工艺、穿着场景、功能特点与品牌质感。广告包含9个关键镜头，请严格按照以下两个步骤执行：\n\n第一步：策划与分镜设计\n\n请先分析产品图片中鞋子的真实外观，包括鞋型、颜色、材质、鞋底结构、鞋带、Logo、缝线、纹理和其他细节。后续所有镜头必须保持鞋子外观一致，不得擅自改变鞋型、颜色、品牌标识、结构或材质。\n\n根据鞋子的核心卖点、目标人群、使用场景、品牌调性及视觉特征，设计一个具有吸引力的视觉叙事逻辑。请输出一个包含9个镜头的Markdown分镜表格，表头必须包含：\n\n- 镜头序号（1-9）\n- 景别与运镜（如：超特写、特写、中景、低角度、推镜头、环绕镜头、跟拍）\n- 画面详细描述（精准描述鞋子在画面中的状态、角度、材质、光影、环境与动作，确保与原产品图片一致）\n- 时长（总计15秒）\n- 旁白/音效\n\n9个镜头需要形成完整的广告节奏，建议包含：\n\n1. 产品整体亮相\n2. 鞋面材质与纹理特写\n3. 鞋带、Logo、缝线或结构细节展示\n4. 鞋底、防滑纹路或缓震结构展示\n5. 穿着状态或脚部动态展示\n6. 真实使用场景展示\n7. 运动、行走或功能性能展示\n8. 产品360度或多角度展示\n9. 品牌感结尾与产品定格\n\n第二步：编写 Nano Banana Pro 绘图提示词\n\n请根据前面设计的9个镜头，编写一段专门用于 Nano Banana Pro 模型的英文提示词，用于生成一张3×3网格分镜设计图。整张大图必须包含9个按照顺序排列的16:9画面，每个画面对应一个广告镜头。\n\n提示词必须满足以下要求：\n\n1. 必须使用英文编写。\n2. 开头必须包含以下原文：\n\n3x3 grid storyboard sheet, 9 panels sequence, 16:9 aspect ratio per panel, consistent visual style\n\n3. 必须严格保持参考鞋子的外观一致：\n   - identical shoe silhouette and proportions\n   - identical color scheme\n   - identical upper material and texture\n   - identical sole structure and tread pattern\n   - identical laces, stitching, logo placement, and branding details\n   - no redesign, no deformation, no extra accessories\n\n4. 每个画面必须清晰展示一个不同的镜头，并按照1至9的顺序排列。每个面板应包含：\n   - 不同的景别或摄像机角度\n   - 清晰的产品主体\n   - 明确的光线方向与氛围\n   - 合理的背景和使用场景\n   - 具有商业广告质感的构图\n\n5. 画面风格要求：\n   - premium commercial shoe advertising\n   - cinematic product photography\n   - realistic materials\n   - studio-quality lighting\n   - sharp focus on the shoe\n   - subtle depth of field\n   - high-end brand campaign aesthetic\n   - clean composition\n   - consistent color grading\n   - photorealistic details\n\n6. 9个面板的具体内容：\n\nPanel 1: Hero shot of the shoe in a clean premium studio, three-quarter angle, full product visible, dramatic key light, elegant shadow.\n\nPanel 2: Extreme close-up of the upper material, showing realistic texture, stitching, pores, weave, and surface finish.\n\nPanel 3: Close-up of the laces, eyelets, logo, stitching, and construction details, preserving exact branding placement.\n\nPanel 4: Low-angle close-up of the outsole, showing the tread pattern, grip texture, cushioning structure, and contact surface.\n\nPanel 5: The shoe being worn on a person’s foot, natural standing pose, realistic fit, accurate proportions, no distortion.\n\nPanel 6: The wearer walking through a stylish urban environment, the shoe clearly visible, natural motion, cinematic tracking shot.\n\nPanel 7: Dynamic performance scene showing the shoe during movement, emphasizing flexibility, stability, traction, and comfort without changing the shoe design.\n\nPanel 8: Premium multi-angle product presentation, showing the same shoe from side, rear, top, and three-quarter views with consistent appearance.\n\nPanel 9: Final hero product shot, the shoe centered on a clean luxury background, refined lighting, subtle brand atmosphere, strong commercial campaign ending.\n\n7. 版式要求：\n\n- exactly 9 panels\n- 3 columns by 3 rows\n- panels arranged in numerical order from left to right, top to bottom\n- each panel visually separated by thin clean gutters\n- no overlapping panels\n- no missing panels\n- no extra panels\n- no collage confusion\n- each panel should read as a separate 16:9 cinematic frame\n- keep the shoe large and clearly recognizable in every relevant panel\n- maintain the same shoe identity across all nine panels\n\n8. 文字要求：\n\n- minimal or no text inside the storyboard panels\n- do not generate fake brand names\n- do not generate random logos\n- do not add incorrect product labels\n- do not add subtitles, captions, watermarks, or UI elements\n- if panel labels are necessary, use only simple labels: 1, 2, 3, 4, 5, 6, 7, 8, 9\n\n9. Negative prompt：\n\ndifferent shoe design, inconsistent shoe identity, altered silhouette, changed color, wrong material, incorrect sole, deformed shoe, extra laces, missing laces, distorted logo, duplicated shoe, floating shoe, malformed foot, extra toes, unnatural anatomy, random text, fake brand name, unreadable logo, watermark, subtitles, captions, UI elements, extra panels, missing panels, overlapping panels, inconsistent lighting, inconsistent perspective, low resolution, blurry details, cartoon style, illustration, CGI appearance, plastic-looking material, oversaturated colors, cluttered background, poor composition",
+            "status": "idle",
+            "fontSize": 14
+          }
+        },
+        {
+          "id": "config-1791803571498-77nh5",
+          "type": "config",
+          "title": "步骤 1 · 生成多视角图",
+          "position": {
+            "x": 651.6815037500388,
+            "y": 178.72860130329326
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "size": "2048x1152",
+            "count": 1,
+            "composerContent": "帮我生成产品@[node:image-1791803485779-shdx2] 的正面和背面图",
+            "outputNodeId": "U-UrrphyglD4jSIbNWw3V"
+          }
+        },
+        {
+          "id": "U-UrrphyglD4jSIbNWw3V",
+          "type": "image",
+          "title": "成果 · 鞋子多视角图",
+          "position": {
+            "x": 1093.133771025165,
+            "y": 208.87014351721314
+          },
+          "width": 340,
+          "height": 191.35167464114832,
+          "metadata": {
+            "prompt": "帮我生成产品图片1 的正面和背面图",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "2048x1152",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:Iz6NXxQZSXLrgaYte2SGS"
+            ],
+            "content": "/templates/shoes-ad-video/media/image_Y_P2wzrz7YvBMLyHMaaKk.webp",
+            "storageKey": "image:Y_P2wzrz7YvBMLyHMaaKk",
+            "naturalWidth": 1280,
+            "naturalHeight": 720,
+            "bytes": 59220,
+            "mimeType": "image/webp",
+            "primaryImageId": "U-UrrphyglD4jSIbNWw3V"
+          }
+        },
+        {
+          "id": "config-1791803780623-et9pa",
+          "type": "config",
+          "title": "步骤 2 · 生成分镜图",
+          "position": {
+            "x": 1575.4354502352976,
+            "y": 193.57066295656205
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "image",
+            "size": "2048x1152",
+            "count": 1,
+            "composerContent": "参考@[node:image-1791803485779-shdx2]和@[node:U-UrrphyglD4jSIbNWw3V] ，根据@[node:text-1791803512637-7d2em] ，帮我生成一张3×3网格的分镜设计图（即一张大图里包含9个按顺序排列的16:9画面）。\n",
+            "outputNodeId": "mlVxIR5y99K4EDbcVQmvT"
+          }
+        },
+        {
+          "id": "mlVxIR5y99K4EDbcVQmvT",
+          "type": "image",
+          "title": "成果 · 分镜图 3×3",
+          "position": {
+            "x": 1999.2905968708983,
+            "y": 222.06157031911138
+          },
+          "width": 340,
+          "height": 191.35167464114832,
+          "metadata": {
+            "prompt": "参考图片1和图片2 ，根据【文本1】 ，帮我生成一张3×3网格的分镜设计图（即一张大图里包含9个按顺序排列的16:9画面）。\n\n【文本1】\n你现在是世界顶级的鞋类广告导演、产品摄影师及视觉策划专家。你的任务是根据我提供的鞋子产品图片，构思并策划一支15秒的高端产品展示广告，突出鞋子的外观设计、材质工艺、穿着场景、功能特点与品牌质感。广告包含9个关键镜头，请严格按照以下两个步骤执行：\n\n第一步：策划与分镜设计\n\n请先分析产品图片中鞋子的真实外观，包括鞋型、颜色、材质、鞋底结构、鞋带、Logo、缝线、纹理和其他细节。后续所有镜头必须保持鞋子外观一致，不得擅自改变鞋型、颜色、品牌标识、结构或材质。\n\n根据鞋子的核心卖点、目标人群、使用场景、品牌调性及视觉特征，设计一个具有吸引力的视觉叙事逻辑。请输出一个包含9个镜头的Markdown分镜表格，表头必须包含：\n\n- 镜头序号（1-9）\n- 景别与运镜（如：超特写、特写、中景、低角度、推镜头、环绕镜头、跟拍）\n- 画面详细描述（精准描述鞋子在画面中的状态、角度、材质、光影、环境与动作，确保与原产品图片一致）\n- 时长（总计15秒）\n- 旁白/音效\n\n9个镜头需要形成完整的广告节奏，建议包含：\n\n1. 产品整体亮相\n2. 鞋面材质与纹理特写\n3. 鞋带、Logo、缝线或结构细节展示\n4. 鞋底、防滑纹路或缓震结构展示\n5. 穿着状态或脚部动态展示\n6. 真实使用场景展示\n7. 运动、行走或功能性能展示\n8. 产品360度或多角度展示\n9. 品牌感结尾与产品定格\n\n第二步：编写 Nano Banana Pro 绘图提示词\n\n请根据前面设计的9个镜头，编写一段专门用于 Nano Banana Pro 模型的英文提示词，用于生成一张3×3网格分镜设计图。整张大图必须包含9个按照顺序排列的16:9画面，每个画面对应一个广告镜头。\n\n提示词必须满足以下要求：\n\n1. 必须使用英文编写。\n2. 开头必须包含以下原文：\n\n3x3 grid storyboard sheet, 9 panels sequence, 16:9 aspect ratio per panel, consistent visual style\n\n3. 必须严格保持参考鞋子的外观一致：\n   - identical shoe silhouette and proportions\n   - identical color scheme\n   - identical upper material and texture\n   - identical sole structure and tread pattern\n   - identical laces, stitching, logo placement, and branding details\n   - no redesign, no deformation, no extra accessories\n\n4. 每个画面必须清晰展示一个不同的镜头，并按照1至9的顺序排列。每个面板应包含：\n   - 不同的景别或摄像机角度\n   - 清晰的产品主体\n   - 明确的光线方向与氛围\n   - 合理的背景和使用场景\n   - 具有商业广告质感的构图\n\n5. 画面风格要求：\n   - premium commercial shoe advertising\n   - cinematic product photography\n   - realistic materials\n   - studio-quality lighting\n   - sharp focus on the shoe\n   - subtle depth of field\n   - high-end brand campaign aesthetic\n   - clean composition\n   - consistent color grading\n   - photorealistic details\n\n6. 9个面板的具体内容：\n\nPanel 1: Hero shot of the shoe in a clean premium studio, three-quarter angle, full product visible, dramatic key light, elegant shadow.\n\nPanel 2: Extreme close-up of the upper material, showing realistic texture, stitching, pores, weave, and surface finish.\n\nPanel 3: Close-up of the laces, eyelets, logo, stitching, and construction details, preserving exact branding placement.\n\nPanel 4: Low-angle close-up of the outsole, showing the tread pattern, grip texture, cushioning structure, and contact surface.\n\nPanel 5: The shoe being worn on a person’s foot, natural standing pose, realistic fit, accurate proportions, no distortion.\n\nPanel 6: The wearer walking through a stylish urban environment, the shoe clearly visible, natural motion, cinematic tracking shot.\n\nPanel 7: Dynamic performance scene showing the shoe during movement, emphasizing flexibility, stability, traction, and comfort without changing the shoe design.\n\nPanel 8: Premium multi-angle product presentation, showing the same shoe from side, rear, top, and three-quarter views with consistent appearance.\n\nPanel 9: Final hero product shot, the shoe centered on a clean luxury background, refined lighting, subtle brand atmosphere, strong commercial campaign ending.\n\n7. 版式要求：\n\n- exactly 9 panels\n- 3 columns by 3 rows\n- panels arranged in numerical order from left to right, top to bottom\n- each panel visually separated by thin clean gutters\n- no overlapping panels\n- no missing panels\n- no extra panels\n- no collage confusion\n- each panel should read as a separate 16:9 cinematic frame\n- keep the shoe large and clearly recognizable in every relevant panel\n- maintain the same shoe identity across all nine panels\n\n8. 文字要求：\n\n- minimal or no text inside the storyboard panels\n- do not generate fake brand names\n- do not generate random logos\n- do not add incorrect product labels\n- do not add subtitles, captions, watermarks, or UI elements\n- if panel labels are necessary, use only simple labels: 1, 2, 3, 4, 5, 6, 7, 8, 9\n\n9. Negative prompt：\n\ndifferent shoe design, inconsistent shoe identity, altered silhouette, changed color, wrong material, incorrect sole, deformed shoe, extra laces, missing laces, distorted logo, duplicated shoe, floating shoe, malformed foot, extra toes, unnatural anatomy, random text, fake brand name, unreadable logo, watermark, subtitles, captions, UI elements, extra panels, missing panels, overlapping panels, inconsistent lighting, inconsistent perspective, low resolution, blurry details, cartoon style, illustration, CGI appearance, plastic-looking material, oversaturated colors, cluttered background, poor composition",
+            "status": "success",
+            "isBatchRoot": false,
+            "batchUsesReferenceImages": true,
+            "generationType": "edit",
+            "size": "2048x1152",
+            "quality": "auto",
+            "background": "",
+            "count": 1,
+            "references": [
+              "image:Iz6NXxQZSXLrgaYte2SGS",
+              "image:Y_P2wzrz7YvBMLyHMaaKk"
+            ],
+            "content": "/templates/shoes-ad-video/media/image_t6rDzXXE6cM6KOJwgGjVt.webp",
+            "storageKey": "image:t6rDzXXE6cM6KOJwgGjVt",
+            "naturalWidth": 1280,
+            "naturalHeight": 720,
+            "bytes": 166412,
+            "mimeType": "image/webp",
+            "primaryImageId": "mlVxIR5y99K4EDbcVQmvT"
+          }
+        },
+        {
+          "id": "config-1791803933609-us43f",
+          "type": "config",
+          "title": "步骤 3 · 生成广告成片",
+          "position": {
+            "x": 2491.343715584843,
+            "y": 187.54360353719446
+          },
+          "width": 340,
+          "height": 240,
+          "metadata": {
+            "content": "",
+            "status": "idle",
+            "generationMode": "video",
+            "size": "16:9",
+            "count": 1,
+            "seconds": "15",
+            "composerContent": "请根据产品图@[node:image-1791803485779-shdx2]和多视角图@[node:U-UrrphyglD4jSIbNWw3V] ，以及视频分镜内容，以及分镜提示词约束@[node:text-1791803512637-7d2em] ，制作视频。 ",
+            "vquality": "480p",
+            "outputNodeId": "wEhJOQAVrHCtSZzY4WcIH"
+          }
+        },
+        {
+          "id": "wEhJOQAVrHCtSZzY4WcIH",
+          "type": "video",
+          "title": "成果 · 广告成片",
+          "position": {
+            "x": 2923.4613629073715,
+            "y": 195.13950322312144
+          },
+          "width": 420,
+          "height": 241.11111111111111,
+          "metadata": {
+            "prompt": "请根据产品图图片1和多视角图图片2 ，以及视频分镜内容，以及分镜提示词约束【文本1】 ，制作视频。\n\n【文本1】\n你现在是世界顶级的鞋类广告导演、产品摄影师及视觉策划专家。你的任务是根据我提供的鞋子产品图片，构思并策划一支15秒的高端产品展示广告，突出鞋子的外观设计、材质工艺、穿着场景、功能特点与品牌质感。广告包含9个关键镜头，请严格按照以下两个步骤执行：\n\n第一步：策划与分镜设计\n\n请先分析产品图片中鞋子的真实外观，包括鞋型、颜色、材质、鞋底结构、鞋带、Logo、缝线、纹理和其他细节。后续所有镜头必须保持鞋子外观一致，不得擅自改变鞋型、颜色、品牌标识、结构或材质。\n\n根据鞋子的核心卖点、目标人群、使用场景、品牌调性及视觉特征，设计一个具有吸引力的视觉叙事逻辑。请输出一个包含9个镜头的Markdown分镜表格，表头必须包含：\n\n- 镜头序号（1-9）\n- 景别与运镜（如：超特写、特写、中景、低角度、推镜头、环绕镜头、跟拍）\n- 画面详细描述（精准描述鞋子在画面中的状态、角度、材质、光影、环境与动作，确保与原产品图片一致）\n- 时长（总计15秒）\n- 旁白/音效\n\n9个镜头需要形成完整的广告节奏，建议包含：\n\n1. 产品整体亮相\n2. 鞋面材质与纹理特写\n3. 鞋带、Logo、缝线或结构细节展示\n4. 鞋底、防滑纹路或缓震结构展示\n5. 穿着状态或脚部动态展示\n6. 真实使用场景展示\n7. 运动、行走或功能性能展示\n8. 产品360度或多角度展示\n9. 品牌感结尾与产品定格\n\n第二步：编写 Nano Banana Pro 绘图提示词\n\n请根据前面设计的9个镜头，编写一段专门用于 Nano Banana Pro 模型的英文提示词，用于生成一张3×3网格分镜设计图。整张大图必须包含9个按照顺序排列的16:9画面，每个画面对应一个广告镜头。\n\n提示词必须满足以下要求：\n\n1. 必须使用英文编写。\n2. 开头必须包含以下原文：\n\n3x3 grid storyboard sheet, 9 panels sequence, 16:9 aspect ratio per panel, consistent visual style\n\n3. 必须严格保持参考鞋子的外观一致：\n   - identical shoe silhouette and proportions\n   - identical color scheme\n   - identical upper material and texture\n   - identical sole structure and tread pattern\n   - identical laces, stitching, logo placement, and branding details\n   - no redesign, no deformation, no extra accessories\n\n4. 每个画面必须清晰展示一个不同的镜头，并按照1至9的顺序排列。每个面板应包含：\n   - 不同的景别或摄像机角度\n   - 清晰的产品主体\n   - 明确的光线方向与氛围\n   - 合理的背景和使用场景\n   - 具有商业广告质感的构图\n\n5. 画面风格要求：\n   - premium commercial shoe advertising\n   - cinematic product photography\n   - realistic materials\n   - studio-quality lighting\n   - sharp focus on the shoe\n   - subtle depth of field\n   - high-end brand campaign aesthetic\n   - clean composition\n   - consistent color grading\n   - photorealistic details\n\n6. 9个面板的具体内容：\n\nPanel 1: Hero shot of the shoe in a clean premium studio, three-quarter angle, full product visible, dramatic key light, elegant shadow.\n\nPanel 2: Extreme close-up of the upper material, showing realistic texture, stitching, pores, weave, and surface finish.\n\nPanel 3: Close-up of the laces, eyelets, logo, stitching, and construction details, preserving exact branding placement.\n\nPanel 4: Low-angle close-up of the outsole, showing the tread pattern, grip texture, cushioning structure, and contact surface.\n\nPanel 5: The shoe being worn on a person’s foot, natural standing pose, realistic fit, accurate proportions, no distortion.\n\nPanel 6: The wearer walking through a stylish urban environment, the shoe clearly visible, natural motion, cinematic tracking shot.\n\nPanel 7: Dynamic performance scene showing the shoe during movement, emphasizing flexibility, stability, traction, and comfort without changing the shoe design.\n\nPanel 8: Premium multi-angle product presentation, showing the same shoe from side, rear, top, and three-quarter views with consistent appearance.\n\nPanel 9: Final hero product shot, the shoe centered on a clean luxury background, refined lighting, subtle brand atmosphere, strong commercial campaign ending.\n\n7. 版式要求：\n\n- exactly 9 panels\n- 3 columns by 3 rows\n- panels arranged in numerical order from left to right, top to bottom\n- each panel visually separated by thin clean gutters\n- no overlapping panels\n- no missing panels\n- no extra panels\n- no collage confusion\n- each panel should read as a separate 16:9 cinematic frame\n- keep the shoe large and clearly recognizable in every relevant panel\n- maintain the same shoe identity across all nine panels\n\n8. 文字要求：\n\n- minimal or no text inside the storyboard panels\n- do not generate fake brand names\n- do not generate random logos\n- do not add incorrect product labels\n- do not add subtitles, captions, watermarks, or UI elements\n- if panel labels are necessary, use only simple labels: 1, 2, 3, 4, 5, 6, 7, 8, 9\n\n9. Negative prompt：\n\ndifferent shoe design, inconsistent shoe identity, altered silhouette, changed color, wrong material, incorrect sole, deformed shoe, extra laces, missing laces, distorted logo, duplicated shoe, floating shoe, malformed foot, extra toes, unnatural anatomy, random text, fake brand name, unreadable logo, watermark, subtitles, captions, UI elements, extra panels, missing panels, overlapping panels, inconsistent lighting, inconsistent perspective, low resolution, blurry details, cartoon style, illustration, CGI appearance, plastic-looking material, oversaturated colors, cluttered background, poor composition",
+            "status": "success",
+            "size": "16:9",
+            "seconds": "15",
+            "vquality": "480p",
+            "generateAudio": "true",
+            "watermark": "false",
+            "references": [
+              "image:Iz6NXxQZSXLrgaYte2SGS",
+              "image:Y_P2wzrz7YvBMLyHMaaKk",
+              "image:t6rDzXXE6cM6KOJwgGjVt"
+            ],
+            "content": "/templates/shoes-ad-video/media/video_gkvo7Q4boeSq4vPgzujSy.mp4",
+            "storageKey": "video:gkvo7Q4boeSq4vPgzujSy",
+            "naturalWidth": 720,
+            "naturalHeight": 414,
+            "bytes": 831471,
+            "mimeType": "video/mp4",
+            "durationMs": 15104
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": "giXeznR2RMz8GDaO9Ihvt",
+          "fromNodeId": "image-1791803485779-shdx2",
+          "toNodeId": "config-1791803571498-77nh5"
+        },
+        {
+          "id": "DVBFeIL81uEFOEmhjX_Ba",
+          "fromNodeId": "config-1791803571498-77nh5",
+          "toNodeId": "U-UrrphyglD4jSIbNWw3V"
+        },
+        {
+          "id": "RerNt2j5tE5jjX-chQIvg",
+          "fromNodeId": "text-1791803512637-7d2em",
+          "toNodeId": "config-1791803780623-et9pa"
+        },
+        {
+          "id": "conn-1791803786247",
+          "fromNodeId": "image-1791803485779-shdx2",
+          "toNodeId": "config-1791803780623-et9pa"
+        },
+        {
+          "id": "conn-1791803788002",
+          "fromNodeId": "U-UrrphyglD4jSIbNWw3V",
+          "toNodeId": "config-1791803780623-et9pa"
+        },
+        {
+          "id": "LYv0xra_BXiSIAtomL4lS",
+          "fromNodeId": "config-1791803780623-et9pa",
+          "toNodeId": "mlVxIR5y99K4EDbcVQmvT"
+        },
+        {
+          "id": "-5rJ5TMvJLT2L-bSVVwMW",
+          "fromNodeId": "text-1791803512637-7d2em",
+          "toNodeId": "config-1791803933609-us43f"
+        },
+        {
+          "id": "conn-1791803963360",
+          "fromNodeId": "mlVxIR5y99K4EDbcVQmvT",
+          "toNodeId": "config-1791803933609-us43f"
+        },
+        {
+          "id": "conn-1791803968228",
+          "fromNodeId": "image-1791803485779-shdx2",
+          "toNodeId": "config-1791803933609-us43f"
+        },
+        {
+          "id": "conn-1791803970043",
+          "fromNodeId": "U-UrrphyglD4jSIbNWw3V",
+          "toNodeId": "config-1791803933609-us43f"
+        },
+        {
+          "id": "2YUmR-HM2ktIC_WxS1zfD",
+          "fromNodeId": "config-1791803933609-us43f",
+          "toNodeId": "wEhJOQAVrHCtSZzY4WcIH"
+        }
+      ]
+    },
+    "files": [
+      {
+        "storageKey": "image:Iz6NXxQZSXLrgaYte2SGS",
+        "path": "/templates/shoes-ad-video/media/image_Iz6NXxQZSXLrgaYte2SGS.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:Y_P2wzrz7YvBMLyHMaaKk",
+        "path": "/templates/shoes-ad-video/media/image_Y_P2wzrz7YvBMLyHMaaKk.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "image:t6rDzXXE6cM6KOJwgGjVt",
+        "path": "/templates/shoes-ad-video/media/image_t6rDzXXE6cM6KOJwgGjVt.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "video:gkvo7Q4boeSq4vPgzujSy",
+        "path": "/templates/shoes-ad-video/media/video_gkvo7Q4boeSq4vPgzujSy.mp4",
+        "mimeType": "video/mp4"
+      }
+    ]
+  },
+  {
+    "id": "dance-cover-video",
+    "title": "人物舞蹈复刻视频",
+    "description": "一张人物图加一段舞蹈参考视频，让视频中的人物以相同身份外观完整复刻参考视频的整套舞蹈动作，提供教学参考和动作捕捉两条独立分支。",
+    "tags": [
+      "舞蹈复刻",
+      "动作参考",
+      "图生视频"
+    ],
+    "author": "官方",
+    "cover": "/templates/covers/dance-cover-video.webp",
+    "previewVideo": "/templates/dance-cover-video/media/video_OdNfD6K97roKhuc5i3j3i.mp4",
+    "project": {
+      "title": "人物舞蹈复刻视频",
+      "backgroundMode": "lines",
+      "viewport": {
+        "k": 0.3613539573014774,
+        "x": 569.5619305015985,
+        "y": 131.08612866033576
+      },
+      "nodes": [
+        {
+          "id": "dance-instructions",
+          "type": "text",
+          "title": "使用说明",
+          "position": {
+            "x": 103.86860294918975,
+            "y": -169.0479028277851
+          },
+          "width": 1067.6774662932255,
+          "height": 180,
+          "metadata": {
+            "content": "人物舞蹈复刻视频｜1 张人物图 + 1 段舞蹈参考视频 → 人物跳同款舞蹈\n① 两条分支相互独立：分支 A 用教学视频做动作与时间参考，分支 B 用深度动作捕捉视频；克隆后替换对应的人物图和参考视频。\n② 替换素材后选中人物图与参考视频重新生成视频；人物身份外观保持一致，动作按参考视频完整复刻、不镜像不删减。",
+            "status": "idle",
+            "fontSize": 16
+          }
+        },
+        {
+          "id": "video-1791795394883-8tlfc",
+          "type": "video",
+          "title": "替换舞蹈参考视频 A · 教学",
+          "position": {
+            "x": 256.2524122830512,
+            "y": 129.64146962238294
+          },
+          "width": 236.25,
+          "height": 420,
+          "metadata": {
+            "content": "/templates/dance-cover-video/media/video_yVXmIgo39F8ibGCKWSXLY.mp4",
+            "storageKey": "video:yVXmIgo39F8ibGCKWSXLY",
+            "status": "success",
+            "naturalWidth": 720,
+            "naturalHeight": 1280,
+            "bytes": 611632,
+            "mimeType": "video/mp4",
+            "durationMs": 11208,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "image-1791795774134-fz7wz",
+          "type": "image",
+          "title": "替换人物图 A",
+          "position": {
+            "x": 240.02824541458182,
+            "y": 629.8039973086928
+          },
+          "width": 319.3474590000001,
+          "height": 319.3474590000001,
+          "metadata": {
+            "content": "/templates/dance-cover-video/media/image_rpW4AB7QnYXSJgyNVEDFh.webp",
+            "status": "success",
+            "storageKey": "image:rpW4AB7QnYXSJgyNVEDFh",
+            "naturalWidth": 800,
+            "naturalHeight": 800,
+            "bytes": 31294,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "video-1791795862980-tip9c",
+          "type": "video",
+          "title": "成果 · 舞蹈复刻视频 A",
+          "position": {
+            "x": 930.4349581313041,
+            "y": 110.9520971722149
+          },
+          "width": 241.11111111111111,
+          "height": 420,
+          "metadata": {
+            "prompt": "使用图片1 中的人物作为唯一主角，使用视频1 作为动作与时间参考，生成完整的舞蹈视频。\n\n人物外观：\n严格保持图片1 中人物的身份与外观，包括脸部特征、发型、发色、体型、身体比例、肤色、服装和配饰。整段视频中人物外观保持一致，面部清晰稳定，服装不发生变化。\n参考视频A中的白模或灰度深度信息仅用于指导姿势、动作和空间位置；最终画面呈现参考图片B中人物的真实外观与服装。\n\n舞蹈动作：\n完整复刻参考视频1 中舞蹈教学者的整套动作，严格遵循原视频的动作顺序、节奏、停顿时长、身体朝向、动作幅度、重心变化和移动路线。\n按照原视频时间轴同步完成每一个动作，准确还原手臂与手部姿势、抬腿与踏步、屈膝、转身、身体倾斜及定格动作。保持原视频的左右方向，不进行镜像翻转。\n保留所有教学停顿、重复动作和动作之间的衔接，不自行编舞、不添加或遗漏动作，不以循环片段替代完整舞蹈。人物从参考视频的起始姿势开始，以对应的结束姿势结束。\n\n动作与身体：\n身体结构和关节运动符合人体规律，四肢比例稳定，动作连贯自然。双脚接地可靠，踏步、落脚和重心转换准确协调，无滑步、漂浮或肢体穿模。\n在动作全过程中保持人物身份与面部特征稳定，头部转动、视线方向和身体朝向跟随参考视频。头发和衣物随动作自然运动。\n\n构图与镜头：\n人物作为唯一舞者，在舞台中央沿参考视频的路线完成动作。使用固定机位、全身构图，完整展示头部、双手和双脚，为抬臂、抬腿及横向移动保留足够空间。\n保持与参考视频一致的拍摄角度，镜头稳定，不切镜、不推拉、不环绕。背景简洁，光照稳定，无其他人物或遮挡舞蹈动作的物体。\n\n时长与成片：\n视频时长与视频1 保持一致，动作起止时间与原视频同步。画面清晰，人物外观一致，动作平滑，重点呈现完整、准确的舞蹈复刻。",
+            "status": "success",
+            "size": "9:16",
+            "seconds": "12",
+            "vquality": "480p",
+            "generateAudio": "false",
+            "watermark": "false",
+            "references": [
+              "image:rpW4AB7QnYXSJgyNVEDFh",
+              "video:yVXmIgo39F8ibGCKWSXLY"
+            ],
+            "content": "/templates/dance-cover-video/media/video_OdNfD6K97roKhuc5i3j3i.mp4",
+            "storageKey": "video:OdNfD6K97roKhuc5i3j3i",
+            "naturalWidth": 414,
+            "naturalHeight": 720,
+            "bytes": 428076,
+            "mimeType": "video/mp4",
+            "durationMs": 12042
+          }
+        },
+        {
+          "id": "video-1791796472458-0uorf",
+          "type": "video",
+          "title": "替换舞蹈参考视频 B · 动作捕捉",
+          "position": {
+            "x": 294.33428356589565,
+            "y": 1015.5950898220281
+          },
+          "width": 236.44444444444446,
+          "height": 420,
+          "metadata": {
+            "content": "/templates/dance-cover-video/media/video_shfkC95yleuUv1m5YmqVp.mp4",
+            "status": "success",
+            "storageKey": "video:shfkC95yleuUv1m5YmqVp",
+            "naturalWidth": 608,
+            "naturalHeight": 1080,
+            "bytes": 950817,
+            "mimeType": "video/mp4",
+            "durationMs": 9833,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "image-1791796509650-8bmgd",
+          "type": "image",
+          "title": "替换人物图 B",
+          "position": {
+            "x": 103.86860294918975,
+            "y": 1507.486418466315
+          },
+          "width": 640,
+          "height": 426.66666666666663,
+          "metadata": {
+            "content": "/templates/dance-cover-video/media/image_cJmoR5mhxT5xnP4A7kyd_.webp",
+            "status": "success",
+            "storageKey": "image:cJmoR5mhxT5xnP4A7kyd_",
+            "naturalWidth": 1248,
+            "naturalHeight": 832,
+            "bytes": 17034,
+            "mimeType": "image/webp",
+            "freeResize": false,
+            "prompt": ""
+          }
+        },
+        {
+          "id": "video-1791796527245-aoj3n",
+          "type": "video",
+          "title": "成果 · 舞蹈复刻视频 B",
+          "position": {
+            "x": 919.6193230494445,
+            "y": 1028.3214400514746
+          },
+          "width": 241.11111111111111,
+          "height": 420,
+          "metadata": {
+            "prompt": "使用图片1 中的人物作为唯一主角，使用视频1 作为动作与时间参考，生成完整的舞蹈视频。\n\n人物外观：\n严格保持图片1 中人物的身份与外观，包括脸部特征、发型、发色、体型、身体比例、肤色、服装和配饰。整段视频中人物外观保持一致，面部清晰稳定，服装不发生变化。\n参考视频A中的白模或灰度深度信息仅用于指导姿势、动作和空间位置；最终画面呈现参考图片B中人物的真实外观与服装。\n\n舞蹈动作：\n完整复刻参考视频1 中舞蹈教学者的整套动作，严格遵循原视频的动作顺序、节奏、停顿时长、身体朝向、动作幅度、重心变化和移动路线。\n按照原视频时间轴同步完成每一个动作，准确还原手臂与手部姿势、抬腿与踏步、屈膝、转身、身体倾斜及定格动作。保持原视频的左右方向，不进行镜像翻转。\n保留所有教学停顿、重复动作和动作之间的衔接，不自行编舞、不添加或遗漏动作，不以循环片段替代完整舞蹈。人物从参考视频的起始姿势开始，以对应的结束姿势结束。\n\n动作与身体：\n身体结构和关节运动符合人体规律，四肢比例稳定，动作连贯自然。双脚接地可靠，踏步、落脚和重心转换准确协调，无滑步、漂浮或肢体穿模。\n在动作全过程中保持人物身份与面部特征稳定，头部转动、视线方向和身体朝向跟随参考视频。头发和衣物随动作自然运动。\n\n构图与镜头：\n人物作为唯一舞者，在舞台中央沿参考视频的路线完成动作。使用固定机位、全身构图，完整展示头部、双手和双脚，为抬臂、抬腿及横向移动保留足够空间。\n保持与参考视频一致的拍摄角度，镜头稳定，不切镜、不推拉、不环绕。背景简洁，光照稳定，无其他人物或遮挡舞蹈动作的物体。\n\n时长与成片：\n视频时长与视频1 保持一致，动作起止时间与原视频同步。画面清晰，人物外观一致，动作平滑，重点呈现完整、准确的舞蹈复刻。",
+            "status": "success",
+            "size": "9:16",
+            "seconds": "11",
+            "vquality": "480p",
+            "generateAudio": "false",
+            "watermark": "false",
+            "references": [
+              "image:cJmoR5mhxT5xnP4A7kyd_",
+              "video:shfkC95yleuUv1m5YmqVp"
+            ],
+            "content": "/templates/dance-cover-video/media/video_BJ4OExECczy3Rhiy91ONy.mp4",
+            "storageKey": "video:BJ4OExECczy3Rhiy91ONy",
+            "naturalWidth": 414,
+            "naturalHeight": 720,
+            "bytes": 172432,
+            "mimeType": "video/mp4",
+            "durationMs": 11042
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": "P3ibfALPoCNOlVbHig5ok",
+          "fromNodeId": "video-1791795394883-8tlfc",
+          "toNodeId": "video-1791795862980-tip9c"
+        },
+        {
+          "id": "conn-1791795865383",
+          "fromNodeId": "image-1791795774134-fz7wz",
+          "toNodeId": "video-1791795862980-tip9c"
+        },
+        {
+          "id": "K1_BMMChZHx7cfBXlANT-",
+          "fromNodeId": "video-1791796472458-0uorf",
+          "toNodeId": "video-1791796527245-aoj3n"
+        },
+        {
+          "id": "conn-1791796534774",
+          "fromNodeId": "image-1791796509650-8bmgd",
+          "toNodeId": "video-1791796527245-aoj3n"
+        }
+      ]
+    },
+    "files": [
+      {
+        "storageKey": "video:yVXmIgo39F8ibGCKWSXLY",
+        "path": "/templates/dance-cover-video/media/video_yVXmIgo39F8ibGCKWSXLY.mp4",
+        "mimeType": "video/mp4"
+      },
+      {
+        "storageKey": "image:rpW4AB7QnYXSJgyNVEDFh",
+        "path": "/templates/dance-cover-video/media/image_rpW4AB7QnYXSJgyNVEDFh.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "video:OdNfD6K97roKhuc5i3j3i",
+        "path": "/templates/dance-cover-video/media/video_OdNfD6K97roKhuc5i3j3i.mp4",
+        "mimeType": "video/mp4"
+      },
+      {
+        "storageKey": "video:shfkC95yleuUv1m5YmqVp",
+        "path": "/templates/dance-cover-video/media/video_shfkC95yleuUv1m5YmqVp.mp4",
+        "mimeType": "video/mp4"
+      },
+      {
+        "storageKey": "image:cJmoR5mhxT5xnP4A7kyd_",
+        "path": "/templates/dance-cover-video/media/image_cJmoR5mhxT5xnP4A7kyd_.webp",
+        "mimeType": "image/webp"
+      },
+      {
+        "storageKey": "video:BJ4OExECczy3Rhiy91ONy",
+        "path": "/templates/dance-cover-video/media/video_BJ4OExECczy3Rhiy91ONy.mp4",
+        "mimeType": "video/mp4"
+      }
+    ]
   }
 ]
