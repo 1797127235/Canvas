@@ -1,16 +1,16 @@
 # Implementation Plan: identity
 
-状态：已批准。模块：`identity`。依据：[SPEC-identity.md](../SPEC-identity.md)，规格已批准。本文的技术方向、阶段性开放策略和四项参数已批准；[任务清单](./todo.md) 已批准。已确认 Task 0 的最小会话服务和 PostgreSQL 固定窗口限流调整；Task 1a 的依赖与编译配置已完成。当前 identity 本地主要实现及验收已完成；54 项后端、14 项前端测试和两端类型检查通过，独立浏览器主要流程通过。下方数据库/HTTP运行边界、清理周期及生产代理事实仍待确认，不写入业务实现；现已启用启动时过期清理，不引入定时周期。
+状态：已批准。模块：`identity`。依据：[identity.md](./identity.md)，规格已批准。本文的技术方向、阶段性开放策略和四项参数已批准；[任务清单](./identity-todo.md) 已批准。已确认 Task 0 的最小会话服务和 PostgreSQL 固定窗口限流调整；Task 1a 的依赖与编译配置已完成。当前 identity 本地主要实现及验收已完成；54 项后端、14 项前端测试和两端类型检查通过，独立浏览器主要流程通过。下方数据库/HTTP运行边界、清理周期及生产代理事实仍待确认，不写入业务实现；现已启用启动时过期清理，不引入定时周期。
 
 ## Overview
 
 交付邮箱密码注册、登录、当前会话查询、退出以及游客与登录用户的前端访问入口。游客继续使用现有内置模板只读预览，私人业务数据由后续模块按账号持久化。
 
-本文主体覆盖 identity，不能把它的完成等同于多用户项目完成。正式任务清单已写入 `tasks/todo.md`，identity 部分已批准；下一模块 catalog 的待审阅计划附在文末，保留 identity 尚未完成的生产关卡。产品待办仍记在 `docs/content/docs/progress/todo.mdx`。
+本文主体覆盖 identity，不能把它的完成等同于多用户项目完成。正式任务清单已写入 `identity-todo.md`，identity 部分已批准；下一模块 catalog 的待审阅计划附在文末，保留 identity 尚未完成的生产关卡。产品待办仍记在 `docs/content/docs/progress/todo.mdx`。
 
 ## 当前实现证据
 
-注册、登录、会话和来源限流已落地，统一 `readCurrentUser` / `requireUser` 提供可信身份；正常身份模式按中间阶段边界关闭未隔离的旧本地业务写入。用户要求本地 Vite 默认免登录开发，通过 `VITE_AUTH_BYPASS=false` 可恢复身份联调。测试与浏览器证据详见 `tasks/todo.md`，正式生产上线尚未验证。
+注册、登录、会话和来源限流已落地，统一 `readCurrentUser` / `requireUser` 提供可信身份；正常身份模式按中间阶段边界关闭未隔离的旧本地业务写入。用户要求本地 Vite 默认免登录开发，通过 `VITE_AUTH_BYPASS=false` 可恢复身份联调。测试与浏览器证据详见 `identity-todo.md`，正式生产上线尚未验证。
 
 ## Existing Evidence（首次规划时）
 
@@ -263,7 +263,7 @@ SQL 超时设置只作用于身份数据库访问，未来长时间生成任务�
 
 ## catalog 技术计划（待审阅）
 
-依据：[SPEC-catalog.md](../SPEC-catalog.md)。本节是同一多用户项目的下一模块，不替换 identity 计划或未完成关卡。
+依据：[catalog.md](./catalog.md)。本节是同一多用户项目的下一模块，不替换 identity 计划或未完成关卡。
 
 ### 顺序与模块边界
 

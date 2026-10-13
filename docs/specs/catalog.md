@@ -1,6 +1,6 @@
 # Spec: catalog 与账号生成
 
-状态：当前开发环境作为实际运行环境，核心多用户与真实文本/图片/视频链路已验证，剩余场景和用户确认见 Pending Tests。属于 [CAPABILITY-MAP.md](./CAPABILITY-MAP.md)。
+状态：当前开发环境作为实际运行环境，核心多用户与真实文本/图片/视频链路已验证，剩余场景和用户确认见 Pending Tests。属于 [capability-map.md](./capability-map.md)。
 
 ## 目标
 

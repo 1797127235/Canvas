@@ -28,7 +28,7 @@ description: 生产服务器地址、发布流程与注意事项
 
    标签：分支名、`sha-<短哈希>`（回滚用）、打 `v*` tag 时为版本号；`main` 上同时更新 `latest`。在仓库 Actions 页面确认 workflow 通过后再发布。
 
-3. 服务器首次拉取私有镜像前需要登录 GHCR（用带 `read:packages` 权限的 PAT，只需做一次）：
+3. 两个包目前是公开的，服务器拉取不需要登录。若之后改成私有，再用带 `read:packages` 权限的 PAT 登录一次：
 
    ```powershell
    docker login ghcr.io -u <GitHub 用户名> -p <PAT>
@@ -40,6 +40,14 @@ description: 生产服务器地址、发布流程与注意事项
    cd D:\infinite-canvas-v2
    docker compose pull
    docker compose up -d
+   ```
+
+   在 RDP 桌面里上面两条即可。**通过 SSH 执行时 `docker compose pull` 会失败**（原因见「注意事项」），改用：
+
+   ```powershell
+   docker pull ghcr.io/1797127235/infinite-canvas-web:sha-<短哈希>
+   docker pull ghcr.io/1797127235/infinite-canvas-api:sha-<短哈希>
+   docker compose up -d --pull never
    ```
 
 5. 验证：`/api/health` 返回 `{"ok":true}`；`/templates/templates.json` 模板数量正确；随机抽一个模板封面或媒体文件返回 200。涉及生成链路的发布，再登录跑一单真实生成。
@@ -82,6 +90,7 @@ api 容器日志轮转单独放大为 50MB × 10 个文件（约 500MB），其�
 - `.env`（`WEB_PORT=3015`、`POSTGRES_PASSWORD`、`CREDENTIALS_ENCRYPTION_KEY`、`RATE_LIMIT_SECRET`、`IMAGE_API`、`IMAGE_WEB`、`IMAGE_TAG` 等）只存在于服务器，不在 git 里，也不在镜像里；不要把它的内容写进仓库。
 - `IMAGE_TAG` 决定服务器跑哪个镜像，建议固定成 workflow 产出的 `sha-<短哈希>` 或版本号，不要长期停在 `latest`；`latest` 只代表 main 的最新构建，无法判断线上实际版本。
 - **首次从本地构建切换到镜像拉取时**，服务器 `.env` 里原来指向本地镜像的 `IMAGE_TAG`（如 `dc131b4`）或 `local` 在 GHCR 里并不存在，必须先改成镜像仓库里真实存在的标签（`latest` 或某个 `sha-<短哈希>`），否则 `docker compose pull` 会报 manifest unknown。切换后旧的本地镜像可以 `docker image prune` 清理。
+- **SSH 会话里 `docker compose pull` 必然失败**，报 `error getting credentials - err: exit status 1, out: 'A specified logon session does not exist. It may already have been terminated.'`。原因是服务器机器级环境变量 `DOCKER_CONFIG` 指向 `D:\data-crawling-group\docker-client-config`，其 `config.json` 配了 `credsStore=wincred`，而 wincred 只在交互式登录会话（RDP 桌面）可用；compose 又会把 `docker-compose.yml` 里所有镜像（含 `docker.io` 的 `postgres:16-alpine`）都过一遍凭据助手，因此整条命令直接失败，和包是否公开无关。绕过办法是用 `docker pull` 单独拉 ghcr 的两个镜像（公开包匿名可拉），再 `docker compose up -d --pull never`，此时 compose 不访问仓库、不触发凭据助手；`postgres:16-alpine` 服务器本地已有，不需要重新拉。
 - 数据库表由 db-init 和后端启动迁移维护；`db` 容器保持运行，不要随发布重建，账号、画布和媒体数据都在它的 volume 里。
 - 服务器 PowerShell 控制台是 GBK 编码，直接 `Get-Content` 查看 UTF-8 中文文件会乱码，看起来像文件坏了；校验内容用 ASCII 字符串（例如模板 id）或比对 SHA256。
 - 发布完成后浏览器强刷一次，确认模板库和画布正常。

@@ -1,55 +1,111 @@
 ---
-title: Docker Deployment
-description: Deploy the multi-user Infinite Canvas with Docker Compose
+title: Docker 部署
+description: 使用 Docker Compose 部署多用户版无限画布
 ---
 
-# Docker Deployment
+# Docker 部署
 
-The multi-user edition ships as one compose stack: PostgreSQL, the Node 24 API backend, and an nginx frontend that serves the static app and proxies `/api`. The database has no host port; only the frontend is exposed (default port 3015, HTTP).
+多用户版使用一套 compose 栈部署：PostgreSQL、后端（Node 24 API）、前端（nginx 托管静态页并反代 `/api`）。数据库默认不对宿主机开放端口，只能在栈内部访问；前端对外暴露一个 HTTP 端口（默认 3015）。
 
-Frontend and backend images are built by GitHub Actions and pushed to GHCR (`.github/workflows/publish-images.yml`); the server pulls them instead of building locally. Log in to GHCR once with a PAT that has `read:packages`:
+## 前置条件
+
+- 已安装 Docker 和 Docker Compose v2。
+- 服务器能访问 GHCR 镜像仓库。
+- 知道用户浏览器实际访问服务器的地址（IP 或域名 + 端口）。
+
+前后端镜像由 GitHub Actions 构建后推到 GHCR（`.github/workflows/publish-images.yml`），服务器只拉取不本地构建。首次拉取私有镜像前先登录一次：
 
 ```bash
-docker login ghcr.io -u <github-user> -p <PAT>
+docker login ghcr.io -u <GitHub 用户名> -p <带 read:packages 的 PAT>
 ```
 
-## First deployment
+## 首次部署
 
 ```bash
+# 1. 准备配置
 cp .env.example .env
-# Fill in POSTGRES_PASSWORD and RATE_LIMIT_SECRET, then generate the
-# credential encryption key (back it up outside the server; it cannot change later):
+# 编辑 .env：填 POSTGRES_PASSWORD、RATE_LIMIT_SECRET，
+# 并生成加密密钥（生成后必须异地备份一份，之后不能更换）：
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
+# 2. 拉取镜像并启动
 docker compose pull
 docker compose up -d
-curl http://127.0.0.1:3015/api/health   # {"ok":true}
+
+# 3. 验证
+curl http://127.0.0.1:3015/api/health   # 应返回 {"ok":true}
 ```
 
-Open `http://server-ip:3015`, register the first account, and save your upstream API key in the account settings.
+浏览器打开 `http://服务器IP:3015`，注册第一个账号，在账号配置里保存上游 API Key 即可开始使用。
 
-Identity tables (`001/002`) are created once by the `db-init` service; workspace, credential, media, task, and history tables (`003~005`) are applied by the backend on every startup. Existing data is never cleared.
+数据库表结构自动就绪：`001/002`（用户和会话）由 `db-init` 一次性服务创建，`003~005`（工作区、凭证、媒体、任务、历史）由后端每次启动自动补建，都不会清理已有数据。
 
-## Updating and rollback
+## 关键配置（.env）
+
+| 变量 | 说明 |
+| --- | --- |
+| `APP_ORIGIN` | 浏览器地址栏里的完整地址（含端口）。写请求按来源校验，不一致会被后端以 403 拒绝；换端口或域名访问时要同步改这一项并重启。 |
+| `WEB_PORT` | 前端对外端口，默认 3015。 |
+| `POSTGRES_PASSWORD` | 数据库密码，长随机串。 |
+| `CREDENTIALS_ENCRYPTION_KEY` | 32 字节 base64，加密所有账号保存的 API Key。首次设置后不能更换，丢失等于全部账号 Key 作废，必须在服务器之外再存一份。 |
+| `RATE_LIMIT_SECRET` | 登录/注册限流签名，任意随机串。 |
+| `CATALOG_CONFIG_PATH` | 上游目录配置路径，compose 已把 `server/config/catalog.json` 挂载为容器内路径，保持默认。全部模型共用其中的 `baseUrl`，账号 Key 只在该上游做模型发现；修改后重启 api 生效。 |
+| `IMAGE_API` / `IMAGE_WEB` | 两个镜像的仓库地址，默认指向 GHCR 上的 `infinite-canvas-api` / `infinite-canvas-web`，不需要改。 |
+| `IMAGE_TAG` | 服务器实际运行的镜像标签。建议固定成 workflow 产出的 `sha-<短哈希>` 或版本号，不要长期停在 `latest`。 |
+
+媒体文件默认存在命名卷 `media_data`；`MINIO_*` 五个字段全部配置后改存 MinIO（桶需预先创建）。
+
+## 更新
 
 ```bash
-# set IMAGE_TAG in .env to the tag produced by the workflow (sha-<short> or a version)
+# .env 里把 IMAGE_TAG 改成 workflow 产出的 sha-<短哈希> 或版本号
 docker compose pull
 docker compose up -d
 ```
 
-Rollback: point `IMAGE_TAG` back to the previous tag, then `docker compose pull && docker compose up -d`. Database changes so far are additive only, so rolling code back does not affect data.
+数据库结构由后端启动时自动补齐，无独立迁移步骤。
 
-To build locally instead of pulling, add the build override:
+## 回滚
+
+把 `.env` 的 `IMAGE_TAG` 改回上一个 `sha-<短哈希>` 或版本号，再 `docker compose pull && docker compose up -d`，前提是旧镜像仍可从仓库拉取。数据库结构变更目前只增不删，回滚旧版代码不影响数据。
+
+## 本地构建（可选）
+
+不拉镜像、改为服务器或本机自行构建时，叠加构建覆盖文件：
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
-## Backup
+## 备份与恢复
 
-`scripts/backup.ps1` dumps the database, tars the media volume, and copies `.env` (which contains the encryption key), keeping the last 7 runs. Schedule it daily via Windows Task Scheduler. Restore commands are in the Chinese version of this page.
+```powershell
+# 每日备份（数据库导出 + 媒体复制 + .env），保留最近 7 份
+powershell -ExecutionPolicy Bypass -File scripts\backup.ps1 -ProjectDir D:\infinite-canvas-v2
+```
 
-## Security note
+建议在 Windows 计划任务里每日执行一次。恢复（先 `docker compose up -d` 确保服务在运行）：
 
-The default deployment is LAN HTTP: credentials cross the network in cleartext, which is only acceptable on a trusted network. Add HTTPS (reverse proxy with a certificate, or a tunnel) before exposing the service to the public internet, and update `APP_ORIGIN` accordingly.
+```powershell
+# 数据库：把备份拷进容器再执行 psql，避免 PowerShell 管道改写文件内容
+docker compose cp backups\<时间戳>\db.sql db:/tmp/db.sql
+docker compose exec -T db psql -U infinite_canvas -d infinite_canvas -f /tmp/db.sql
+# 媒体：把备份的 media 目录复制回容器数据目录
+docker compose cp backups\<时间戳>\media api:/app/server/dist/data
+```
+
+`CREDENTIALS_ENCRYPTION_KEY` 包含在备份的 `.env` 里，备份目录请限制访问权限。
+
+## 发布后验证清单
+
+每次部署或升级后：
+
+1. `curl http://127.0.0.1:3015/api/health` 返回 `{"ok":true}`；
+2. `docker compose ps` 三个长驻服务均为 running/healthy；
+3. 浏览器实际注册/登录一次，保存 Key 并试一次生成；
+4. `docker compose logs api --since 10m` 无异常堆栈。
+5. `docker compose images api` 的 tag 与 `.env` 的 `IMAGE_TAG` 一致，确认跑的是预期镜像。
+
+## 安全说明
+
+当前部署走局域网 HTTP：密码和 Key 在内网明文传输，仅适合可信网络。若要通过公网访问，必须先补 HTTPS（反向代理 + 证书或隧道），并把 `APP_ORIGIN` 改成公网地址。

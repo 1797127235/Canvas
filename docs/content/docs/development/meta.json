@@ -1,6 +1,0 @@
-{
-  "title": "Development",
-  "root": true,
-  "defaultOpen": true,
-  "pages": ["local-development", "deployment", "canvas-data-structure"]
-}

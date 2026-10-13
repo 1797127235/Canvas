@@ -59,7 +59,9 @@
 ## 文档规范
 
 - README 保持简洁，只放项目介绍、核心功能、快速开始和文档入口。
-- `docs/index.md` 放给 AI 使用的文档索引，不要再放到 `docs/content/docs/` 内容目录里。
+- `docs/index.md` 放给 AI 使用的文档索引，不要再放到 `docs/content/docs/` 内容目录里；索引里用仓库内真实相对路径，不要写文档站路由（项目没有文档站）。
+- 规格、技术计划、任务清单统一放 `docs/specs/`，用英文小写短横线命名；正文文档放 `docs/content/docs/`，架构图放 `docs/diagrams/`。
+- 文档只写简体中文，一篇一个文件，不再维护 `.zh-CN` 双语副本。
 - 详细功能介绍写到 `docs/content/docs/overview/features.mdx`。
 - 后续待办写到 `docs/content/docs/progress/todo.mdx`。
 - 已实现但还需要用户测试确认的事项写到 `docs/content/docs/progress/pending-test.mdx`。

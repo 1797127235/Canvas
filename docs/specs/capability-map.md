@@ -20,8 +20,8 @@
 
 ## 模块规格索引
 
-- `identity`：[SPEC-identity.md](./SPEC-identity.md)，已批准；[技术计划](./tasks/plan.md) 已批准；[任务清单](./tasks/todo.md) 已批准；identity 本地注册、登录、会话、限流及入口边界已实现；后端 54/54、前端 14/14 测试、两端类型检查及独立浏览器主要流程通过。用户已确认注册、登录、锁定和双标签页退出主流程通过。本地默认开启真实多用户模式，旧本地工作区仅显式 `VITE_AUTH_BYPASS=true` 时开放；生产运行参数/代理/定期清理不属于本轮开发验收。
-- `catalog`：[SPEC-catalog.md](./SPEC-catalog.md) 已按本地开发标准接入账号上游模型发现，目录不保存 Key、不绑定特定模型，失败不回退本地渠道。
+- `identity`：[identity.md](./identity.md)，已批准；[技术计划](./identity-plan.md) 已批准；[任务清单](./identity-todo.md) 已批准；identity 本地注册、登录、会话、限流及入口边界已实现；后端 54/54、前端 14/14 测试、两端类型检查及独立浏览器主要流程通过。用户已确认注册、登录、锁定和双标签页退出主流程通过。本地默认开启真实多用户模式，旧本地工作区仅显式 `VITE_AUTH_BYPASS=true` 时开放；生产运行参数/代理/定期清理不属于本轮开发验收。
+- `catalog`：[catalog.md](./catalog.md) 已按本地开发标准接入账号上游模型发现，目录不保存 Key、不绑定特定模型，失败不回退本地渠道。
 - `credentials`、`media`、`workspace`、`generation` 已补齐账号 Key 加密、四类服务端生成、账号历史、工作区串行保存和换号隔离、媒体 Range 读取及 ZIP 导入重新归属；本轮专项后端 14/14、前端 5/5、两端类型检查、真实数据库双账号隔离、独立浏览器主流程以及真实文本/图片/视频生成与重启恢复通过；未逐项验证的参数、断网/冲突交互与 ZIP 互导保留在 Pending Tests。
 
 ## 模块

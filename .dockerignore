@@ -1,10 +1,13 @@
+# 构建上下文是仓库根，但两个镜像只用到 web/ 和 server/ 的部分文件，其余一律排除以缩小上下文。
+# Dockerfile（web）用 web/，Dockerfile.api 用 server/{package.json,bun.lock,tsconfig.json,src,sql}。
 .git
+.github
 .idea
-docs2
-data
-web/.next
-web/node_modules
-web/out
+.agents
+.claude
+docs
+**/node_modules
+**/dist
 *.log
 .env*
 !.env.example

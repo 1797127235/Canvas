@@ -1,6 +1,6 @@
 # Spec: identity 用户身份与会话
 
-状态：已批准。本文对应已批准的 [CAPABILITY-MAP.md](./CAPABILITY-MAP.md) 中的 `identity` 模块。技术计划见 [tasks/plan.md](./tasks/plan.md)，已批准；[任务清单](./tasks/todo.md) 已批准，注册、登录、会话及入口边界的本地实现与主要验收已完成；后端 54/54、前端 14/14 测试和两端类型检查通过。用户已确认注册、登录、锁定和双标签页退出主流程通过。生产运行参数、代理配置仍待完成，不代表多用户业务系统已经交付。
+状态：已批准。本文对应已批准的 [capability-map.md](./capability-map.md) 中的 `identity` 模块。技术计划见 [identity-plan.md](./identity-plan.md)，已批准；[任务清单](./identity-todo.md) 已批准，注册、登录、会话及入口边界的本地实现与主要验收已完成；后端 54/54、前端 14/14 测试和两端类型检查通过。用户已确认注册、登录、锁定和双标签页退出主流程通过。生产运行参数、代理配置仍待完成，不代表多用户业务系统已经交付。
 
 ## Objective
 
@@ -85,8 +85,8 @@ cd server && bun run start
 既有前端入口和拟新增位置：
 
 ```text
-CAPABILITY-MAP.md                   能力边界、依赖与规格索引
-SPEC-identity.md                    本模块需求与验收标准
+capability-map.md                   能力边界、依赖与规格索引
+identity.md                         本模块需求与验收标准
 server/src/                         拟新增后端源码
 server/src/identity/                身份路由、会话与账号逻辑
 server/tests/                       拟新增后端单元和集成测试

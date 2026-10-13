@@ -1,5 +1,5 @@
 # 前端多阶段构建：Vite 产物由 nginx 托管，/api 反代到同栈 api 服务。
-FROM oven/bun:1.3.13 AS web-build
+FROM oven/bun:1.3.14 AS web-build
 
 WORKDIR /app/web
 COPY web/package.json web/bun.lock ./

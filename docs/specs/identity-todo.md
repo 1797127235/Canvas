@@ -41,7 +41,7 @@ Vite 本地开发默认使用真实账号后端；仅显式 `VITE_AUTH_BYPASS=tr
 
 ## 下一模块：catalog（已实现首个纵向切片，完整生成适配仍待验收）
 
-依据：`SPEC-catalog.md` 及 `tasks/plan.md` 文末。与 identity 同属多用户能力图；本轮已实现 catalog、credentials、workspace、media、generation 的首个服务端纵向切片，保留生产待办，不把未配置的 MinIO/真实上游写成完成。
+依据：`catalog.md` 及 `identity-plan.md` 文末。与 identity 同属多用户能力图；本轮已实现 catalog、credentials、workspace、media、generation 的首个服务端纵向切片，保留生产待办，不把未配置的 MinIO/真实上游写成完成。
 
 - [x] CAT-T1：内置协议与配置校验（依赖：无）。已实现 OpenAI-compatible 固定 adapter、单上游配置校验和启用模型投影。
   - 验收：固定路由/能力明确，未知 adapter/字段、重复 ID、非法上游拒绝；任务 ID/模型名不能越出固定路径。
