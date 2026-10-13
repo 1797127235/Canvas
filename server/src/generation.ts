@@ -95,7 +95,7 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
             if (!model) return response.status(404).json({ error: { code: "MODEL_NOT_FOUND", message: "模型不可用" } });
             const id = randomUUID();
             await database.query(
-                "INSERT INTO user_generation_tasks (id, user_id, upstream_id, base_url, model_id, kind, status, operation) VALUES ($1, $2, '', $3, $4, 'image', 'running', $5)",
+                "INSERT INTO user_generation_tasks (id, user_id, base_url, model_id, kind, status, operation) VALUES ($1, $2, $3, $4, 'image', 'running', $5)",
                 [id, response.locals.user.id, model.baseUrl, model.id, JSON.stringify(parsed.data.input)],
             );
             void runImageTask({ database, options, id, userId: response.locals.user.id, model, apiKey, input: parsed.data.input });
