@@ -2,6 +2,7 @@
 
 ## Unreleased
 
++ [修复] 画布「重试」生图现在会上报服务端任务号：`handleRetryNode` 此前调用生图未传 `onTask`，节点永远拿不到 `generationTaskId`，导致点重试后任务在服务端正常执行、但刷新页面就被 `resetInterruptedGeneration` 判为「页面刷新后生成已中断，请重新生成。」（批量槽位重试同时补上槽位 `taskId`）；批量生图、图片编辑、文生图那几条路径原本已正确传递。
 + [修复] 画布图片异步任务建表字段错误：`POST /api/generation-tasks` 仍按已删除的 `upstream_id` 列插入，006 迁移删除该列后线上每次画布生图都报 `column "upstream_id" of relation "user_generation_tasks" does not exist`；现改为只写现存列，画布生图恢复正常（工作台直连生图和视频任务不受影响）。
 + [修复] 账号模式生图兼容 url 形态的上游结果：部分网关（如 gpt-image 系）返回图片地址而不是 base64，此前 SDK 解析失败报「Invalid JSON response」且已生成成功的图被丢弃；服务端现在下载地址归一化为 base64。
 + [新增] 画布图片生成改为服务端异步任务：创建任务立即返回、后台执行、结果落进账号媒体；页面刷新后画布凭任务号自动恢复轮询并把图写回对应节点/槽位，不再出现「页面刷新后生成已中断，请重新生成」。

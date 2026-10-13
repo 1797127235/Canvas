@@ -145,23 +145,25 @@ export function hasResumableImageTask(node: CanvasNodeData) {
     return Boolean(node.metadata?.generationTaskId || node.metadata?.images?.some((image) => image.status === "loading" && image.taskId));
 }
 
-export function resetInterruptedGeneration(nodes: CanvasNodeData[]) {
-    return nodes.map((node) =>
-        node.metadata?.status === "loading"
-            ? hasResumableVideoTask(node) || hasResumableImageTask(node)
-                ? node
-                : {
-                      ...node,
-                      metadata: {
-                          ...node.metadata,
-                          status: "error" as const,
-                          errorDetails: i18n.t("canvas.generation.interrupted"),
-                          images: node.metadata.images?.map((image) => (image.status === "loading" && !image.taskId ? { ...image, status: "error" as const, errorDetails: i18n.t("canvas.generation.interrupted") } : image)),
-                          texts: node.metadata.texts?.map((text) => (text.status === "loading" ? { ...text, status: "error" as const, errorDetails: i18n.t("canvas.generation.interrupted") } : text)),
-                      },
-                  }
-            : node,
-    );
+export function resetInterruptedGeneration(nodes: CanvasNodeData[], connections: CanvasConnection[] = []) {
+    // 配置节点自己不持有任务号，下游仍有可恢复的生成节点时不算中断。
+    const resumableIds = new Set(nodes.filter((node) => hasResumableVideoTask(node) || hasResumableImageTask(node)).map((node) => node.id));
+    const isResumable = (node: CanvasNodeData) =>
+        resumableIds.has(node.id) || (node.type === CanvasNodeType.Config && connections.some((connection) => connection.fromNodeId === node.id && resumableIds.has(connection.toNodeId)));
+    return nodes.map((node) => {
+        if (node.metadata?.status !== "loading" || isResumable(node)) return node;
+        const errorDetails = i18n.t("canvas.generation.interrupted");
+        return {
+            ...node,
+            metadata: {
+                ...node.metadata,
+                status: "error" as const,
+                errorDetails,
+                images: node.metadata.images?.map((image) => (image.status === "loading" && !image.taskId ? { ...image, status: "error" as const, errorDetails } : image)),
+                texts: node.metadata.texts?.map((text) => (text.status === "loading" ? { ...text, status: "error" as const, errorDetails } : text)),
+            },
+        };
+    });
 }
 
 export function isGenerationCanceled(error: unknown) {
