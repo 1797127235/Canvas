@@ -2,6 +2,9 @@
 
 ## Unreleased
 
++ [新增] 前后端镜像改由 GitHub Actions 构建并推送到 GHCR（`.github/workflows/publish-images.yml`）：推 main 或打 `v*` tag 时先跑质量门禁（前端类型检查与测试、后端类型检查与测试，用 postgres:16 服务容器建测试库），通过后构建并推送 `infinite-canvas-web` / `infinite-canvas-api` 两个镜像；服务器改为 `docker compose pull && docker compose up -d`，不再本地构建。
++ [调整] `.env` 新增 `IMAGE_API` / `IMAGE_WEB` 指定镜像仓库，`IMAGE_TAG` 默认由 `local` 改为 `latest`；本地需要自行构建时叠加 `docker-compose.build.yml`。
+
 + [调整] 移除远程画布节点插件体系、插件管理器、插件 SDK 和示例插件，保留内置节点注册表，后续节点由前端静态实现。
 
 + [优化] 工作流模板预览直接使用模板静态地址显示图片和视频，不再等全部原始媒体下载完成；克隆时才下载并上传原始文件。

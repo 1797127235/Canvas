@@ -7,6 +7,12 @@ description: Deploy the multi-user Infinite Canvas with Docker Compose
 
 The multi-user edition ships as one compose stack: PostgreSQL, the Node 24 API backend, and an nginx frontend that serves the static app and proxies `/api`. The database has no host port; only the frontend is exposed (default port 3015, HTTP).
 
+Frontend and backend images are built by GitHub Actions and pushed to GHCR (`.github/workflows/publish-images.yml`); the server pulls them instead of building locally. Log in to GHCR once with a PAT that has `read:packages`:
+
+```bash
+docker login ghcr.io -u <github-user> -p <PAT>
+```
+
 ## First deployment
 
 ```bash
@@ -15,7 +21,8 @@ cp .env.example .env
 # credential encryption key (back it up outside the server; it cannot change later):
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 curl http://127.0.0.1:3015/api/health   # {"ok":true}
 ```
 
@@ -26,12 +33,18 @@ Identity tables (`001/002`) are created once by the `db-init` service; workspace
 ## Updating and rollback
 
 ```bash
-git pull
-# set IMAGE_TAG in .env to the new version or commit hash
-docker compose build && docker compose up -d
+# set IMAGE_TAG in .env to the tag produced by the workflow (sha-<short> or a version)
+docker compose pull
+docker compose up -d
 ```
 
-Rollback: point `IMAGE_TAG` back to the previous tag and run `docker compose up -d`. Database changes so far are additive only, so rolling code back does not affect data.
+Rollback: point `IMAGE_TAG` back to the previous tag, then `docker compose pull && docker compose up -d`. Database changes so far are additive only, so rolling code back does not affect data.
+
+To build locally instead of pulling, add the build override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
 
 ## Backup
 

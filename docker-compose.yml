@@ -1,4 +1,5 @@
-# 多用户生产栈：PostgreSQL + 后端 + 前端。首次使用复制 .env.example 为 .env 并填写密钥。
+# 多用户生产栈：PostgreSQL + 后端 + 前端。镜像由 GitHub Actions 构建后推到 GHCR，服务器只拉取不构建。
+# 首次使用复制 .env.example 为 .env 并填写密钥；本地需要自行构建时叠加 docker-compose.build.yml。
 services:
   db:
     image: postgres:16-alpine
@@ -43,10 +44,7 @@ services:
         fi
 
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
-    image: infinite-canvas-api:${IMAGE_TAG:-local}
+    image: ${IMAGE_API:-ghcr.io/1797127235/infinite-canvas-api}:${IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       db:
@@ -75,10 +73,7 @@ services:
         max-file: "10"
 
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: infinite-canvas-web:${IMAGE_TAG:-local}
+    image: ${IMAGE_WEB:-ghcr.io/1797127235/infinite-canvas-web}:${IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       - api

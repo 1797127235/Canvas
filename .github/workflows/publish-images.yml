@@ -1,0 +1,134 @@
+# 质量门禁 + 构建镜像推送到 GHCR。服务器只拉取镜像运行，不再本地构建。
+# 触发：推送到 main、打版本 tag（v*）、PR 到 main（只跑门禁）、或手动触发。
+name: Publish images
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-images-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # 发布前门禁：两端类型检查 + 测试。任一失败都不构建镜像。
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: infinite_canvas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d infinite_canvas"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+
+      - name: Install web dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+      - name: Install server dependencies
+        working-directory: server
+        run: bun install --frozen-lockfile
+
+      - name: Web type check
+        working-directory: web
+        run: bun run typecheck
+      - name: Web tests
+        working-directory: web
+        run: bun test
+
+      - name: Server type check
+        working-directory: server
+        run: bun run typecheck
+
+      # 集成测试需要一个独立测试库，且库名必须以 _test 结尾（见 server/tests/support/database.ts）。
+      - name: Create test database
+        run: psql -h 127.0.0.1 -U postgres -d infinite_canvas -c "CREATE DATABASE infinite_canvas_test;"
+        env:
+          PGPASSWORD: postgres
+      - name: Apply schema to test database
+        run: |
+          for file in server/sql/*.sql; do
+            psql -h 127.0.0.1 -U postgres -d infinite_canvas_test -v ON_ERROR_STOP=1 -q -f "$file"
+          done
+        env:
+          PGPASSWORD: postgres
+      - name: Server tests
+        working-directory: server
+        run: bun run test
+        env:
+          NODE_ENV: test
+          HOST: 127.0.0.1
+          PORT: "4100"
+          APP_ORIGIN: http://localhost:3000
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/infinite_canvas
+          TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/infinite_canvas_test
+          RATE_LIMIT_SECRET: ci-only-secret
+
+  publish:
+    needs: verify
+    # PR 只跑质量门禁，不推送镜像。
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: web
+            dockerfile: Dockerfile
+          - name: api
+            dockerfile: Dockerfile.api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 标签：分支名、sha-<短哈希>（回滚用）、版本 tag（v* 时）、main 上额外更新 latest。
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/infinite-canvas-${{ matrix.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

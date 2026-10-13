@@ -5,6 +5,8 @@ description: 当前版本已实现但仍需人工验证的变更项
 
 # 待测试
 
+- 镜像化发布（本轮新增，待用户确认）：前后端镜像改由 GitHub Actions（`.github/workflows/publish-images.yml`）构建并推送到 GHCR，服务器只 `docker compose pull && docker compose up -d`，不再本地构建。workflow 先跑质量门禁（前端类型检查 + 31 项测试、后端类型检查 + 77 项测试；后端用 postgres:16 服务容器，先把 `server/sql/*.sql` 应用到 `infinite_canvas_test`），通过后才构建。镜像标签：分支名、`sha-<短哈希>`（回滚用）、`v*` 版本号，main 同时更新 `latest`。`.env` 新增 `IMAGE_API` / `IMAGE_WEB`，`IMAGE_TAG` 默认由 `local` 改为 `latest`；本地自行构建时叠加 `docker-compose.build.yml`。已在本机验证：两端 typecheck 通过、前端 31/31、后端 77/77（临时 PostgreSQL + 建表脚本）、`docker compose config` 在基础与构建覆盖两种模式下均正确解析出 GHCR 镜像与 `IMAGE_TAG`。待用户确认：Actions 首次运行通过并产出两个 GHCR 包、服务器 `docker login ghcr.io` 后能拉取启动、把 `IMAGE_TAG` 改回旧 `sha-` 标签可回滚。另需在 GitHub 仓库设置里把该 workflow 设为必需检查（手工步骤）。首次切换时服务器 `.env` 的 `IMAGE_TAG` 必须先改成仓库里存在的标签（`latest` 或 `sha-<短哈希>`），原来的 `dc131b4` / `local` 在 GHCR 中不存在，否则 `docker compose pull` 报 manifest unknown。
+
 - AI SDK 模型适配层：账号模式四类生成统一使用 `ai`；Grok 图片/视频使用 xAI provider，GPT 图片/文本/语音使用 OpenAI provider；H3 的 `/v1/videos` 兼容端点实现为 SDK VideoModelV4 provider。删除旧服务端 HTTP、multipart 和视频任务解析分支；新任务保存完整 operation，006 迁移保留原 UUID、账号归属与任务号。后端专项 16/16、全量后端 72/72、前端账号生成 5/5、独立 PostgreSQL 迁移与重复执行通过。新代码真实验证 Codex2API：Grok 生图、文生视频和 H3 图生视频已完成并下载，原任务可恢复；图片 MIME 跟随实际产物。待浏览器确认画布/工作台、刷新续查、图片编辑和多图/首尾帧。H3 视频/音频参考已发送，但参考视频实际采纳仍未验证；Grok 视频 R2V 明确拒绝，避免静默忽略；H3-Max 由当前 catalog 禁用。未部署或重启现有服务，真实音频未验收。H3 参考视频复测已保存实际发送的完整 JSON（含内联视频）及脱敏 HTTP 元数据；首次误用同前缀但不同完整内容的账号 Key 返回 401，用户重新提供的 Key 目录查询 200 且创建任务成功。新任务 `vid_0ed6efb54f4a44f2ade5b141818b7d29` 完成并下载，但花朵参考仍得到白衣人物，当前 `videos` 字段协议未通过参考效果验收。
 
 - 工作流模板预览：打开模板弹窗应立即显示画布和节点，图片、视频由浏览器按模板静态地址各自加载，不再先转圈等待全部原始媒体下载完成；视频仍可播放。点「克隆并编辑」后，原始图片和视频应下载并上传到当前账号，新画布中的媒体可查看、可播放。

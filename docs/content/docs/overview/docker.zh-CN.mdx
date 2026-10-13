@@ -10,8 +10,14 @@ description: 使用 Docker Compose 部署多用户版无限画布
 ## 前置条件
 
 - 已安装 Docker 和 Docker Compose v2。
-- 服务器能访问镜像仓库和 npm 源（首次构建需要）。
+- 服务器能访问 GHCR 镜像仓库。
 - 知道用户浏览器实际访问服务器的地址（IP 或域名 + 端口）。
+
+前后端镜像由 GitHub Actions 构建后推到 GHCR（`.github/workflows/publish-images.yml`），服务器只拉取不本地构建。首次拉取私有镜像前先登录一次：
+
+```bash
+docker login ghcr.io -u <GitHub 用户名> -p <带 read:packages 的 PAT>
+```
 
 ## 首次部署
 
@@ -22,8 +28,9 @@ cp .env.example .env
 # 并生成加密密钥（生成后必须异地备份一份，之后不能更换）：
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
-# 2. 构建并启动
-docker compose up -d --build
+# 2. 拉取镜像并启动
+docker compose pull
+docker compose up -d
 
 # 3. 验证
 curl http://127.0.0.1:3015/api/health   # 应返回 {"ok":true}
@@ -43,16 +50,16 @@ curl http://127.0.0.1:3015/api/health   # 应返回 {"ok":true}
 | `CREDENTIALS_ENCRYPTION_KEY` | 32 字节 base64，加密所有账号保存的 API Key。首次设置后不能更换，丢失等于全部账号 Key 作废，必须在服务器之外再存一份。 |
 | `RATE_LIMIT_SECRET` | 登录/注册限流签名，任意随机串。 |
 | `CATALOG_CONFIG_PATH` | 上游目录配置路径，compose 已把 `server/config/catalog.json` 挂载为容器内路径，保持默认。全部模型共用其中的 `baseUrl`，账号 Key 只在该上游做模型发现；修改后重启 api 生效。 |
-| `IMAGE_TAG` | 镜像标签，升级时换成新版本号或提交号，便于回滚。 |
+| `IMAGE_API` / `IMAGE_WEB` | 两个镜像的仓库地址，默认指向 GHCR 上的 `infinite-canvas-api` / `infinite-canvas-web`，不需要改。 |
+| `IMAGE_TAG` | 服务器实际运行的镜像标签。建议固定成 workflow 产出的 `sha-<短哈希>` 或版本号，不要长期停在 `latest`。 |
 
 媒体文件默认存在命名卷 `media_data`；`MINIO_*` 五个字段全部配置后改存 MinIO（桶需预先创建）。
 
 ## 更新
 
 ```bash
-git pull
-# .env 里把 IMAGE_TAG 改成新版本号（如 git 短哈希）
-docker compose build
+# .env 里把 IMAGE_TAG 改成 workflow 产出的 sha-<短哈希> 或版本号
+docker compose pull
 docker compose up -d
 ```
 
@@ -60,7 +67,15 @@ docker compose up -d
 
 ## 回滚
 
-把 `.env` 的 `IMAGE_TAG` 改回上一个值再 `docker compose up -d` 即可，前提是旧镜像未删除。数据库结构变更目前只增不删，回滚旧版代码不影响数据。
+把 `.env` 的 `IMAGE_TAG` 改回上一个 `sha-<短哈希>` 或版本号，再 `docker compose pull && docker compose up -d`，前提是旧镜像仍可从仓库拉取。数据库结构变更目前只增不删，回滚旧版代码不影响数据。
+
+## 本地构建（可选）
+
+不拉镜像、改为服务器或本机自行构建时，叠加构建覆盖文件：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
 
 ## 备份与恢复
 
@@ -89,6 +104,7 @@ docker compose cp backups\<时间戳>\media api:/app/server/dist/data
 2. `docker compose ps` 三个长驻服务均为 running/healthy；
 3. 浏览器实际注册/登录一次，保存 Key 并试一次生成；
 4. `docker compose logs api --since 10m` 无异常堆栈。
+5. `docker compose images api` 的 tag 与 `.env` 的 `IMAGE_TAG` 一致，确认跑的是预期镜像。
 
 ## 安全说明
 
