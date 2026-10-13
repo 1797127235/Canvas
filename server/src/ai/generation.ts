@@ -27,15 +27,49 @@ export async function createImages(model: CatalogModel, apiKey: string, input: I
     const { openai, xai } = providers(model, apiKey);
     const isXai = model.adapter === "xai-images";
     const { quality, background, output_format } = input;
-    const result = await generateImage({
-        model: isXai ? xai.image(model.upstreamModel) : openai.image(model.upstreamModel),
-        prompt: input.images?.length ? { text: input.prompt, images: input.images } : input.prompt,
-        n: input.n, maxImagesPerCall: input.n || 1,
-        ...(isXai ? { aspectRatio: mediaAspectRatio(input.size, ["1:1", "2:3", "3:2", "4:3", "3:4", "16:9", "9:16", "21:9", "9:21"]) } : { size: input.size as `${number}x${number}` | undefined }),
-        providerOptions: isXai ? { xai: { quality, output_format } } : { openai: { quality, background, outputFormat: output_format } },
-        maxRetries: 0, abortSignal: signal,
-    });
-    return { data: result.images.map(image => ({ b64_json: image.base64, mime_type: image.mediaType })), warnings: result.warnings };
+    try {
+        const result = await generateImage({
+            model: isXai ? xai.image(model.upstreamModel) : openai.image(model.upstreamModel),
+            prompt: input.images?.length ? { text: input.prompt, images: input.images } : input.prompt,
+            n: input.n, maxImagesPerCall: input.n || 1,
+            ...(isXai ? { aspectRatio: mediaAspectRatio(input.size, ["1:1", "2:3", "3:2", "4:3", "3:4", "16:9", "9:16", "21:9", "9:21"]) } : { size: input.size as `${number}x${number}` | undefined }),
+            providerOptions: isXai ? { xai: { quality, output_format } } : { openai: { quality, background, outputFormat: output_format } },
+            maxRetries: 0, abortSignal: signal,
+        });
+        return { data: result.images.map(image => ({ b64_json: image.base64, mime_type: image.mediaType })), warnings: result.warnings };
+    } catch (error) {
+        // 部分 OpenAI 兼容网关返回 url 形态结果，SDK 只认 b64_json；这里下载 url 归一化为 base64。
+        const bridged = await bridgeImageUrls(error, signal);
+        if (bridged) return bridged;
+        throw error;
+    }
+}
+
+async function bridgeImageUrls(error: unknown, signal: AbortSignal) {
+    const responseBody = (error as { responseBody?: unknown }).responseBody;
+    if (typeof responseBody !== "string") return null;
+    let payload: { data?: Array<{ url?: unknown; b64_json?: unknown }> };
+    try {
+        payload = JSON.parse(responseBody);
+    } catch {
+        return null;
+    }
+    if (!Array.isArray(payload?.data) || !payload.data.length) return null;
+    const images: Array<{ b64_json: string; mime_type: string }> = [];
+    for (const entry of payload.data) {
+        if (typeof entry?.b64_json === "string" && entry.b64_json) {
+            images.push({ b64_json: entry.b64_json, mime_type: "image/png" });
+            continue;
+        }
+        if (typeof entry?.url !== "string" || !entry.url) return null;
+        const response = await fetch(entry.url, { signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]) });
+        if (!response.ok) throw new Error(`生成结果下载失败：HTTP ${response.status}`);
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const mimeType = response.headers.get("content-type")?.split(";")[0];
+        images.push({ b64_json: buffer.toString("base64"), mime_type: mimeType === "image/jpeg" || mimeType === "image/webp" ? mimeType : "image/png" });
+    }
+    if (!images.length) return null;
+    return { data: images, warnings: [] };
 }
 
 export async function createSpeech(model: CatalogModel, apiKey: string, input: SpeechInput, signal: AbortSignal) {

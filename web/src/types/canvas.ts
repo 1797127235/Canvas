@@ -35,6 +35,8 @@ export type CanvasNodeImage = {
     naturalHeight: number;
     bytes: number;
     mimeType: string;
+    /** 账号模式异步生成任务号，页面刷新后据此恢复。 */
+    taskId?: string;
 };
 
 export type CanvasNodeText = {
@@ -84,6 +86,8 @@ export type CanvasNodeMetadata = {
     durationMs?: number;
     videoTaskId?: string;
     videoTaskProvider?: "openai" | "gemini";
+    /** 账号模式图片异步生成任务号，页面刷新后据此恢复。 */
+    generationTaskId?: string;
     groupId?: string;
     interactive?: boolean; // Plugin node interaction/move state; see CanvasNodeDefinition.interactionToggle.
 };

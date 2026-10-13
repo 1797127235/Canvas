@@ -4,15 +4,19 @@ import type { Pool } from "pg";
 import { APICallError } from "ai";
 import { z } from "zod";
 import { requireUser } from "./identity/auth-middleware.js";
-import { accountModels, resolveModel, type Catalog } from "./catalog/catalog.js";
+import { accountModels, resolveModel, type Catalog, type CatalogModel } from "./catalog/catalog.js";
 import { readUserApiKey } from "./credentials.js";
 import { generationInput } from "./ai/input.js";
 import { createImages, createSpeech, createText, createTextStream, createVideo, readVideo } from "./ai/generation.js";
+import { type ImageInput } from "./ai/input.js";
 import { downloadGatewayVideo } from "./ai/gateway-video.js";
 import { logError, redactText } from "./log.js";
+import { storeAccountMedia, type MediaOptions } from "./media.js";
 
-type GenerationOptions = { catalog: Catalog; encryptionKey?: string };
+type GenerationOptions = { catalog: Catalog; encryptionKey?: string; media?: MediaOptions };
 const taskIdSchema = z.string().uuid();
+const IMAGE_TASK_TIMEOUT_MS = 15 * 60_000;
+const IMAGE_TASK_STALE_MS = 20 * 60_000;
 
 export function createGenerationRouter(database: Pool, options: GenerationOptions) {
     const router = Router();
@@ -78,7 +82,72 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
     });
     router.get("/generations/:id", requireUser(database), (request, response) => readTask(request, response, database, options, false));
     router.get("/generations/:id/content", requireUser(database), (request, response) => readTask(request, response, database, options, true));
+    // 图片异步任务：创建后立即返回，服务端后台执行并把结果落进账号媒体，刷新页面后仍可按任务号恢复。
+    router.post("/generation-tasks", requireUser(database), async (request, response) => {
+        const parsed = generationInput.safeParse(request.body);
+        if (!parsed.success || parsed.data.capability !== "image") return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "生成参数无效" } });
+        if (!options.media) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
+        const apiKey = await readUserApiKey(database, response.locals.user.id, options.encryptionKey);
+        if (!apiKey) return apiKeyRequired(response);
+        try {
+            const models = await accountModels(options.catalog, apiKey);
+            const model = resolveModel({ models }, parsed.data.modelId, "image");
+            if (!model) return response.status(404).json({ error: { code: "MODEL_NOT_FOUND", message: "模型不可用" } });
+            const id = randomUUID();
+            await database.query(
+                "INSERT INTO user_generation_tasks (id, user_id, upstream_id, base_url, model_id, kind, status, operation) VALUES ($1, $2, '', $3, $4, 'image', 'running', $5)",
+                [id, response.locals.user.id, model.baseUrl, model.id, JSON.stringify(parsed.data.input)],
+            );
+            void runImageTask({ database, options, id, userId: response.locals.user.id, model, apiKey, input: parsed.data.input });
+            return response.status(201).json({ id, status: "running" });
+        } catch (error) {
+            return generationFailure(response, error, apiKey);
+        }
+    });
+    router.get("/generation-tasks/:id", requireUser(database), async (request, response) => {
+        const parsed = taskIdSchema.safeParse(request.params.id);
+        if (!parsed.success) return taskNotFound(response);
+        const task = await database.query<{ kind: string; status: string | null; result: unknown; error: string | null; created_at: Date }>(
+            "SELECT kind, status, result, error, created_at FROM user_generation_tasks WHERE id = $1 AND user_id = $2", [parsed.data, response.locals.user.id],
+        );
+        const row = task.rows[0];
+        if (!row || row.kind !== "image") return taskNotFound(response);
+        if (row.status === "completed") {
+            const result = z.object({ mediaIds: z.array(z.string()) }).safeParse(row.result);
+            if (result.success) return response.json({ id: parsed.data, status: "completed", mediaIds: result.data.mediaIds });
+        }
+        if (row.status === "failed") return response.json({ id: parsed.data, status: "failed", error: row.error || "上游生成失败" });
+        // 进程重启会丢失进行中的后台执行，超过单次生成上限即标记失败，避免客户端无限轮询。
+        if (row.status === "running" && Date.now() - new Date(row.created_at).getTime() > IMAGE_TASK_STALE_MS) {
+            const message = "服务重启导致生成中断，请重新生成";
+            await database.query("UPDATE user_generation_tasks SET status = 'failed', error = $2 WHERE id = $1", [parsed.data, message]);
+            return response.json({ id: parsed.data, status: "failed", error: message });
+        }
+        return response.json({ id: parsed.data, status: "running" });
+    });
     return router;
+}
+
+const imageTasks = new Set<string>();
+async function runImageTask(context: { database: Pool; options: GenerationOptions; id: string; userId: string; model: CatalogModel; apiKey: string; input: ImageInput }) {
+    if (imageTasks.has(context.id)) return;
+    imageTasks.add(context.id);
+    try {
+        const result = await createImages(context.model, context.apiKey, context.input, AbortSignal.timeout(IMAGE_TASK_TIMEOUT_MS));
+        const mediaIds: string[] = [];
+        for (const image of result.data) {
+            const stored = await storeAccountMedia(context.database, context.options.media!, context.userId, Buffer.from(image.b64_json, "base64"), image.mime_type);
+            mediaIds.push(stored.id);
+        }
+        await context.database.query("UPDATE user_generation_tasks SET status = 'completed', result = $2 WHERE id = $1", [context.id, JSON.stringify({ mediaIds })]);
+
+    } catch (error) {
+        const message = redactText((error instanceof Error ? error.message : "上游生成失败").replaceAll(context.apiKey, "[已隐藏]"), 300);
+        logError("image-task", error, { taskId: context.id });
+        await context.database.query("UPDATE user_generation_tasks SET status = 'failed', error = $2 WHERE id = $1", [context.id, message]).catch(() => undefined);
+    } finally {
+        imageTasks.delete(context.id);
+    }
 }
 
 async function readTask(request: Request, response: Response, database: Pool, options: GenerationOptions, content: boolean) {

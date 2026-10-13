@@ -3,6 +3,7 @@ import { afterEach, expect, mock, test } from "bun:test";
 mock.module("@/lib/auth-access", () => ({ bypassLocalAuth: false, canAccessLocalFeatures: (status: string) => status === "authenticated" }));
 
 import { useCatalogStore, catalogModel } from "../src/stores/use-catalog-store";
+import { useUserStore } from "../src/stores/use-user-store";
 import { defaultConfig, resolveModelForCapability } from "../src/stores/use-config-store";
 import { buildGenerationConfig } from "../src/lib/canvas/canvas-generation-helpers";
 import { requestGeneration, requestEdit, requestImageQuestion } from "../src/services/api/image";
@@ -73,9 +74,17 @@ test("loads one catalog for concurrent consumers, with no stale fallback after f
 
 test("canvas and workbench send the same server image model without local keys or host", async () => {
     useCatalogStore.setState({ models, status: "ready" });
+    useUserStore.setState({ status: "authenticated", user: { id: "user-1", email: "user@example.com" } });
     const sent: Array<{ url: string; body: Record<string, unknown>; signal?: AbortSignal | null }> = [];
+    const mediaBytes = new Uint8Array([0x68, 0x65, 0x6c, 0x6c, 0x6f]);
+    let taskSeq = 0;
     globalThis.fetch = (async (url, init) => {
-        sent.push({ url: String(url), body: JSON.parse(String(init?.body)), signal: init?.signal });
+        const path = String(url);
+        const isTaskCreate = init?.method === "POST" && path === "/api/generation-tasks";
+        sent.push({ url: path, body: isTaskCreate ? JSON.parse(String(init?.body)) : {}, signal: init?.signal });
+        if (isTaskCreate) return json({ id: `11111111-1111-4111-8111-${String(++taskSeq).padStart(12, "0")}` });
+        if (path.startsWith("/api/generation-tasks/")) return json({ status: "completed", mediaIds: [`22222222-2222-4222-8222-${String(taskSeq).padStart(12, "0")}`] });
+        if (path.startsWith("/api/media/")) return new Response(mediaBytes, { headers: { "content-type": "image/jpeg" } });
         return json({ data: [{ b64_json: "aGVsbG8=", mime_type: "image/jpeg" }] });
     }) as typeof fetch;
     const node = { id: "node", type: CanvasNodeType.Image, title: "", width: 100, height: 100, position: { x: 0, y: 0 }, metadata: { model: obsoleteConfig.imageModel } };
@@ -85,16 +94,17 @@ test("canvas and workbench send the same server image model without local keys o
     const first = await requestGeneration({ ...obsoleteConfig, count: "1" }, "workbench", { signal });
     const second = await requestGeneration({ ...canvasConfig, count: "1" }, "canvas", { signal });
     await requestEdit(canvasConfig, "edit", [{ id: "ref", name: "ref.png", type: "image/png", dataUrl: "data:image/png;base64,aGVsbG8=" }], { signal });
-    expect(sent.map(item => item.url)).toEqual(["/api/generations", "/api/generations", "/api/generations"]);
-    expect(sent.every(item => item.body.modelId === models[0].id && item.signal === signal)).toBe(true);
+    const taskCreates = sent.filter(item => item.url === "/api/generation-tasks");
+    expect(taskCreates.map(item => item.url)).toEqual(["/api/generation-tasks", "/api/generation-tasks", "/api/generation-tasks"]);
+    expect(taskCreates.every(item => item.body.modelId === models[0].id && item.signal === signal)).toBe(true);
     expect(JSON.stringify(sent)).not.toContain("old-local-key");
     expect(JSON.stringify(sent)).not.toContain("old.invalid");
     expect(first[0].id).not.toBe(second[0].id);
     expect(first[0].dataUrl).toBe("data:image/jpeg;base64,aGVsbG8=");
-    expect((sent[2].body.input as Record<string, unknown>).images).toEqual(["data:image/png;base64,aGVsbG8="]);
+    expect((taskCreates[2].body.input as Record<string, unknown>).images).toEqual(["data:image/png;base64,aGVsbG8="]);
     expect(resolveModelForCapability(obsoleteConfig, "old-text", "text")).toBe("");
     await requestGeneration({ ...obsoleteConfig, count: "1", quality: "1k", size: "1:1" }, "preset");
-    expect((sent.at(-1)?.body.input as Record<string, unknown>).size).toBe("1024x1024");
+    expect((taskCreates.at(-1)?.body.input as Record<string, unknown>).size).toBe("1024x1024");
 });
 
 test("canvas and workbench use one video create/poll path and preserve binary bytes", async () => {

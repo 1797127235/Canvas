@@ -4,9 +4,10 @@ import i18n from "@/i18n";
 import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
 import { normalizePluginImages, runModelPlugin } from "./model-plugin";
 import { bypassLocalAuth } from "@/lib/auth-access";
-import { requestServerGenerationResponse, requestServerImageGeneration } from "./generation";
+import { requestServerGenerationResponse } from "./generation";
 import { useCatalogStore, catalogModel } from "@/stores/use-catalog-store";
 import { nanoid } from "nanoid";
+import { useUserStore } from "@/stores/use-user-store";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
@@ -73,6 +74,72 @@ type GeminiPayload = {
 };
 type GeminiStreamState = { buffer: string; text: string; toolCalls: ResponseToolCall[]; error?: string };
 type RequestOptions = { signal?: AbortSignal };
+export type ImageRequestOptions = RequestOptions & { /** 任务创建后回调，用于把任务号写进节点，页面刷新后恢复。 */ onTask?: (taskId: string) => void };
+
+const IMAGE_TASK_POLL_MS = 2500;
+const IMAGE_TASK_TIMEOUT_MS = 15 * 60_000;
+
+// 账号模式图片生成走服务端异步任务：创建任务 → 轮询 → 从账号媒体取回图片。
+// onTask 在任务创建后立刻回调；页面刷新后画布可凭任务号继续轮询，不再丢失生成。
+export async function requestServerImageTaskGeneration(modelId: string, input: Record<string, unknown>, options: ImageRequestOptions = {}) {
+    const userId = useUserStore.getState().user?.id;
+    const headers = { "Content-Type": "application/json", Accept: "application/json", ...(userId ? { "X-Account-Id": userId } : {}) };
+    const create = await fetch("/api/generation-tasks", { method: "POST", signal: options.signal, credentials: "same-origin", headers, body: JSON.stringify({ capability: "image", modelId, input }) });
+    if (userId !== useUserStore.getState().user?.id) throw new DOMException("账号已切换", "AbortError");
+    if (!create.ok) throw new Error(await readImageTaskError(create));
+    const taskId = (await create.json() as { id?: string }).id;
+    if (!taskId) throw new Error("服务端没有返回任务号");
+    options.onTask?.(taskId);
+    const deadline = Date.now() + IMAGE_TASK_TIMEOUT_MS;
+    let state = await pollServerImageTask(taskId, options);
+    while (state.status === "running" && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, IMAGE_TASK_POLL_MS));
+        options.signal?.throwIfAborted();
+        state = await pollServerImageTask(taskId, options);
+    }
+    if (state.status === "failed") throw new Error(state.error || "上游生成失败");
+    if (state.status !== "completed" || !state.images?.length) throw new Error("生成超时，请重试");
+    return state.images;
+}
+
+export type ServerImageTaskState = { status: "running" } | { status: "failed"; error: string } | { status: "completed"; images: Array<{ id: string; dataUrl: string }> };
+
+async function readAccountMediaDataUrl(mediaId: string, signal?: AbortSignal) {
+    const userId = useUserStore.getState().user?.id;
+    const response = await fetch(`/api/media/${encodeURIComponent(mediaId)}`, { credentials: "same-origin", signal, headers: { Accept: "image/*", ...(userId ? { "X-Account-Id": userId } : {}) } });
+    if (userId !== useUserStore.getState().user?.id) throw new DOMException("账号已切换", "AbortError");
+    if (!response.ok) throw new Error("生成结果读取失败");
+    const buffer = new Uint8Array(await response.arrayBuffer());
+    const mimeType = response.headers.get("content-type")?.split(";")[0] || "image/png";
+    let binary = "";
+    for (let offset = 0; offset < buffer.length; offset += 0x8000) binary += String.fromCharCode(...buffer.subarray(offset, offset + 0x8000));
+    return `data:${mimeType};base64,${btoa(binary)}`;
+}
+
+// 轮询一次图片任务；completed 时把账号媒体取回并转为 dataURL。
+export async function pollServerImageTask(taskId: string, options: RequestOptions = {}): Promise<ServerImageTaskState> {
+    const userId = useUserStore.getState().user?.id;
+    const poll = await fetch(`/api/generation-tasks/${encodeURIComponent(taskId)}`, { credentials: "same-origin", signal: options.signal, headers: { Accept: "application/json", ...(userId ? { "X-Account-Id": userId } : {}) } });
+    if (userId !== useUserStore.getState().user?.id) throw new DOMException("账号已切换", "AbortError");
+    if (!poll.ok) return { status: "failed", error: await readImageTaskError(poll) };
+    const state = await poll.json() as { status?: string; mediaIds?: string[]; error?: string };
+    if (state.status === "failed") return { status: "failed", error: state.error || "上游生成失败" };
+    if (state.status !== "completed" || !state.mediaIds?.length) return { status: "running" };
+    const images = [];
+    for (const mediaId of state.mediaIds) {
+        images.push({ id: nanoid(), dataUrl: await readAccountMediaDataUrl(mediaId, options.signal) });
+    }
+    return { status: "completed", images };
+}
+
+async function readImageTaskError(response: Response) {
+    try {
+        const payload = await response.json() as { error?: { message?: string } };
+        return payload.error?.message || "服务端生成失败";
+    } catch {
+        return `服务端生成失败（HTTP ${response.status}）`;
+    }
+}
 
 const QUALITY_BASE: Record<string, number> = {
     low: 1024,
@@ -690,7 +757,7 @@ export function accountImageSize(size: string) {
     return preset && preset !== "auto" ? preset : undefined;
 }
 
-async function requestAccountImages(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
+async function requestAccountImages(config: AiConfig, prompt: string, references: ReferenceImage[], options?: ImageRequestOptions) {
     await useCatalogStore.getState().load();
     const model = catalogModel("image", config.model || config.imageModel);
     if (!model) throw new Error(useCatalogStore.getState().error || "暂无可用图片模型");
@@ -698,14 +765,14 @@ async function requestAccountImages(config: AiConfig, prompt: string, references
     const size = accountImageSize(config.size);
     const background = normalizeBackground(config.background);
     const images = await Promise.all(references.map((image) => imageToDataUrl(image, options)));
-    return requestServerImageGeneration(model.id, {
+    return requestServerImageTaskGeneration(model.id, {
         prompt, n: Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1))),
         ...(quality ? { quality } : {}), ...(size ? { size } : {}), ...(background ? { background } : {}),
         output_format: IMAGE_OUTPUT_FORMAT, ...(images.length ? { images } : {}),
-    }, options?.signal);
+    }, { signal: options?.signal, onTask: options?.onTask });
 }
 
-export async function requestGeneration(config: AiConfig, prompt: string, options?: RequestOptions) {
+export async function requestGeneration(config: AiConfig, prompt: string, options?: ImageRequestOptions) {
     if (!bypassLocalAuth) return requestAccountImages(config, prompt, [], options);
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
@@ -766,7 +833,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     }
 }
 
-export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
+export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], options?: ImageRequestOptions) {
     if (!bypassLocalAuth) return requestAccountImages(config, buildImageReferencePromptText(prompt, references), references, options);
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));

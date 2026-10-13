@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
-import { Transform, type Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
+import { Readable, Transform } from "node:stream";import { pipeline } from "node:stream/promises";
 import { dirname, resolve, sep } from "node:path";
 import { Router, type Request, type Response } from "express";
 import type { Pool } from "pg";
@@ -11,8 +10,19 @@ import { Client } from "minio";
 import { requireUser } from "./identity/auth-middleware.js";
 
 type ByteRange = { start: number; end: number };
-type MediaStore = { put(key: string, body: Transform, mimeType: string): Promise<void>; get(key: string, range?: ByteRange): Promise<Readable>; remove(key: string): Promise<void> };
-type MediaOptions = { client?: Client; bucket?: string; directory?: string };
+type MediaStore = { put(key: string, body: Readable, mimeType: string): Promise<void>; get(key: string, range?: ByteRange): Promise<Readable>; remove(key: string): Promise<void> };
+export type MediaOptions = { client?: Client; bucket?: string; directory?: string };
+
+// 供生成任务等服务端流程落盘媒体：写入与 /api/media 上传相同的存储和 user_media 表。
+export async function storeAccountMedia(database: Pool, options: MediaOptions, userId: string, bytes: Buffer, mimeType: string) {
+    const store = mediaStore(options);
+    if (!store) throw new Error("媒体存储尚未配置");
+    const id = randomUUID();
+    const objectKey = `${userId}/${id}`;
+    await store.put(objectKey, Readable.from(bytes), mimeType);
+    await database.query("INSERT INTO user_media (id, user_id, object_key, mime_type, byte_size) VALUES ($1, $2, $3, $4, $5)", [id, userId, objectKey, mimeType, bytes.length]);
+    return { id, mimeType, bytes: bytes.length };
+}
 
 export function createMediaRouter(database: Pool, options: MediaOptions) {
     const router = Router();

@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import express from "express";
 import type { Pool } from "pg";
 
 import { createApp } from "../src/app.js";
 import { createGenerationRouter } from "../src/generation.js";
+import { createMediaRouter } from "../src/media.js";
 import { encryptCredential } from "../src/credential-crypto.js";
 import { hashSid } from "../src/identity/session.js";
 import { startTestServer } from "./support/http.js";
@@ -163,4 +167,95 @@ test("unified generation validates models, multipart references, task ownership 
         await fetch(`${historyUrl}/record`, { method: "DELETE", headers: historyHeaders });
         assert.deepEqual(await (await fetch(historyUrl, { headers: { cookie: cookie(sidA) } })).json(), { logs: [] });
     } finally { await api.close(); await provider.close(); }
+});
+
+test("image generation runs as a background task, bridges url results and stores account media", async () => {
+    const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 1, 2, 3]);
+    let imageCalls = 0;
+    let lastImageRequest: { model?: string; authorization?: string } | undefined;
+    const upstream = express();
+    upstream.use(express.json());
+    upstream.use((request, response) => {
+        if (request.path === "/v1/models") return response.json({ data: [{ id: "gpt-image-2.5", capability: "image" }] });
+        if (request.path === "/v1/images/generations") {
+            imageCalls++;
+            lastImageRequest = { model: request.body.model, authorization: request.header("authorization") };
+            return response.json({ created: 1, data: [{ url: `${request.protocol}://${request.get("host")}/files/result.png` }], usage: {} });
+        }
+        if (request.path === "/files/result.png") return response.type("image/png").send(png);
+        return response.status(404).end();
+    });
+    const provider = await startTestServer(upstream);
+    const directory = await mkdtemp(join(tmpdir(), "image-task-media-"));
+    const tasks = new Map<string, { user: string; kind: string; status?: string; result?: string; error?: string; created_at: Date }>();
+    const media = new Map<string, { user: string; object_key: string; mime_type: string; byte_size: number }>();
+    const database = { query: async (sql: string, values: any[]) => {
+        if (sql.includes("FROM sessions")) {
+            const user = (values[0] as Buffer).equals(hashSid(sidA)) ? userA : userB;
+            return { rows: [{ id: user, email: `${user}@example.com`, expires_at: new Date("2099-01-01") }] };
+        }
+        if (sql.includes("FROM user_credentials")) return { rows: [{ encrypted_api_key: encryptCredential("test-key-A", secret) }] };
+        if (sql.startsWith("INSERT INTO user_generation_tasks")) {
+            // SQL 里 kind/status 是字面量 'image'/'running'，operation 是最后一个参数。
+            tasks.set(values[0], { user: values[1], kind: "image", status: "running", created_at: new Date() });
+            return { rows: [] };
+        }
+        if (sql.startsWith("SELECT kind, status, result, error, created_at")) {
+            const task = tasks.get(values[0]);
+            if (!task || task.user !== values[1]) return { rows: [] };
+            return { rows: [{ kind: task.kind, status: task.status, result: task.result ?? null, error: task.error ?? null, created_at: task.created_at }] };
+        }
+        if (sql.startsWith("UPDATE user_generation_tasks SET status = 'completed'")) {
+            const task = tasks.get(values[0]);
+            // pg 的 JSONB 列返回的是解析后的对象，测试双胞胎保持一致。
+            if (task) { task.status = "completed"; task.result = JSON.parse(values[1]); }
+            return { rows: [] };
+        }
+        if (sql.startsWith("UPDATE user_generation_tasks SET status = 'failed'")) {
+            const task = tasks.get(values[0]);
+            if (task) { task.status = "failed"; task.error = values[1]; }
+            return { rows: [] };
+        }
+        if (sql.startsWith("INSERT INTO user_media")) {
+            media.set(values[0], { user: values[1], object_key: values[2], mime_type: values[3], byte_size: values[4] });
+            return { rows: [] };
+        }
+        if (sql.startsWith("SELECT object_key, mime_type, byte_size FROM user_media")) {
+            const file = media.get(values[0]);
+            if (!file || file.user !== values[1]) return { rows: [] };
+            return { rows: [{ object_key: file.object_key, mime_type: file.mime_type, byte_size: String(file.byte_size) }] };
+        }
+        console.log("SQL:", sql.slice(0, 70));
+        throw new Error(`Unexpected query: ${sql.slice(0, 60)}`);
+    } } as unknown as Pool;
+    const catalog = { models: [
+        { id: "image", name: "Image 2.5", upstreamModel: "gpt-image-2.5", adapter: "openai-images" as const, capability: "image" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
+    ] };
+    const api = await startTestServer(createApp({ appOrigin: origin, apiRouter: createMediaRouter(database, { directory }).use(createGenerationRouter(database, { catalog, encryptionKey: secret, media: { directory } })) }));
+    const headers = { origin, cookie: cookie(sidA), "content-type": "application/json" };
+    try {
+        const t0 = Date.now();
+        const create = await fetch(`${api.baseUrl}/api/generation-tasks`, { method: "POST", headers, body: JSON.stringify({ capability: "image", modelId: "image", input: { prompt: "奶龙", n: 1, size: "1024x1024" } }) });
+        assert.equal(create.status, 201);
+        const { id, status } = await create.json() as { id: string; status: string };
+        assert.equal(status, "running");
+        const others = { origin, cookie: cookie(sidB) };
+        assert.equal((await fetch(`${api.baseUrl}/api/generation-tasks/${id}`, { headers: others })).status, 404);
+        let state: { status: string; mediaIds?: string[]; error?: string } | undefined;
+        for (let index = 0; index < 40; index++) {
+            const poll = await fetch(`${api.baseUrl}/api/generation-tasks/${id}`, { headers: { origin, cookie: cookie(sidA) } });
+            state = await poll.json() as { status: string; mediaIds?: string[]; error?: string };
+
+            if (state.status !== "running") break;
+            await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        assert.equal(state?.status, "completed");
+        assert.equal(state?.mediaIds?.length, 1);
+        assert.equal(imageCalls, 1);
+        assert.equal(lastImageRequest?.model, "gpt-image-2.5");
+        assert.equal(lastImageRequest?.authorization, "Bearer test-key-A");
+        const bytes = await (await fetch(`${api.baseUrl}/api/media/${state!.mediaIds![0]}`, { headers: { origin, cookie: cookie(sidA) } })).arrayBuffer();
+        assert.deepEqual(new Uint8Array(bytes), new Uint8Array(png));
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${state!.mediaIds![0]}`, { headers: { origin, cookie: cookie(sidB) } })).status, 404);
+    } finally { await api.close(); await provider.close(); await rm(directory, { recursive: true, force: true }); }
 });

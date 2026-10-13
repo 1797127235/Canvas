@@ -140,10 +140,15 @@ export function hasResumableVideoTask(node: CanvasNodeData) {
     return node.type === CanvasNodeType.Video && Boolean(node.metadata?.videoTaskId) && !node.metadata?.content;
 }
 
+// 账号模式图片任务在服务端执行，刷新后凭任务号恢复，不当作中断。
+export function hasResumableImageTask(node: CanvasNodeData) {
+    return Boolean(node.metadata?.generationTaskId || node.metadata?.images?.some((image) => image.status === "loading" && image.taskId));
+}
+
 export function resetInterruptedGeneration(nodes: CanvasNodeData[]) {
     return nodes.map((node) =>
         node.metadata?.status === "loading"
-            ? hasResumableVideoTask(node)
+            ? hasResumableVideoTask(node) || hasResumableImageTask(node)
                 ? node
                 : {
                       ...node,
@@ -151,7 +156,7 @@ export function resetInterruptedGeneration(nodes: CanvasNodeData[]) {
                           ...node.metadata,
                           status: "error" as const,
                           errorDetails: i18n.t("canvas.generation.interrupted"),
-                          images: node.metadata.images?.map((image) => (image.status === "loading" ? { ...image, status: "error" as const, errorDetails: i18n.t("canvas.generation.interrupted") } : image)),
+                          images: node.metadata.images?.map((image) => (image.status === "loading" && !image.taskId ? { ...image, status: "error" as const, errorDetails: i18n.t("canvas.generation.interrupted") } : image)),
                           texts: node.metadata.texts?.map((text) => (text.status === "loading" ? { ...text, status: "error" as const, errorDetails: i18n.t("canvas.generation.interrupted") } : text)),
                       },
                   }
