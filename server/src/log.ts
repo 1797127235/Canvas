@@ -1,6 +1,6 @@
 import pino from "pino";
 
-type LogContext = { method?: string; path?: string };
+type LogContext = { method?: string; path?: string } & Record<string, unknown>;
 
 // 日志统一走 pino 输出 JSON 行到 stdout，由容器 json-file 轮转收集；级别可用 LOG_LEVEL 覆盖。
 let logger = pino({ level: process.env.LOG_LEVEL || "info" });
@@ -13,6 +13,12 @@ export function initLogging(destination: NodeJS.WritableStream) {
 export function logError(scope: string, error: unknown, context: LogContext = {}) {
     const detail = error instanceof Error ? { name: error.name, message: redact(error.message) } : { name: "UnknownError", message: "未知错误" };
     logger.error({ scope, ...context, ...detail }, scope);
+}
+
+// 截断并脱敏一段文本（上游响应体、错误详情等），防止密钥和超大内容进入日志。
+export function redactText(value: string, limit = 2048) {
+    const text = value.length > limit ? `${value.slice(0, limit)}…[truncated ${value.length - limit} chars]` : value;
+    return redact(text);
 }
 
 export function logRequest(fields: { method: string; path: string; status: number; durationMs: number; userId?: string; media?: boolean; reqBody?: unknown; resBody?: unknown }) {

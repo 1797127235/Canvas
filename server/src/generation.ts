@@ -9,6 +9,7 @@ import { readUserApiKey } from "./credentials.js";
 import { generationInput } from "./ai/input.js";
 import { createImages, createSpeech, createText, createTextStream, createVideo, readVideo } from "./ai/generation.js";
 import { downloadGatewayVideo } from "./ai/gateway-video.js";
+import { logError, redactText } from "./log.js";
 
 type GenerationOptions = { catalog: Catalog; encryptionKey?: string };
 const taskIdSchema = z.string().uuid();
@@ -112,8 +113,24 @@ function apiKeyRequired(response: Response) { return response.status(409).json({
 function taskNotFound(response: Response) { return response.status(404).json({ error: { code: "GENERATION_NOT_FOUND", message: "生成任务不存在" } }); }
 function generationFailure(response: Response, error: unknown, apiKey: string) {
     const unauthorized = APICallError.isInstance(error) && [401, 403].includes(error.statusCode || 0);
+    logError("generation", error, { upstream: upstreamLogDetails(error, apiKey) });
     const message = unauthorized ? "上游认证失败，请检查账号 API Key" : (error instanceof Error ? error.message : "上游生成失败，请检查模型和参数").replaceAll(apiKey, "[已隐藏]").slice(0, 300);
     const payload = { error: { code: unauthorized ? "UPSTREAM_AUTH_FAILED" : "UPSTREAM_ERROR", message } };
     if (response.headersSent) return response.end(`data: ${JSON.stringify(payload)}\n\n`);
     return response.status(502).json(payload);
+}
+
+// 把 AI SDK / 上游错误里的状态码、URL 和原始响应体记进日志，便于排查「Invalid JSON response」这类失败。
+export function upstreamLogDetails(error: unknown, apiKey: string) {
+    const source = error as { statusCode?: unknown; url?: unknown; responseBody?: unknown; text?: unknown; data?: unknown };
+    const detail: Record<string, unknown> = {};
+    if (typeof source.statusCode === "number") detail.status = source.statusCode;
+    if (typeof source.url === "string") detail.url = source.url.replaceAll(apiKey, "[已隐藏]");
+    for (const key of ["responseBody", "text", "data"] as const) {
+        const value = source[key];
+        if (value == null) continue;
+        const text = typeof value === "string" ? value : JSON.stringify(value) ?? "";
+        if (text) detail[key] = redactText(text.replaceAll(apiKey, "[已隐藏]"));
+    }
+    return Object.keys(detail).length ? detail : undefined;
 }
