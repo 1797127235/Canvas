@@ -136,8 +136,16 @@ export function nodeGenerationPrompt(node: CanvasNodeData | undefined) {
     return node?.metadata?.composerContent ?? node?.metadata?.prompt ?? "";
 }
 
-export function hasResumableVideoTask(node: CanvasNodeData) {
+// 节点上是否还挂着一个服务端视频任务号（不管当前状态）。手动「查询任务」用它。
+export function hasVideoTaskId(node: CanvasNodeData) {
     return node.type === CanvasNodeType.Video && Boolean(node.metadata?.videoTaskId) && !node.metadata?.content;
+}
+
+// 刷新后能自动恢复的任务：必须是 loading。
+// 失败节点若残留任务号（例如建任务被上游拒绝），不能当可恢复任务去轮询，
+// 否则会拿着一个数据库里不存在的任务号无限轮询（节点上还显示“任务 ID”）。
+export function hasResumableVideoTask(node: CanvasNodeData) {
+    return node.metadata?.status === "loading" && hasVideoTaskId(node);
 }
 
 // 账号模式图片任务在服务端执行，刷新后凭任务号恢复，不当作中断。

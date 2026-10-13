@@ -9,6 +9,7 @@ import { pollServerImageTask, requestEdit, requestGeneration, requestImageQuesti
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
 import { createVideoGenerationTask, isVideoTaskFailed, storeGeneratedVideo, waitForVideoGenerationTask } from "@/services/api/video";
 import { defaultConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
+import { useCatalogStore } from "@/stores/use-catalog-store";
 import { ensureImagePreview, uploadImage } from "@/services/image-storage";
 import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
@@ -64,6 +65,7 @@ import {
     getGenerationCount,
     getInputSummary,
     hasResumableVideoTask,
+    hasVideoTaskId,
     hasResumableImageTask,
     hydrateAssistantImages,
     hydrateCanvasImages,
@@ -313,7 +315,15 @@ function InfiniteCanvasPage() {
             // 等响应回来才写，这几秒内刷新就会把任务当成「已中断」。
             const preTaskId = nextServerTaskId();
             if (preTaskId) setNodes((prev) => prev.map((item) => (item.id === nodeId ? { ...item, metadata: { ...item.metadata, videoTaskId: preTaskId } } : item)));
-            const task = await createVideoGenerationTask(config, prompt, images, { signal, videos, audios, taskId: preTaskId });
+            let task: Awaited<ReturnType<typeof createVideoGenerationTask>>;
+            try {
+                task = await createVideoGenerationTask(config, prompt, images, { signal, videos, audios, taskId: preTaskId });
+            } catch (error) {
+                // 建任务失败（上游拒绝、参数无效等）时服务端根本没落库，预写的号是幽灵号：
+                // 不清掉节点会一直显示一个不存在的任务 ID，还会被当成可恢复任务。
+                if (preTaskId) setNodes((prev) => prev.map((item) => (item.id === nodeId ? { ...item, metadata: { ...item.metadata, videoTaskId: undefined } } : item)));
+                throw error;
+            }
             if (task.provider !== "plugin") {
                 setNodes((prev) => prev.map((item) => (item.id === nodeId ? { ...item, metadata: { ...item.metadata, videoTaskId: task.id, videoTaskProvider: task.provider === "gemini" ? "gemini" : "openai", model: config.model } } : item)));
             }
@@ -330,6 +340,9 @@ function InfiniteCanvasPage() {
             videoPollIdsRef.current.add(node.id);
             let controller: AbortController | undefined;
             try {
+                // 刷新恢复可能早于模型目录加载完成：目录为空时 resolveModelForCapability 会返回空模型名，
+                // isAiConfigReady 随之误判，把正常在跑的任务打成「请先完成配置」。所以必须先等目录就绪。
+                if (!bypassLocalAuth) await useCatalogStore.getState().load();
                 const generationConfig = buildGenerationConfig(effectiveConfig, node, "video");
                 if (!isAiConfigReady(generationConfig, generationConfig.model)) {
                     if (silent) {
@@ -2831,7 +2844,8 @@ function InfiniteCanvasPage() {
 
     const handleRetryNode = useCallback(
         async (node: CanvasNodeData, imageId?: string) => {
-            if (hasResumableVideoTask(node)) {
+            // 手动「查询任务」：节点带任务号就查这个任务本身，不看状态（非 loading 才会出现该按钮）。
+            if (hasVideoTaskId(node)) {
                 await pollVideoNodeTask(node);
                 return;
             }

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { resetInterruptedGeneration } from "../src/lib/canvas/canvas-generation-helpers";
+import { resetInterruptedGeneration, hasResumableVideoTask, hasVideoTaskId } from "../src/lib/canvas/canvas-generation-helpers";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData } from "../src/types/canvas";
 
 const node = (id: string, type: CanvasNodeType, metadata: CanvasNodeData["metadata"] = {}): CanvasNodeData =>
@@ -53,4 +53,39 @@ test("刷新恢复：未在生成的节点不受影响", () => {
     const nodes = [node("done", CanvasNodeType.Image, { status: "success" }), node("idle", CanvasNodeType.Text, { status: "idle" })];
     const result = resetInterruptedGeneration(nodes);
     expect(result.map((item) => item.metadata?.status)).toEqual(["success", "idle"]);
+});
+
+// 视频节点建任务被上游拒绝时曾被预写进一个服务端没落库的「幽灵任务号」，
+// 且旧判定不看状态，失败节点被无限当可恢复任务轮询（显示一个不存在的任务 ID）。
+test("视频恢复：只有 loading 状态才当作可恢复任务", () => {
+    expect(hasResumableVideoTask(node("loading", CanvasNodeType.Video, { status: "loading", videoTaskId: "t" }))).toBe(true);
+    expect(hasResumableVideoTask(node("error", CanvasNodeType.Video, { status: "error", videoTaskId: "幽灵号" }))).toBe(false);
+    expect(hasResumableVideoTask(node("success", CanvasNodeType.Video, { status: "success" }))).toBe(false);
+    expect(hasResumableVideoTask(node("hasContent", CanvasNodeType.Video, { status: "loading", videoTaskId: "t", content: "v.mp4" }))).toBe(false);
+    expect(hasResumableVideoTask(node("image", CanvasNodeType.Image, { status: "loading", videoTaskId: "t" }))).toBe(false);
+});
+
+test("视频恢复：失败的视频节点不因残留任务号被判为可恢复，也不受刷新中断影响", () => {
+    const leftovers = resetInterruptedGeneration([
+        node("video-error", CanvasNodeType.Video, { status: "error", videoTaskId: "幽灵号", errorDetails: "上游视频生成失败" }),
+        node("video-running", CanvasNodeType.Video, { status: "loading", videoTaskId: "真号" }),
+    ]);
+    // error 节点既不该被交给恢复轮询，也不该被改写错误文案（它已经带着真实的上游错误）。
+    expect(hasResumableVideoTask(leftovers[0])).toBe(false);
+    expect(leftovers[0].metadata?.errorDetails).toBe("上游视频生成失败");
+    expect(hasResumableVideoTask(leftovers[1])).toBe(true);
+});
+
+// 手动「查询任务」与自动恢复是两个语义：工具栏在「有任务号且非 loading」时显示查询按钮，
+// 所以查询必须按 hasVideoTaskId 判断，否则点查询会掉进普通重试、另建一个新任务。
+test("视频查询：非 loading 但带任务号的节点可查询，但不可自动恢复", () => {
+    const failed = node("failed", CanvasNodeType.Video, { status: "error", videoTaskId: "t", errorDetails: "上游视频生成失败" });
+    expect(hasVideoTaskId(failed)).toBe(true);
+    expect(hasResumableVideoTask(failed)).toBe(false);
+    const running = node("running", CanvasNodeType.Video, { status: "loading", videoTaskId: "t" });
+    expect(hasVideoTaskId(running)).toBe(true);
+    expect(hasResumableVideoTask(running)).toBe(true);
+    // 已有内容后无论在跑与否都不再算任务。
+    expect(hasVideoTaskId(node("done", CanvasNodeType.Video, { status: "loading", videoTaskId: "t", content: "v.mp4" }))).toBe(false);
+    expect(hasVideoTaskId(node("image", CanvasNodeType.Image, { status: "error", videoTaskId: "t" }))).toBe(false);
 });
