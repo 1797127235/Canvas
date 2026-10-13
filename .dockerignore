@@ -2,10 +2,6 @@
 .idea
 docs2
 data
-docs/.next
-docs/.source
-docs/node_modules
-docs/out
 web/.next
 web/node_modules
 web/out
