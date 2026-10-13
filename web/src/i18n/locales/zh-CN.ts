@@ -184,7 +184,6 @@ export default {
         cloneSuccess: "已克隆到我的画布",
         cloneFailed: "克隆失败，请重试",
         templateMissing: "模板不存在",
-        templateLoadFailed: "模板加载失败",
         backToLibrary: "返回模板库",
     },
     assets: {

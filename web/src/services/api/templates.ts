@@ -40,18 +40,6 @@ export async function fetchWorkflowTemplates() {
     return (await response.json()) as WorkflowTemplate[];
 }
 
-// 拉取模板媒体并转成 object URL，返回 storageKey → URL，供预览页注入节点渲染；调用方负责 revoke。
-export async function loadTemplateMedia(template: WorkflowTemplate) {
-    const entries = await Promise.all(
-        template.files.map(async (file) => {
-            const response = await fetch(file.path);
-            if (!response.ok) throw new Error(`template media request failed: ${file.path}`);
-            return [file.storageKey, URL.createObjectURL(await response.blob())] as const;
-        }),
-    );
-    return new Map(entries);
-}
-
 // 克隆模板：账号模式重新上传媒体并改写引用，开发豁免模式写入 IndexedDB；返回新画布 id。
 export async function cloneWorkflowTemplate(template: WorkflowTemplate) {
     if (!canAccessLocalFeatures(useUserStore.getState().status)) throw new Error("AUTH_REQUIRED");

@@ -1,7 +1,7 @@
 import { CopyPlus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { App, Button, Modal, Spin } from "antd";
+import { App, Button, Modal } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { CanvasNode } from "@/components/canvas/canvas-node";
@@ -11,8 +11,7 @@ import { bypassLocalAuth, canAccessLocalFeatures } from "@/lib/auth-access";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
-import { registerMediaUrl } from "@/services/image-storage";
-import { cloneWorkflowTemplate, loadTemplateMedia, type WorkflowTemplate } from "@/services/api/templates";
+import { cloneWorkflowTemplate, type WorkflowTemplate } from "@/services/api/templates";
 import { CanvasNodeType, type CanvasNodeData, type ViewportTransform } from "@/types/canvas";
 
 const noop = () => undefined;
@@ -22,48 +21,12 @@ export function WorkflowPreviewModal({ template, onClose }: { template: Workflow
     const { message } = App.useApp();
     const { t } = useTranslation();
     const containerRef = useRef<HTMLDivElement | null>(null);
-    const [media, setMedia] = useState<Map<string, string>>(new Map());
     const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, k: 1 });
     const [cloning, setCloning] = useState(false);
     const userStatus = useUserStore((state) => state.status);
 
-    useEffect(() => {
-        if (!template) return;
-        let cancelled = false;
-        let urls: string[] = [];
-        void loadTemplateMedia(template)
-            .then((map) => {
-                if (cancelled) {
-                    map.forEach((url) => URL.revokeObjectURL(url));
-                    return;
-                }
-                urls = [...map.values()];
-                map.forEach((url, key) => {
-                    if (key.startsWith("image:")) registerMediaUrl(key, url);
-                });
-                setMedia(map);
-            })
-            .catch(() => {
-                if (!cancelled) message.error(t("prompts.templateLoadFailed"));
-            });
-        return () => {
-            cancelled = true;
-            urls.forEach((url) => URL.revokeObjectURL(url));
-        };
-    }, [template, message, t]);
-
-    // 预览展示用的节点副本：视频/音频的播放地址换成模板媒体 object URL（图片走 registerMediaUrl 注册表）。
-    const displayNodes = useMemo(() => {
-        if (!template) return [];
-        if (!media.size) return template.project.nodes;
-        return template.project.nodes.map((node) => {
-            const key = node.metadata?.storageKey;
-            if ((node.type === CanvasNodeType.Video || node.type === CanvasNodeType.Audio) && key && media.has(key)) {
-                return { ...node, metadata: { ...node.metadata, content: media.get(key) } };
-            }
-            return node;
-        });
-    }, [template, media]);
+    // 节点 metadata.content 已是 /templates 静态地址，浏览器直接加载；原始文件只在克隆时下载。
+    const displayNodes = useMemo(() => template?.project.nodes ?? [], [template]);
 
     const nodeById = useMemo(() => new Map(displayNodes.map((node) => [node.id, node])), [displayNodes]);
 
@@ -136,11 +99,6 @@ export function WorkflowPreviewModal({ template, onClose }: { template: Workflow
             }
         >
             <div ref={containerRef} className="relative h-full w-full overflow-hidden">
-                {!media.size ? (
-                    <div className="absolute inset-0 z-10 grid place-items-center">
-                        <Spin />
-                    </div>
-                ) : null}
                 {template ? (
                     <InfiniteCanvas containerRef={containerRef} viewport={viewport} tool="pan" backgroundMode={template.project.backgroundMode || "lines"} onViewportChange={setViewport}>
                         <svg className="absolute left-0 top-0 h-[10000px] w-[10000px] overflow-visible" style={{ pointerEvents: "none", transform: "translateZ(0)", zIndex: 0 }}>
