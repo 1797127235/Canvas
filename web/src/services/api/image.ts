@@ -678,7 +678,10 @@ function accountImageSize(quality: string, size: string) {
     const value = size.trim();
     if (!value || value.toLowerCase() === "auto") return undefined;
     const ratio = inferMediaRatio(value, "");
-    const preset = ratio ? computeMediaSize(inferMediaScale(value, quality), ratio) : "";
+    if (!ratio || ratio === "auto") return undefined;
+    // 质量为自动时按既有约定落到 1K 档，保证发给服务端的一定是 "宽x高" 像素尺寸。
+    const scale = inferMediaScale(value, quality);
+    const preset = computeMediaSize(scale === "auto" ? "1k" : scale, ratio);
     return preset && preset !== "auto" ? preset : undefined;
 }
 
