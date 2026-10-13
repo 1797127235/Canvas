@@ -46,7 +46,7 @@ export const NODE_SPECS = {
     },
 } satisfies Record<CanvasNodeType, CanvasNodeSpec>;
 
-// Return built-in specs directly and resolve plugin types from the registry.
+// Return built-in specs directly and resolve registered static node types from the registry.
 export function getNodeSpec(type: string) {
     if ((Object.values(CanvasNodeType) as string[]).includes(type)) return NODE_SPECS[type as CanvasNodeType];
     const spec = getRegistryNodeSpec(type);

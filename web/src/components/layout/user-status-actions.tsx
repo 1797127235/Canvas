@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { DoorOpen, Keyboard, LogOut, Puzzle, Settings2, UserRoundPlus } from "lucide-react";
+import { DoorOpen, Keyboard, LogOut, Settings2, UserRoundPlus } from "lucide-react";
 import { App, Button, Tooltip } from "antd";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -15,10 +15,9 @@ import { useUserStore } from "@/stores/use-user-store";
 type UserStatusActionsProps = {
     variant?: "default" | "canvas";
     onOpenShortcuts?: () => void;
-    onOpenPlugins?: () => void;
 };
 
-export function UserStatusActions({ variant = "default", onOpenShortcuts, onOpenPlugins }: UserStatusActionsProps) {
+export function UserStatusActions({ variant = "default", onOpenShortcuts }: UserStatusActionsProps) {
     const { t } = useTranslation();
     const { message } = App.useApp();
     const [loggingOut, setLoggingOut] = useState(false);
@@ -74,12 +73,6 @@ export function UserStatusActions({ variant = "default", onOpenShortcuts, onOpen
                     <Settings2 className="size-4" />
                 </Link>
             )}
-            {onOpenPlugins ? (
-                <button type="button" className={naturalIconClass} style={iconStyle} onClick={onOpenPlugins} aria-label={t("topNav.plugins")} title={t("topNav.plugins")}>
-                    <Puzzle className="size-4" />
-                </button>
-            ) : null}
-
             <AnimatedThemeToggler
                 theme={theme}
                 onThemeChange={setTheme}

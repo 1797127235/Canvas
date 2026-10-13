@@ -18,7 +18,7 @@ export enum CanvasNodeType {
     Group = "group",
 }
 
-// Node types are open strings: built-ins use CanvasNodeType and plugins use "<pluginId>:<name>".
+// Node types remain open strings so future built-in node families can be added without changing stored project data.
 export type CanvasNodeTypeId = CanvasNodeType | (string & {});
 
 export type CanvasNodeStatus = "idle" | "success" | "loading" | "error";
@@ -89,7 +89,6 @@ export type CanvasNodeMetadata = {
     /** 账号模式图片异步生成任务号，页面刷新后据此恢复。 */
     generationTaskId?: string;
     groupId?: string;
-    interactive?: boolean; // Plugin node interaction/move state; see CanvasNodeDefinition.interactionToggle.
 };
 
 export type CanvasNodeData = {
