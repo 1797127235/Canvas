@@ -28,9 +28,12 @@ const speechInput = z.strictObject({
     input: z.string().min(1), voice: z.string().min(1), response_format: z.string().optional(),
     speed: z.number().positive().optional(), instructions: z.string().optional(),
 });
+// 任务号由前端预先生成并随请求提交：节点在发起请求时就已经持有任务号，
+// 刷新后即可凭它恢复，不必等待建任务响应（上游模型发现可能耗时数秒）。
+const taskIdField = { taskId: z.string().uuid().optional() };
 export const generationInput = z.discriminatedUnion("capability", [
-    z.strictObject({ capability: z.literal("image"), modelId: z.string().min(1), input: imageInput }),
-    z.strictObject({ capability: z.literal("video"), modelId: z.string().min(1), input: videoInput }),
+    z.strictObject({ capability: z.literal("image"), ...taskIdField, modelId: z.string().min(1), input: imageInput }),
+    z.strictObject({ capability: z.literal("video"), ...taskIdField, modelId: z.string().min(1), input: videoInput }),
     z.strictObject({ capability: z.literal("text"), modelId: z.string().min(1), input: textInput }),
     z.strictObject({ capability: z.literal("audio"), modelId: z.string().min(1), input: speechInput }),
 ]);

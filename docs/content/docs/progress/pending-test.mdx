@@ -9,7 +9,9 @@ The current release needs manual verification in these areas:
 
 The current release needs manual verification in these areas:
 
-- 画布「重试」生图刷新恢复修复（本轮修复，待部署与浏览器确认）：`handleRetryNode` 的图片分支未向 `requestGeneration`/`requestEdit` 传 `onTask`，节点从未写入 `generationTaskId`（批量槽位也未写 `taskId`），于是重试后刷新页面被 `resetInterruptedGeneration` 判为中断并提示「页面刷新后生成已中断，请重新生成。」；服务端任务实际已正常完成（线上 07:22~07:23 UTC 三个图片任务均 `completed`，而工作区所有图片节点任务号均为空）。已补上 `onTask`。注意：批量生图路径将源配置节点置为 loading（project.tsx 约 2482 行）但不写任何任务号，该节点刷新后仍会被判中断；本次未改动，待确认是否需要一并处理。
+- 画布生图刷新中断根因修复（本轮修复，待部署与浏览器确认）：任务号改由前端在发请求前预生成，并与 loading 状态同批写进节点；服务端 `generationInput` 增可选 `taskId`（uuid，非法 422），INSERT 采纳该值（`ON CONFLICT (id) DO NOTHING`），查询在任务刚创建时容忍 404，后台 UPDATE 全部加 `user_id` 限定（任务号变为客户端可控，必须防跨账号写入）。原因：建任务需先做上游模型发现（`/api/models` 无缓存，`POST /api/generation-tasks` 实测中位 9563ms，而同族轮询 `GET /api/generation-tasks/:id` 中位 4ms），旧流程要等这个响应才知道任务号，窗口内刷新必被 `resetInterruptedGeneration` 判为中断；上一轮只补 `onTask` 回调并不能消除窗口。已覆盖重试、批量（逐槽位各持一号）、蒙版编辑、角度生成、内置面板与视频建任务。后端 77/77（新增断言：预生成任务号原样返回、非法任务号 422）、前端 28/28 通过。待用户确认：生成过程中刷新页面不再出现「已中断」。（遗留：`accountModels` 每次建任务都去上游拉模型列表、无缓存，建任务仍要数秒；建议加短 TTL 缓存，属会改变实际行为的边界值，确认后再改。另有约 400ms 保存防抖窗口，极早刷新会回到点击前状态。）
+
+- 画布「重试」生图刷新恢复修复（已包含在上一轮，现已被上一条根因修复取代）：`handleRetryNode` 的图片分支未向 `requestGeneration`/`requestEdit` 传 `onTask`，节点从未写入 `generationTaskId`（批量槽位也未写 `taskId`），于是重试后刷新页面被 `resetInterruptedGeneration` 判为中断并提示「页面刷新后生成已中断，请重新生成。」；服务端任务实际已正常完成（线上 07:22~07:23 UTC 三个图片任务均 `completed`，而工作区所有图片节点任务号均为空）。
 
 - 画布生图建表字段修复（本轮修复，待部署与浏览器确认）：`POST /api/generation-tasks` 建任务时仍带上 006 迁移已删除的 `upstream_id` 列，导致线上画布生图 100% 失败并提示 `column "upstream_id" of relation "user_generation_tasks" does not exist`（工作台生图与视频任务走另一条 INSERT，不受影响）。已改为只写现存列。注意：现有自动化测试用内存假库校验 SQL 分支，不连真实 PostgreSQL，因此漏过了这类列名错误；后续需要能覆盖真实建表的集成测试。服务器镜像 tag（`.env` 的 `IMAGE_TAG`）与实际代码版本无关，本问题即由 tag 名 `dc131b4` 掩盖了实际部署的 HEAD 代码。
 

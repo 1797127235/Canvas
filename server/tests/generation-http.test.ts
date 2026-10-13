@@ -234,7 +234,15 @@ test("image generation runs as a background task, bridges url results and stores
     const api = await startTestServer(createApp({ appOrigin: origin, apiRouter: createMediaRouter(database, { directory }).use(createGenerationRouter(database, { catalog, encryptionKey: secret, media: { directory } })) }));
     const headers = { origin, cookie: cookie(sidA), "content-type": "application/json" };
     try {
-        const t0 = Date.now();
+        // 前端预生成任务号：节点在发请求前就持有它，刷新后可直接按号恢复，所以服务端必须原样采纳。
+        const preTaskId = randomUUID();
+        const preCreated = await fetch(`${api.baseUrl}/api/generation-tasks`, { method: "POST", headers, body: JSON.stringify({ capability: "image", taskId: preTaskId, modelId: "image", input: { prompt: "预生成任务号", n: 1, size: "1024x1024" } }) });
+        assert.equal(preCreated.status, 201);
+        assert.equal((await preCreated.json() as { id: string }).id, preTaskId);
+        // 非法任务号必须被拒，不能让任意字符串进数据库。
+        const invalid = await fetch(`${api.baseUrl}/api/generation-tasks`, { method: "POST", headers, body: JSON.stringify({ capability: "image", taskId: "not-a-uuid", modelId: "image", input: { prompt: "奶龙", n: 1, size: "1024x1024" } }) });
+        assert.equal(invalid.status, 422);
+        const baseline = imageCalls;
         const create = await fetch(`${api.baseUrl}/api/generation-tasks`, { method: "POST", headers, body: JSON.stringify({ capability: "image", modelId: "image", input: { prompt: "奶龙", n: 1, size: "1024x1024" } }) });
         assert.equal(create.status, 201);
         const { id, status } = await create.json() as { id: string; status: string };
@@ -251,7 +259,7 @@ test("image generation runs as a background task, bridges url results and stores
         }
         assert.equal(state?.status, "completed");
         assert.equal(state?.mediaIds?.length, 1);
-        assert.equal(imageCalls, 1);
+        assert.equal(imageCalls, baseline + 1);
         assert.equal(lastImageRequest?.model, "gpt-image-2.5");
         assert.equal(lastImageRequest?.authorization, "Bearer test-key-A");
         const bytes = await (await fetch(`${api.baseUrl}/api/media/${state!.mediaIds![0]}`, { headers: { origin, cookie: cookie(sidA) } })).arrayBuffer();

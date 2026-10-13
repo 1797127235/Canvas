@@ -18,7 +18,7 @@ type VideoResponse = { id: string; status?: string; error?: { message?: string }
 type ApiVideoResponse = VideoResponse | { code?: number | string; data?: VideoResponse | null; msg?: string; message?: string; error?: { message?: string } };
 type ApiEnvelope<T> = T | { code?: number | string; data?: T | null; msg?: string; message?: string; error?: { message?: string } };
 type RequestOptions = { signal?: AbortSignal };
-type VideoMediaOptions = RequestOptions & { videos?: ReferenceVideo[]; audios?: ReferenceAudio[] };
+type VideoMediaOptions = RequestOptions & { videos?: ReferenceVideo[]; audios?: ReferenceAudio[]; taskId?: string };
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
@@ -86,7 +86,7 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
             resolution_name: normalizeVideoResolution(config.vquality), generate_audio: boolConfig(config.videoGenerateAudio, true),
             watermark: boolConfig(config.videoWatermark, false), mode: resolveVideoMode(config.videoMode, images.length), images,
             videos: await mediaData(options?.videos || [], "ref.mp4"), audios: await mediaData(options?.audios || [], "ref.mp3"),
-        }, options?.signal);
+        }, options?.signal, options?.taskId);
         const id = typeof payload.id === "string" ? payload.id : "";
         if (!id) throw new Error(apiText("noVideoTaskId"));
         return { id, provider: "openai", model: model.id };

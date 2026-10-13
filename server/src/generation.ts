@@ -50,9 +50,10 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
                 return;
             }
             const result = await createVideo(model, apiKey, generation.input, signal);
-            const id = randomUUID();
+            // 任务号由前端预生成，节点在建任务的几秒里就已持有它，刷新后可直接恢复。
+            const id = generation.taskId ?? randomUUID();
             await database.query(
-                "INSERT INTO user_generation_tasks (id, user_id, operation, base_url, model_id) VALUES ($1, $2, $3, $4, $5)",
+                "INSERT INTO user_generation_tasks (id, user_id, operation, base_url, model_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING",
                 [id, response.locals.user.id, JSON.stringify(result.operation), model.baseUrl, model.id],
             );
             return response.status(201).json({ id, status: "pending", warnings: result.warnings });
@@ -93,9 +94,9 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
             const models = await accountModels(options.catalog, apiKey);
             const model = resolveModel({ models }, parsed.data.modelId, "image");
             if (!model) return response.status(404).json({ error: { code: "MODEL_NOT_FOUND", message: "模型不可用" } });
-            const id = randomUUID();
+            const id = parsed.data.taskId ?? randomUUID();
             await database.query(
-                "INSERT INTO user_generation_tasks (id, user_id, base_url, model_id, kind, status, operation) VALUES ($1, $2, $3, $4, 'image', 'running', $5)",
+                "INSERT INTO user_generation_tasks (id, user_id, base_url, model_id, kind, status, operation) VALUES ($1, $2, $3, $4, 'image', 'running', $5) ON CONFLICT (id) DO NOTHING",
                 [id, response.locals.user.id, model.baseUrl, model.id, JSON.stringify(parsed.data.input)],
             );
             void runImageTask({ database, options, id, userId: response.locals.user.id, model, apiKey, input: parsed.data.input });
@@ -120,7 +121,7 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
         // 进程重启会丢失进行中的后台执行，超过单次生成上限即标记失败，避免客户端无限轮询。
         if (row.status === "running" && Date.now() - new Date(row.created_at).getTime() > IMAGE_TASK_STALE_MS) {
             const message = "服务重启导致生成中断，请重新生成";
-            await database.query("UPDATE user_generation_tasks SET status = 'failed', error = $2 WHERE id = $1", [parsed.data, message]);
+            await database.query("UPDATE user_generation_tasks SET status = 'failed', error = $2 WHERE id = $1 AND user_id = $3", [parsed.data, message, response.locals.user.id]);
             return response.json({ id: parsed.data, status: "failed", error: message });
         }
         return response.json({ id: parsed.data, status: "running" });
@@ -139,12 +140,13 @@ async function runImageTask(context: { database: Pool; options: GenerationOption
             const stored = await storeAccountMedia(context.database, context.options.media!, context.userId, Buffer.from(image.b64_json, "base64"), image.mime_type);
             mediaIds.push(stored.id);
         }
-        await context.database.query("UPDATE user_generation_tasks SET status = 'completed', result = $2 WHERE id = $1", [context.id, JSON.stringify({ mediaIds })]);
+        // 任务号现在可由客户端提供，所有后台写入都限定在本人行，避免跨账号覆盖。
+        await context.database.query("UPDATE user_generation_tasks SET status = 'completed', result = $2 WHERE id = $1 AND user_id = $3", [context.id, JSON.stringify({ mediaIds }), context.userId]);
 
     } catch (error) {
         const message = redactText((error instanceof Error ? error.message : "上游生成失败").replaceAll(context.apiKey, "[已隐藏]"), 300);
         logError("image-task", error, { taskId: context.id });
-        await context.database.query("UPDATE user_generation_tasks SET status = 'failed', error = $2 WHERE id = $1", [context.id, message]).catch(() => undefined);
+        await context.database.query("UPDATE user_generation_tasks SET status = 'failed', error = $2 WHERE id = $1 AND user_id = $3", [context.id, message, context.userId]).catch(() => undefined);
     } finally {
         imageTasks.delete(context.id);
     }

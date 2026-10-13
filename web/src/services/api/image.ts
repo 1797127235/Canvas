@@ -7,6 +7,7 @@ import { bypassLocalAuth } from "@/lib/auth-access";
 import { requestServerGenerationResponse } from "./generation";
 import { useCatalogStore, catalogModel } from "@/stores/use-catalog-store";
 import { nanoid } from "nanoid";
+import { randomUuid } from "@/lib/utils";
 import { useUserStore } from "@/stores/use-user-store";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
@@ -74,22 +75,27 @@ type GeminiPayload = {
 };
 type GeminiStreamState = { buffer: string; text: string; toolCalls: ResponseToolCall[]; error?: string };
 type RequestOptions = { signal?: AbortSignal };
-export type ImageRequestOptions = RequestOptions & { /** 任务创建后回调，用于把任务号写进节点，页面刷新后恢复。 */ onTask?: (taskId: string) => void };
+export type ImageRequestOptions = RequestOptions & {
+    /** 预生成的任务号，调用方会把它和 loading 状态写进节点，刷新后可直接恢复。 */
+    taskId?: string;
+    /** 任务创建后回调，用于把任务号写进节点，页面刷新后恢复。 */
+    onTask?: (taskId: string) => void;
+};
 
 const IMAGE_TASK_POLL_MS = 2500;
 const IMAGE_TASK_TIMEOUT_MS = 15 * 60_000;
 
 // 账号模式图片生成走服务端异步任务：创建任务 → 轮询 → 从账号媒体取回图片。
-// onTask 在任务创建后立刻回调；页面刷新后画布可凭任务号继续轮询，不再丢失生成。
+// 任务号在这里先生成并立刻交给调用方写进节点，然后才发请求：建任务要等上游模型发现，
+// 可能耗时数秒，若等响应回来才有号，这几秒内刷新就会把任务当成「已中断」。
 export async function requestServerImageTaskGeneration(modelId: string, input: Record<string, unknown>, options: ImageRequestOptions = {}) {
     const userId = useUserStore.getState().user?.id;
     const headers = { "Content-Type": "application/json", Accept: "application/json", ...(userId ? { "X-Account-Id": userId } : {}) };
-    const create = await fetch("/api/generation-tasks", { method: "POST", signal: options.signal, credentials: "same-origin", headers, body: JSON.stringify({ capability: "image", modelId, input }) });
+    const taskId = options.taskId ?? randomUuid();
+    options.onTask?.(taskId);
+    const create = await fetch("/api/generation-tasks", { method: "POST", signal: options.signal, credentials: "same-origin", headers, body: JSON.stringify({ capability: "image", taskId, modelId, input }) });
     if (userId !== useUserStore.getState().user?.id) throw new DOMException("账号已切换", "AbortError");
     if (!create.ok) throw new Error(await readImageTaskError(create));
-    const taskId = (await create.json() as { id?: string }).id;
-    if (!taskId) throw new Error("服务端没有返回任务号");
-    options.onTask?.(taskId);
     const deadline = Date.now() + IMAGE_TASK_TIMEOUT_MS;
     let state = await pollServerImageTask(taskId, options);
     while (state.status === "running" && Date.now() < deadline) {
@@ -121,6 +127,9 @@ export async function pollServerImageTask(taskId: string, options: RequestOption
     const userId = useUserStore.getState().user?.id;
     const poll = await fetch(`/api/generation-tasks/${encodeURIComponent(taskId)}`, { credentials: "same-origin", signal: options.signal, headers: { Accept: "application/json", ...(userId ? { "X-Account-Id": userId } : {}) } });
     if (userId !== useUserStore.getState().user?.id) throw new DOMException("账号已切换", "AbortError");
+    // 建任务要在上游模型发现之后才写库，接着轮询可能短暂 404；当作「还在跑」继续等，
+    // 否则刷新恢复会把自己的任务误判成失败。
+    if (poll.status === 404) return { status: "running" };
     if (!poll.ok) return { status: "failed", error: await readImageTaskError(poll) };
     const state = await poll.json() as { status?: string; mediaIds?: string[]; error?: string };
     if (state.status === "failed") return { status: "failed", error: state.error || "上游生成失败" };
@@ -769,7 +778,7 @@ async function requestAccountImages(config: AiConfig, prompt: string, references
         prompt, n: Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1))),
         ...(quality ? { quality } : {}), ...(size ? { size } : {}), ...(background ? { background } : {}),
         output_format: IMAGE_OUTPUT_FORMAT, ...(images.length ? { images } : {}),
-    }, { signal: options?.signal, onTask: options?.onTask });
+    }, { signal: options?.signal, taskId: options?.taskId, onTask: options?.onTask });
 }
 
 export async function requestGeneration(config: AiConfig, prompt: string, options?: ImageRequestOptions) {
