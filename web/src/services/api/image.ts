@@ -674,14 +674,19 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
     return images;
 }
 
-function accountImageSize(quality: string, size: string) {
+// 账号模式的 size 请求值：面板写入的像素尺寸（手动 W/H 或分辨率档位表格）原样发送，
+// 只有「分辨率=自动 + 具体比例」留下的比例字符串按 1K 档换算；超限尺寸直接报错，不做静默改写。
+export function accountImageSize(size: string) {
     const value = size.trim();
     if (!value || value.toLowerCase() === "auto") return undefined;
+    const dimensions = parseImageDimensions(value);
+    if (dimensions) {
+        validateImageSize(dimensions.width, dimensions.height);
+        return `${dimensions.width}x${dimensions.height}`;
+    }
     const ratio = inferMediaRatio(value, "");
     if (!ratio || ratio === "auto") return undefined;
-    // 质量为自动时按既有约定落到 1K 档，保证发给服务端的一定是 "宽x高" 像素尺寸。
-    const scale = inferMediaScale(value, quality);
-    const preset = computeMediaSize(scale === "auto" ? "1k" : scale, ratio);
+    const preset = computeMediaSize("1k", ratio);
     return preset && preset !== "auto" ? preset : undefined;
 }
 
@@ -690,7 +695,7 @@ async function requestAccountImages(config: AiConfig, prompt: string, references
     const model = catalogModel("image", config.model || config.imageModel);
     if (!model) throw new Error(useCatalogStore.getState().error || "暂无可用图片模型");
     const quality = normalizeQuality(config.quality);
-    const size = accountImageSize(config.quality, config.size);
+    const size = accountImageSize(config.size);
     const background = normalizeBackground(config.background);
     const images = await Promise.all(references.map((image) => imageToDataUrl(image, options)));
     return requestServerImageGeneration(model.id, {
