@@ -50,6 +50,7 @@ description: 生产服务器地址、发布流程与注意事项
 
 ## 注意事项
 
+- **`APP_ORIGIN` 必须和浏览器实际访问的来源一致**（协议 + 域名 + 端口，只支持一个值）。换域名或端口访问时，同步改服务器 `.env` 里的 `APP_ORIGIN` 并 `docker compose up -d` 重建 api，否则所有写操作（登录、保存、生成）都会被同源校验以 403「请求来源不受信任」拒绝；读操作和页面不受影响。
 - **catalog.json 是 api 容器的挂载文件**：常规发布不打进部署包，以服务器上的版本为准。但如果代码改了目录格式要求（例如 AI SDK 适配层要求 `gateway-videos` / `xai-videos` 等 adapter 字段），必须把仓库的 `server/config/catalog.json` 单独 `scp -O` 过去再重启 api，否则 api 启动报 `Invalid catalog configuration` 并崩溃循环。api 起不来先查容器日志里的这个报错。
 - `.env`（`WEB_PORT=3015`、`POSTGRES_PASSWORD`、`CREDENTIALS_ENCRYPTION_KEY`、`RATE_LIMIT_SECRET`、`IMAGE_TAG` 等）只存在于服务器，不在 git 里，打包天然不会覆盖；也不要把它的内容写进仓库。
 - 镜像 tag 取 `.env` 的 `IMAGE_TAG`（当前固定为 `dc131b4`），只是标签，与实际代码版本无关，不要用镜像 tag 判断线上版本。
