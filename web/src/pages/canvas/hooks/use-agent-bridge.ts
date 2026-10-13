@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type Dispatch, type MutableR
 
 import i18n from "@/i18n";
 import { useAgentStore } from "@/stores/use-agent-store";
-import { applyCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "@/lib/canvas/canvas-agent-ops";
+import { applyCanvasOps, type CanvasOp, type CanvasOpsSnapshot } from "@/lib/canvas/canvas-ops";
 import type { CanvasNodeGenerationMode } from "@/components/canvas/canvas-node-prompt-panel";
 import type { CanvasConnection, CanvasNodeData, ContextMenuState, ViewportTransform } from "@/types/canvas";
 
@@ -36,16 +36,16 @@ export function useAgentBridge(params: AgentBridgeParams) {
     const { projectId, title, nodes, connections, selectedNodeIds, viewport, nodesRef, connectionsRef, selectedNodeIdsRef, viewportRef, generateNodeRef, setNodes, setConnections, setSelectedNodeIds, setSelectedConnectionId, setViewport, setContextMenu } =
         params;
     const setAgentCanvasContext = useAgentStore((state) => state.setCanvasContext);
-    const [agentUndoSnapshot, setAgentUndoSnapshot] = useState<CanvasAgentSnapshot | null>(null);
+    const [agentUndoSnapshot, setAgentUndoSnapshot] = useState<CanvasOpsSnapshot | null>(null);
     const projectTitle = title || i18n.t("canvas.project.untitled");
 
-    const agentSnapshot = useMemo<CanvasAgentSnapshot>(() => ({ projectId, title: projectTitle, nodes, connections, selectedNodeIds: Array.from(selectedNodeIds), viewport }), [connections, projectTitle, nodes, projectId, selectedNodeIds, viewport]);
+    const agentSnapshot = useMemo<CanvasOpsSnapshot>(() => ({ projectId, title: projectTitle, nodes, connections, selectedNodeIds: Array.from(selectedNodeIds), viewport }), [connections, projectTitle, nodes, projectId, selectedNodeIds, viewport]);
     const applyAgentOps = useCallback(
-        (ops?: CanvasAgentOp[]) => {
+        (ops?: CanvasOp[]) => {
             const safeOps = Array.isArray(ops) ? ops.filter((op) => op?.type) : [];
             const before = { projectId, title: projectTitle, nodes: nodesRef.current, connections: connectionsRef.current, selectedNodeIds: Array.from(selectedNodeIdsRef.current), viewport: viewportRef.current };
-            const generationOps = safeOps.filter((op): op is Extract<CanvasAgentOp, { type: "run_generation" }> => op.type === "run_generation" && Boolean(op.nodeId));
-            const next = applyCanvasAgentOps(
+            const generationOps = safeOps.filter((op): op is Extract<CanvasOp, { type: "run_generation" }> => op.type === "run_generation" && Boolean(op.nodeId));
+            const next = applyCanvasOps(
                 before,
                 safeOps.filter((op) => op.type !== "run_generation"),
             );

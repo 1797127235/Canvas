@@ -1,4 +1,4 @@
-import type { AgentCanvasReference, AgentSkillReference } from "@/stores/use-agent-store";
+import type { AgentCanvasReference } from "@/stores/use-agent-store";
 
 export const agentInlineTokenClass = "mx-0.5 inline-block h-7 whitespace-nowrap rounded-md border px-1.5 align-baseline text-sm leading-[26px]";
 export const agentInlineTokenMediaClass = "mr-1 inline-block size-5 rounded object-cover align-middle";
@@ -6,22 +6,16 @@ export const agentInlineTokenIconClass = "mr-1 inline-block size-4 align-middle 
 
 export type AgentInlineToken =
     | { type: "text"; value: string }
-    | { type: "skill"; skill: AgentSkillReference }
     | { type: "reference"; reference: AgentCanvasReference };
-
-export function agentSkillMarker(skill: Pick<AgentSkillReference, "name">) {
-    return `$${skill.name}`;
-}
 
 export function agentReferenceMarker(reference: Pick<AgentCanvasReference, "label">) {
     return `@${reference.label}`;
 }
 
-export function parseAgentInlineTokens(text: string, references: AgentCanvasReference[], skill?: AgentSkillReference): AgentInlineToken[] {
-    const markers = [
-        ...(skill ? [{ marker: agentSkillMarker(skill), token: { type: "skill", skill } as AgentInlineToken }] : []),
-        ...references.map((reference) => ({ marker: agentReferenceMarker(reference), token: { type: "reference", reference } as AgentInlineToken })),
-    ].sort((a, b) => b.marker.length - a.marker.length);
+export function parseAgentInlineTokens(text: string, references: AgentCanvasReference[]): AgentInlineToken[] {
+    const markers = references
+        .map((reference) => ({ marker: agentReferenceMarker(reference), token: { type: "reference", reference } as AgentInlineToken }))
+        .sort((a, b) => b.marker.length - a.marker.length);
     if (!markers.length) return [{ type: "text", value: text }];
 
     const tokens: AgentInlineToken[] = [];

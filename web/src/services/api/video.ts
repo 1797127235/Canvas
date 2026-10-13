@@ -101,10 +101,12 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
 
 export async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     if (!bypassLocalAuth) {
-        const payload = unwrapVideoResponse(await pollServerGeneration(task.id, options?.signal) as ApiVideoResponse);
-        if (["failed", "cancelled"].includes(payload.status || "")) return { status: "failed", error: payload.error?.message || apiText("videoGenerationFailed") };
-        // 上游完成态可能是 completed、done 或 succeeded，统一视为完成并经服务端代理下载。
-        if (["completed", "done", "succeeded"].includes(payload.status || "") || videoResultUrl(payload)) return { status: "completed", result: { blob: await fetchServerGenerationContent(task.id, options?.signal) } };
+        const payload = await pollServerGeneration(task.id, options?.signal);
+        if (payload.status === "failed") {
+            const error = payload.error as { message?: string } | undefined;
+            return { status: "failed", error: error?.message || apiText("videoGenerationFailed") };
+        }
+        if (payload.status === "completed") return { status: "completed", result: { blob: await fetchServerGenerationContent(task.id, options?.signal) } };
         return { status: "pending" };
     }
     if (task.provider === "plugin") {

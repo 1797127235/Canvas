@@ -1,0 +1,40 @@
+{
+    "models": [
+        {
+            "id": "grok-imagine-image-2.0",
+            "name": "Grok Imagine Image 2.0",
+            "upstreamModel": "grok-imagine-image-2.0",
+            "adapter": "xai-images",
+            "capability": "image",
+            "enabled": true,
+            "baseUrl": "https://www.codex2api.com/v1"
+        },
+        {
+            "id": "grok-imagine-video-1.5",
+            "name": "Grok Imagine Video 1.5",
+            "upstreamModel": "grok-imagine-video-1.5",
+            "adapter": "xai-videos",
+            "capability": "video",
+            "enabled": true,
+            "baseUrl": "https://www.codex2api.com/v1"
+        },
+        {
+            "id": "MiniMax-H3",
+            "name": "MiniMax H3",
+            "upstreamModel": "MiniMax-H3",
+            "adapter": "gateway-videos",
+            "capability": "video",
+            "enabled": true,
+            "baseUrl": "https://www.codex2api.com/v1"
+        },
+        {
+            "id": "MiniMax-H3-Max",
+            "name": "MiniMax H3 Max",
+            "upstreamModel": "MiniMax-H3-Max",
+            "adapter": "gateway-videos",
+            "capability": "video",
+            "enabled": false,
+            "baseUrl": "https://www.codex2api.com/v1"
+        }
+    ]
+}

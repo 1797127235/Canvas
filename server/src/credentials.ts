@@ -7,6 +7,8 @@ import { encryptCredential, decryptCredential } from "./credential-crypto.js";
 
 export { encryptCredential, decryptCredential };
 
+// 服务端内部取账号明文 Key 的入口：目录查询和生成链路用它调用上游。
+// 未配置加密密钥或该账号没存 Key 时返回 null，由调用方决定报错，不在这一层抛异常。
 export async function readUserApiKey(database: Pool, userId: string, encryptionKey?: string) {
     if (!encryptionKey) return null;
     const result = await database.query<{ encrypted_api_key: Buffer }>("SELECT encrypted_api_key FROM user_credentials WHERE user_id = $1", [userId]);
@@ -14,6 +16,7 @@ export async function readUserApiKey(database: Pool, userId: string, encryptionK
     return encrypted ? decryptCredential(encrypted, encryptionKey) : null;
 }
 
+// 上限 4096 只挡明显异常的超长输入，Key 的真实长度由上游决定。
 const inputSchema = z.object({ apiKey: z.string().min(1).max(4096) });
 type CredentialOptions = { encryptionKey?: string };
 
@@ -26,6 +29,7 @@ export function createCredentialRouter(database: Pool, options: CredentialOption
     return router;
 }
 
+// 只回掩码，明文 Key 不离开服务端。
 async function getCredential(_request: Request, response: Response, database: Pool, options: CredentialOptions) {
     if (!options.encryptionKey) return response.status(503).json({ error: { code: "CREDENTIALS_NOT_CONFIGURED", message: "账号配置尚未启用" } });
     const result = await database.query<{ encrypted_api_key: Buffer }>("SELECT encrypted_api_key FROM user_credentials WHERE user_id = $1", [response.locals.user.id]);
@@ -37,6 +41,7 @@ async function putCredential(request: Request, response: Response, database: Poo
     if (!options.encryptionKey) return response.status(503).json({ error: { code: "CREDENTIALS_NOT_CONFIGURED", message: "账号配置尚未启用" } });
     const parsed = inputSchema.safeParse(request.body);
     if (!parsed.success) return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "API Key 格式无效" } });
+    // 每个账号只有一把 Key，重复保存直接覆盖；清除后旧 Key 立即失效。
     const encrypted = encryptCredential(parsed.data.apiKey, options.encryptionKey);
     await database.query(
         `INSERT INTO user_credentials (user_id, encrypted_api_key) VALUES ($1, $2)
@@ -51,6 +56,7 @@ async function deleteCredential(_request: Request, response: Response, database:
     return response.status(204).end();
 }
 
+// 掩码用于前端回显「已配置」：保留前后各 4 位便于辨认，中间位数封顶避免暴露真实长度。
 function maskApiKey(value: string) {
     return value.length <= 8 ? "••••••••" : `${value.slice(0, 4)}${"•".repeat(Math.min(12, value.length - 8))}${value.slice(-4)}`;
 }

@@ -6,7 +6,7 @@ Infinite Canvas 画布节点插件的 **TypeScript SDK**。插件作者只写节
 
 | 能力 | 说明 |
 | --- | --- |
-| **完整类型** | `CanvasPlugin` / `CanvasNodeDefinition` / `CanvasNodeContext` / `CanvasAgentOp` / `CanvasTheme` / `CanvasNodeData` … 全部有提示 |
+| **完整类型** | `CanvasPlugin` / `CanvasNodeDefinition` / `CanvasNodeContext` / `CanvasOp` / `CanvasTheme` / `CanvasNodeData` … 全部有提示 |
 | `definePlugin(...)` | 给插件对象(或工厂)补全类型;对象形式无需再 `const { React } = runtime` |
 | automatic JSX | `jsxImportSource` 指向本包,TSX 自动转发到宿主 React,**不打包第二份 React** |
 | 类型化 hooks | `import { useState, useEffect, useMemo, useRef, ... }`,运行时转发宿主 React |

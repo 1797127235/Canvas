@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { App, Button } from "antd";
 import { Download, FileUp, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -12,15 +12,12 @@ import type { CanvasExportFile } from "@/types/canvas-export";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useCanvasUiStore } from "@/stores/canvas/use-canvas-ui-store";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
-import { hasAgentUrlBootstrap } from "@/lib/agent/agent-url-bootstrap";
 
 export default function CanvasPage() {
     const { message } = App.useApp();
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
     const inputRef = useRef<HTMLInputElement>(null);
-    const autoOpenRef = useRef(false);
     const hydrated = useCanvasStore((state) => state.hydrated);
     const projects = useCanvasStore((state) => state.projects);
     const createProject = useCanvasStore((state) => state.createProject);
@@ -28,12 +25,8 @@ export default function CanvasPage() {
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const setDeleteIds = useCanvasUiStore((state) => state.setDeleteProjectIds);
 
-    const mode = searchParams.get("mode");
-    const agentMode = mode === "new" || mode === "recent" || mode === "choose";
-    const agentQuery = agentMode ? `?${searchParams.toString()}` : "";
     const enterProject = (id: string) => {
-        const agentHash = hasAgentUrlBootstrap(window.location.hash) ? window.location.hash : "";
-        navigate(`/canvas/${id}${agentQuery}${agentHash}`, { replace: Boolean(agentHash) });
+        navigate(`/canvas/${id}`);
     };
     const createAndEnter = () => enterProject(createProject(t("canvas.defaultTitle", { count: projects.length + 1 })));
     const importCanvas = async (file?: File) => {
@@ -52,14 +45,6 @@ export default function CanvasPage() {
             if (inputRef.current) inputRef.current.value = "";
         }
     };
-
-    useEffect(() => {
-        if (!hydrated || autoOpenRef.current || (mode !== "new" && mode !== "recent")) return;
-        autoOpenRef.current = true;
-        enterProject(mode === "new" ? createProject(t("canvas.defaultTitle", { count: projects.length + 1 })) : projects[0]?.id || createProject(t("canvas.defaultTitle", { count: projects.length + 1 })));
-    }, [createProject, hydrated, mode, projects, t]);
-
-    if (hydrated && (mode === "new" || mode === "recent")) return <main className="flex h-full items-center justify-center bg-background text-sm text-stone-500">{t("canvas.opening")}</main>;
 
     return (
         <main className="h-full overflow-auto bg-background text-stone-950 dark:text-stone-100">

@@ -1,14 +1,13 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { App, Button, Image, Modal, Popover } from "antd";
-import { Brain, CheckCircle2, ChevronDown, ChevronRight, Circle, CircleAlert, Copy, ExternalLink, FilePenLine, FileText, FolderOpen, ListChecks, LoaderCircle, Search, ShieldAlert, TerminalSquare, Wrench, XCircle } from "lucide-react";
+import { Button, Image, Modal, Popover } from "antd";
+import { Brain, CheckCircle2, ChevronDown, ChevronRight, Circle, CircleAlert, Copy, ExternalLink, FilePenLine, FileText, ListChecks, LoaderCircle, Search, ShieldAlert, TerminalSquare, Wrench, XCircle } from "lucide-react";
 import { Streamdown, type LinkSafetyModalProps } from "streamdown";
 import { useTranslation } from "react-i18next";
 
 import i18n from "@/i18n";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { canvasThemes } from "@/lib/canvas-theme";
-import { useAgentStore, type AgentCanvasReference, type AgentPendingApproval, type AgentSkillReference } from "@/stores/use-agent-store";
-import { resolveAgentMessageAssetUrl, revealAgentLocalFile } from "@/services/api/canvas-agent";
+import { useAgentStore, type AgentCanvasReference, type AgentPendingApproval } from "@/stores/use-agent-store";
 import { AgentCanvasReferencePreview, canvasReferenceIcon, canvasReferenceKindLabel } from "./agent-canvas-reference-preview";
 import { agentInlineTokenClass, agentInlineTokenIconClass, agentInlineTokenMediaClass, agentReferenceMarker, parseAgentInlineTokens } from "./agent-chat-inline-tokens";
 
@@ -25,66 +24,23 @@ const streamdownAnimation = { duration: 20, stagger: 0, sep: "word" } as const;
 
 function AgentLinkModal({ isOpen, onClose, onConfirm, url }: LinkSafetyModalProps) {
     const { t } = useTranslation();
-    const { message } = App.useApp();
     const copyText = useCopyText();
-    const localPath = localFilePath(url);
-    const [opening, setOpening] = useState(false);
-    const open = async () => {
-        if (!localPath) return onConfirm();
-        const { url: endpoint, token } = useAgentStore.getState();
-        setOpening(true);
-        try {
-            await revealAgentLocalFile(endpoint, token, localPath);
-            message.success(t("agent.message.revealed"));
-            onClose();
-        } catch (error) {
-            message.error(error instanceof Error ? error.message : t("agent.message.openLocalFailed"));
-        } finally {
-            setOpening(false);
-        }
-    };
     return (
-        <Modal open={isOpen} onCancel={onClose} footer={null} centered width={420} title={t(localPath ? "agent.message.openLocal" : "agent.message.openExternal")}>
+        <Modal open={isOpen} onCancel={onClose} footer={null} centered width={420} title={t("agent.message.openExternal")}>
             <div className="text-sm text-black/55 dark:text-white/55">
-                {t(localPath ? "agent.message.localDescription" : "agent.message.externalDescription")}
+                {t("agent.message.externalDescription")}
             </div>
-            <div className="mt-4 max-h-32 overflow-auto break-all rounded-lg bg-black/[.035] px-3 py-2.5 font-mono text-xs leading-5 dark:bg-white/[.06]">{localPath || url}</div>
+            <div className="mt-4 max-h-32 overflow-auto break-all rounded-lg bg-black/[.035] px-3 py-2.5 font-mono text-xs leading-5 dark:bg-white/[.06]">{url}</div>
             <div className="mt-5 flex justify-end gap-2">
-                <Button type="text" icon={<Copy className="size-4" />} onClick={() => copyText(localPath || url, t(localPath ? "agent.message.pathCopied" : "agent.message.linkCopied"))}>
-                    {t(localPath ? "agent.message.copyPath" : "agent.message.copyLink")}
+                <Button type="text" icon={<Copy className="size-4" />} onClick={() => copyText(url, t("agent.message.linkCopied"))}>
+                    {t("agent.message.copyLink")}
                 </Button>
-                <Button type="text" loading={opening} icon={localPath ? <FolderOpen className="size-4" /> : <ExternalLink className="size-4" />} onClick={open}>
-                    {t(localPath ? "agent.message.showInFolder" : "agent.message.continueOpen")}
+                <Button type="text" icon={<ExternalLink className="size-4" />} onClick={onConfirm}>
+                    {t("agent.message.continueOpen")}
                 </Button>
             </div>
         </Modal>
     );
-}
-
-function localFilePath(value: string) {
-    let decoded = value;
-    try {
-        decoded = decodeURI(value);
-    } catch {}
-    if (decoded.startsWith("file://")) {
-        try {
-            return decodeURIComponent(new URL(decoded).pathname);
-        } catch {
-            return "";
-        }
-    }
-    if (/^[A-Za-z]:[\\/]/.test(decoded)) return decoded;
-    let pathname = decoded;
-    if (decoded.startsWith("http://") || decoded.startsWith("https://")) {
-        try {
-            const parsed = new URL(decoded);
-            if (!["localhost", "127.0.0.1"].includes(parsed.hostname)) return "";
-            pathname = parsed.pathname;
-        } catch {
-            return "";
-        }
-    }
-    return /^\/(?:Users|home|private|tmp|Volumes|var\/folders)\//.test(pathname) ? decodeURIComponent(pathname) : "";
 }
 
 export type AgentChatAttachment = { id: string; name: string; url: string };
@@ -97,7 +53,6 @@ export type AgentChatMessageItem = {
     detail?: unknown;
     attachments?: AgentChatAttachment[];
     canvasReferences?: AgentCanvasReference[];
-    skill?: AgentSkillReference;
     /** Present while the message is actively streaming; cleared on completion. */
     streamId?: string;
 };
@@ -127,7 +82,7 @@ export function AgentChatMessage({ item, theme, onRejectTool, onApproveTool }: {
                 style={{ color }}
             >
                 {isUser ? (
-                    <AgentUserMessageContent text={item.text} references={item.canvasReferences || []} skill={item.skill} theme={theme} />
+                    <AgentUserMessageContent text={item.text} references={item.canvasReferences || []} theme={theme} />
                 ) : (
                     <Streamdown {...streamdownProps()} animated={streamdownAnimation} isAnimating={!!item.streamId}>{item.text}</Streamdown>
                 )}
@@ -138,28 +93,20 @@ export function AgentChatMessage({ item, theme, onRejectTool, onApproveTool }: {
     );
 }
 
-function AgentUserMessageContent({ text, references, skill, theme }: { text: string; references: AgentCanvasReference[]; skill?: AgentSkillReference; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
-    const tokens = parseAgentInlineTokens(text, references, skill);
+function AgentUserMessageContent({ text, references, theme }: { text: string; references: AgentCanvasReference[]; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
+    const tokens = parseAgentInlineTokens(text, references);
     return (
         <div className="whitespace-pre-wrap break-words">
             {tokens.map((token, index) => token.type === "text"
                 ? token.value
-                : token.type === "skill"
-                    ? <AgentSkillMention key={`skill:${index}`} skill={token.skill} theme={theme} />
-                    : <AgentCanvasMention key={`${token.reference.nodeId}:${index}`} reference={token.reference} theme={theme} />)}
+                : <AgentCanvasMention key={`${token.reference.nodeId}:${index}`} reference={token.reference} theme={theme} />)}
         </div>
     );
 }
 
-function AgentSkillMention({ skill, theme }: { skill: AgentSkillReference; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
-    return <span className={agentInlineTokenClass} style={{ background: theme.toolbar.panel, borderColor: theme.node.stroke, color: theme.node.text }} title={skill.path}>/{skill.displayName || skill.name}</span>;
-}
-
 function AgentCanvasMention({ reference, theme }: { reference: AgentCanvasReference; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
     const node = useAgentStore((state) => state.canvasContext?.snapshot.nodes.find((item) => item.id === reference.nodeId));
-    const endpoint = useAgentStore((state) => state.url);
-    const token = useAgentStore((state) => state.token);
-    const previewUrl = resolveAgentMessageAssetUrl(endpoint, token, reference.previewUrl || node?.metadata?.content || "");
+    const previewUrl = reference.previewUrl || node?.metadata?.content || "";
     const previewText = reference.text || node?.metadata?.content || node?.metadata?.prompt;
     const Icon = canvasReferenceIcon(reference.kind);
     return (

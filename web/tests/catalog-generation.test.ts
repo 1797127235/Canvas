@@ -76,7 +76,7 @@ test("canvas and workbench send the same server image model without local keys o
     const sent: Array<{ url: string; body: Record<string, unknown>; signal?: AbortSignal | null }> = [];
     globalThis.fetch = (async (url, init) => {
         sent.push({ url: String(url), body: JSON.parse(String(init?.body)), signal: init?.signal });
-        return json({ data: [{ b64_json: "aGVsbG8=" }] });
+        return json({ data: [{ b64_json: "aGVsbG8=", mime_type: "image/jpeg" }] });
     }) as typeof fetch;
     const node = { id: "node", type: CanvasNodeType.Image, title: "", width: 100, height: 100, position: { x: 0, y: 0 }, metadata: { model: obsoleteConfig.imageModel } };
     const canvasConfig = buildGenerationConfig(obsoleteConfig, node, "image");
@@ -90,6 +90,7 @@ test("canvas and workbench send the same server image model without local keys o
     expect(JSON.stringify(sent)).not.toContain("old-local-key");
     expect(JSON.stringify(sent)).not.toContain("old.invalid");
     expect(first[0].id).not.toBe(second[0].id);
+    expect(first[0].dataUrl).toBe("data:image/jpeg;base64,aGVsbG8=");
     expect((sent[2].body.input as Record<string, unknown>).images).toEqual(["data:image/png;base64,aGVsbG8="]);
     expect(resolveModelForCapability(obsoleteConfig, "old-text", "text")).toBe("");
     await requestGeneration({ ...obsoleteConfig, count: "1", quality: "1k", size: "1:1" }, "preset");

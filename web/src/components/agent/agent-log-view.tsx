@@ -330,7 +330,6 @@ function declaredLogLevel(value: unknown): DisplayLog["level"] | "" {
 function logTitle(fallback: string, value: unknown) {
     if (fallback !== "日志" && fallback !== "Log" || !value || typeof value !== "object" || Array.isArray(value)) return fallback;
     const target = String((value as Record<string, unknown>).target || "").toLowerCase();
-    if (target.includes("skill")) return i18n.t("agent.logs.skillLoading");
     if (target.includes("plugin")) return i18n.t("agent.logs.plugin");
     if (target.includes("mcp") || target.includes("rmcp")) return "MCP";
     if (target.includes("shell")) return i18n.t("agent.logs.terminal");
@@ -415,7 +414,6 @@ function compactLogText(value: string) {
 
 function logSignature(value: string) {
     return value
-        .replace(/[a-z]:\\[^\r\n]*?skill\.md/gi, "<SKILL.md>")
         .replace(/file:\/\/\/[^\s"']+/gi, "<路径>")
         .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "<ID>");
 }

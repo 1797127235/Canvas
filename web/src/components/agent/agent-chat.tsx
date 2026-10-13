@@ -3,7 +3,7 @@ import { motion, useSpring, useTransform } from "motion/react";
 import { useTranslation } from "react-i18next";
 
 import { canvasThemes } from "@/lib/canvas-theme";
-import { summarizeCanvasAgentOps } from "@/lib/canvas/canvas-agent-ops";
+import { summarizeCanvasOps } from "@/lib/canvas/canvas-ops";
 import { useAgentStore, type AgentChatItem, type AgentPendingApproval, type AgentPendingToolCall, type AgentTokenUsage } from "@/stores/use-agent-store";
 import { AgentApprovalCard, AgentChatMessage, AgentCommandGroup, AgentPendingToolCard, AgentToolCard, AgentWorkingMessage } from "./agent-chat-message";
 import { agentMessageToChatMessage, currentPlanMessage, isPlanMessage, latestPlanMessage, toolCallDetail, toolName, workingActivity } from "./agent-event-formatters";
@@ -84,7 +84,7 @@ export function AgentChatTimeline({
                         : <AgentChatMessageRow key={entry.item.id} item={entry.item} theme={theme} />)}
                     {pendingTool ? (
                         <AgentPendingToolCard
-                            summary={summarizeCanvasAgentOps(pendingTool.input?.ops || []) || toolName(pendingTool.name)}
+                            summary={summarizeCanvasOps(pendingTool.input?.ops || []) || toolName(pendingTool.name)}
                             detail={toolCallDetail(pendingTool.name, pendingTool.input, "pending")}
                             theme={theme}
                             onReject={onRejectTool}
@@ -114,11 +114,9 @@ export function AgentTaskProgress({ theme, busy }: { theme: (typeof canvasThemes
 }
 
 const AgentChatMessageRow = memo(function AgentChatMessageRow({ item, theme }: { item: AgentChatItem; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
-    const endpoint = useAgentStore((state) => state.url);
-    const token = useAgentStore((state) => state.token);
     return (
         <div style={item.streamId ? undefined : historyMessageStyle}>
-            <AgentChatMessage item={agentMessageToChatMessage(item, endpoint, token)} theme={theme} />
+            <AgentChatMessage item={agentMessageToChatMessage(item)} theme={theme} />
         </div>
     );
 });

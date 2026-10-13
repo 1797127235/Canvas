@@ -32,14 +32,16 @@ description: Major features available in the current project
 - Support image count, aspect ratio, quality, transparent backgrounds, reasoning effort, and custom invocation scripts.
 - Support OpenAI-style video endpoints.
 
-## Canvas Agent
+## Agent panel
 
-- Connect local Codex through Canvas Agent and MCP without giving a web server direct access to browser state.
+The canvas ships an Agent side panel that talks to an Agent service over HTTP and server-sent events:
+
+- Connect to an Agent service by address and token; canvas state is pushed to the service rather than exposing browser state to an unrelated server.
 - Read the active canvas, selection, nodes, edges, generation status, and apply structured operations.
-- Use Codex from the browser side panel with streaming responses, history, approvals, permissions, diagnostics, and local Skills.
+- Stream responses, keep conversation history, and surface approvals, permissions, and diagnostics in the panel.
 - Isolate active canvases and turns across multiple browser tabs.
 
-See [Codex App Plugin](/docs/overview/codex-app-plugin) for installation and usage.
+The panel is kept in place for the multi-user backend; the Agent service it connects to is not part of this release.
 
 ## Plugin system
 

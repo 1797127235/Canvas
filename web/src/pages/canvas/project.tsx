@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Group, Video } from "lucide-react";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
@@ -162,13 +162,9 @@ function InfiniteCanvasPage() {
     const nodeRegistryVersion = useNodeRegistryVersion((state) => state.version);
     const params = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
     const projectId = params.id || "";
-    const localAgentEnabled = useAgentStore((state) => state.enabled);
-    const fragmentBootstrap = useAgentStore((state) => state.fragmentBootstrap);
     const agentPanelOpen = useAgentStore((state) => state.panelOpen);
     const toggleAgentPanel = useAgentStore((state) => state.togglePanel);
-    const openAgentPanel = useAgentStore((state) => state.openPanel);
     const containerRef = useRef<HTMLDivElement>(null);
     const imageInputRef = useRef<HTMLInputElement>(null);
     const uploadTargetRef = useRef<{ nodeId?: string; position?: Position } | null>(null);
@@ -467,11 +463,6 @@ function InfiniteCanvasPage() {
         // Resume once after the current canvas is restored, not on later config identity changes.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectLoaded]);
-
-    useEffect(() => {
-        if (!projectLoaded || !["new", "recent", "choose"].includes(searchParams.get("mode") || "")) return;
-        if (!searchParams.has("agentUrl") && !localAgentEnabled && !fragmentBootstrap) openAgentPanel();
-    }, [fragmentBootstrap, localAgentEnabled, openAgentPanel, projectLoaded, searchParams]);
 
     useEffect(() => {
         if (!projectLoaded || applyingHistoryRef.current || historyPausedRef.current) return;

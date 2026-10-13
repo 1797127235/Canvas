@@ -3,11 +3,12 @@ import { z } from "zod";
 
 export const capabilities = ["image", "video", "text", "audio"] as const;
 export type Capability = typeof capabilities[number];
-export const adapterIds = ["openai-chat", "openai-images", "openai-speech", "openai-videos"] as const;
+export const adapterIds = ["openai-chat", "openai-images", "openai-speech", "xai-images", "xai-videos", "gateway-videos"] as const;
 export type AdapterId = typeof adapterIds[number];
 // Each adapter serves exactly one capability; a mismatch is a configuration error, not a runtime surprise.
 const adapterCapabilities: Record<AdapterId, Capability> = {
-    "openai-chat": "text", "openai-images": "image", "openai-speech": "audio", "openai-videos": "video",
+    "openai-chat": "text", "openai-images": "image", "openai-speech": "audio",
+    "xai-images": "image", "xai-videos": "video", "gateway-videos": "video",
 };
 const modelSchema = z.strictObject({
     id: z.string().min(1), name: z.string().min(1), upstreamModel: z.string().min(1), adapter: z.enum(adapterIds),
@@ -40,9 +41,15 @@ const upstreamModelsSchema = z.object({ data: z.array(z.object({
     id: z.string().min(1), capability: z.unknown().optional(), capabilities: z.unknown().optional(),
 })) });
 const capabilitySchema = z.enum(capabilities);
-const capabilityAdapters: Record<Capability, AdapterId> = {
-    text: "openai-chat", image: "openai-images", audio: "openai-speech", video: "openai-videos",
-};
+function adapterForModel(id: string, capability: Capability): AdapterId {
+    const value = id.toLowerCase();
+    if (capability === "image" && value.includes("grok-imagine")) return "xai-images";
+    if (capability === "video" && value.includes("grok-imagine")) return "xai-videos";
+    if (capability === "text") return "openai-chat";
+    if (capability === "image") return "openai-images";
+    if (capability === "audio") return "openai-speech";
+    return "gateway-videos";
+}
 
 function guessCapability(name: string): Capability {
     const value = name.toLowerCase();
@@ -68,7 +75,7 @@ export async function accountModels(catalog: Catalog, apiKey: string): Promise<C
             const capability = override?.capability || (metadata.success ? metadata.data : metadataList.success ? metadataList.data[0] : guessCapability(model.id));
             return {
                 id: override?.id || model.id, name: override?.name || model.id, upstreamModel: model.id,
-                capability, adapter: override?.adapter || capabilityAdapters[capability], enabled: override?.enabled ?? true, baseUrl,
+                capability, adapter: override?.adapter || adapterForModel(model.id, capability), enabled: override?.enabled ?? true, baseUrl,
             };
         });
     } catch {

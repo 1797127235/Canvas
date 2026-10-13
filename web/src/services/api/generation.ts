@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { useUserStore } from "@/stores/use-user-store";
 
 const responseSchema = z.record(z.string(), z.unknown());
-const imageResponseSchema = z.object({ data: z.array(z.object({ b64_json: z.string().optional(), url: z.string().url().optional() })) });
+const imageResponseSchema = z.object({ data: z.array(z.object({ b64_json: z.string(), mime_type: z.enum(["image/png", "image/jpeg", "image/webp"]) })) });
 
 export async function requestServerGenerationResponse(capability: "image" | "video" | "audio" | "text", modelId: string, input: Record<string, unknown>, signal?: AbortSignal) {
     const userId = useUserStore.getState().user?.id;
@@ -37,10 +37,7 @@ export async function fetchServerGenerationContent(id: string, signal?: AbortSig
 export async function requestServerImageGeneration(modelId: string, input: Record<string, unknown>, signal?: AbortSignal) {
     const payload = await requestServerGeneration("image", modelId, input, signal);
     const parsed = imageResponseSchema.parse(payload);
-    const images = parsed.data.map((item) => {
-        const dataUrl = typeof item.b64_json === "string" ? `data:image/png;base64,${item.b64_json}` : typeof item.url === "string" ? item.url : "";
-        return dataUrl ? { id: nanoid(), dataUrl } : null;
-    }).filter((value): value is { id: string; dataUrl: string } => Boolean(value));
+    const images = parsed.data.map((item) => ({ id: nanoid(), dataUrl: `data:${item.mime_type};base64,${item.b64_json}` }));
     if (!images.length) throw new Error("服务端没有返回图片");
     return images;
 }

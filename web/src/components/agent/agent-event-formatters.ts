@@ -1,9 +1,8 @@
 import { isSiteTool, SITE_TOOL_LABELS } from "@/lib/agent/agent-site-tools";
 import i18n from "@/i18n";
-import { summarizeCanvasAgentOps, type CanvasAgentOp } from "@/lib/canvas/canvas-agent-ops";
+import { summarizeCanvasOps, type CanvasOp } from "@/lib/canvas/canvas-ops";
 import type { CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { randomId } from "@/lib/utils";
-import { resolveAgentMessageAssetUrl } from "@/services/api/canvas-agent";
 import { useAgentStore, type AgentAttachment, type AgentChatItem, type AgentEventLog, type AgentMessageAttachment, type AgentTokenUsage } from "@/stores/use-agent-store";
 import type { AgentChatAttachment } from "./agent-chat-message";
 export const REASONING_PLACEHOLDER = i18n.t("agent.events.analyzing");
@@ -57,12 +56,12 @@ export type AgentUserDetail = { kind: string; status: string; rows?: Array<{ lab
 
 export type AgentLogContext = { endpoint: string; connected: boolean; enabled: boolean; activity: string; waiting: boolean; sending: boolean; messages: number; pendingTool?: string };
 
-export function agentMessageToChatMessage(item: AgentChatItem, endpoint: string, token: string) {
-    return { ...item, meta: item.role === "user" || item.role === "assistant" ? undefined : item.meta, attachments: item.attachments?.map((attachment) => agentAttachmentToChatAttachment(attachment, endpoint, token)) };
+export function agentMessageToChatMessage(item: AgentChatItem) {
+    return { ...item, meta: item.role === "user" || item.role === "assistant" ? undefined : item.meta, attachments: item.attachments?.map(agentAttachmentToChatAttachment) };
 }
 
-export function agentAttachmentToChatAttachment(item: AgentMessageAttachment, endpoint: string, token: string): AgentChatAttachment {
-    return { id: item.id, name: item.name, url: resolveAgentMessageAssetUrl(endpoint, token, item.dataUrl || item.url) };
+export function agentAttachmentToChatAttachment(item: AgentMessageAttachment): AgentChatAttachment {
+    return { id: item.id, name: item.name, url: item.dataUrl || item.url };
 }
 
 export function formatAgentEvent(event: AgentEventPayload): Omit<AgentChatItem, "id"> | null {
@@ -411,7 +410,7 @@ function toolInputRows(name: string, input: unknown) {
     if (name === "site_navigate") return [detailRow(tr("targetPage"), routeName(stringText(objectField(input, "path")) || "/"))].flatMap((row) => (row ? [row] : []));
     if (name === "prompts_search") return [detailRow(tr("searchContent"), objectField(input, "query"))].flatMap((row) => (row ? [row] : []));
     if (name === "canvas_create_text_node") return [detailRow(tr("textContent"), objectField(input, "text"))].flatMap((row) => (row ? [row] : []));
-    if (name === "canvas_apply_ops") return [detailRow(tr("operationContent"), summarizeCanvasAgentOps((objectField(input, "ops") as CanvasAgentOp[] | undefined) || []))].flatMap((row) => (row ? [row] : []));
+    if (name === "canvas_apply_ops") return [detailRow(tr("operationContent"), summarizeCanvasOps((objectField(input, "ops") as CanvasOp[] | undefined) || []))].flatMap((row) => (row ? [row] : []));
     if (name === "canvas_create_attachment_nodes") return [detailRow(tr("imageCount"), Array.isArray(objectField(input, "attachmentIds")) ? (objectField(input, "attachmentIds") as unknown[]).length : 0)].flatMap((row) => (row ? [row] : []));
     return [];
 }
@@ -618,7 +617,6 @@ function mergeLocalMessageMetadata(current: AgentChatItem, incoming: AgentChatIt
     return {
         attachments: incoming.attachments || current.attachments,
         canvasReferences: incoming.canvasReferences || current.canvasReferences,
-        skill: incoming.skill || current.skill,
     };
 }
 

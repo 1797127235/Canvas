@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 
-import type { CanvasAgentOp } from "@/lib/canvas/canvas-agent-ops";
+import type { CanvasOp } from "@/lib/canvas/canvas-ops";
 import type { CanvasTheme } from "@/lib/canvas-theme";
 import type { CanvasConnection, CanvasNodeData, CanvasNodeMetadata } from "@/types/canvas";
 import type { CanvasResourceKind } from "@/lib/canvas/canvas-resource-references";
@@ -54,7 +54,7 @@ export type CanvasNodeContext = {
     getUpstream: () => CanvasNodeData[];
     getDownstream: () => CanvasNodeData[];
     // Canvas operations using the Agent instruction set for nodes, connections, selection, viewport, and generation.
-    applyOps: (ops: CanvasAgentOp[]) => void;
+    applyOps: (ops: CanvasOp[]) => void;
     // Inter-node and inter-plugin communication.
     emit: (event: string, payload?: unknown) => void;
     on: (event: string, handler: (payload: unknown) => void) => () => void;
@@ -82,7 +82,7 @@ export type CanvasPluginHost = {
     getDownstream: (nodeId: string) => CanvasNodeData[];
     updateNode: (nodeId: string, patch: Partial<Pick<CanvasNodeData, "title" | "width" | "height">>) => void;
     updateMetadata: (nodeId: string, patch: CanvasNodeMetadata) => void;
-    applyOps: (ops: CanvasAgentOp[]) => void;
+    applyOps: (ops: CanvasOp[]) => void;
     // AI generation using the current canvas model and credential configuration.
     ai: CanvasPluginAi;
     // Opens or closes the custom panel below a specified node.

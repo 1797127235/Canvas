@@ -22,7 +22,7 @@ async function start() {
     const database = createDatabase(config);
     try {
         // 启动时验证数据库/schema 并清理过期记录；认证拒绝过期凭证不依赖清理。
-        for (const file of ["003-workspace-credentials-media.sql", "004-generation-tasks.sql", "005-generation-history.sql"]) {
+        for (const file of ["003-workspace-credentials-media.sql", "004-generation-tasks.sql", "005-generation-history.sql", "006-generation-sdk-operations.sql"]) {
             await database.pool.query(await readFile(new URL(`../sql/${file}`, import.meta.url), "utf8"));
         }
         await clearExpiredIdentityData(database.pool);

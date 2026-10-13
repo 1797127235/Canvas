@@ -12,7 +12,7 @@ import { ensurePluginsLoaded } from "@/lib/canvas/plugin-loader";
 import { canvasThemes } from "@/lib/canvas-theme";
 import type { CanvasNodeToolbarItem, CanvasPluginAi, CanvasPluginHost } from "@/types/canvas-plugin";
 import type { ReferenceImage } from "@/types/image";
-import type { CanvasAgentOp } from "@/lib/canvas/canvas-agent-ops";
+import type { CanvasOp } from "@/lib/canvas/canvas-ops";
 import type { CanvasConnection, CanvasNodeData, ViewportTransform } from "@/types/canvas";
 
 type CanvasTheme = (typeof canvasThemes)[keyof typeof canvasThemes];
@@ -27,7 +27,7 @@ type PluginHostParams = {
     viewportRef: MutableRefObject<ViewportTransform>;
     setNodes: Dispatch<SetStateAction<CanvasNodeData[]>>;
     setDialogNodeId: Dispatch<SetStateAction<string | null>>;
-    applyAgentOps: (ops?: CanvasAgentOp[]) => unknown;
+    applyAgentOps: (ops?: CanvasOp[]) => unknown;
 };
 
 /**

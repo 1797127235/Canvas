@@ -32,11 +32,11 @@ test("unified generation validates models, multipart references, task ownership 
         if (request.method === "GET") return response.json({ id: "upstream-task", status: "completed" });
         if (request.path === "/v1/videos") return response.status(201).json({ request_id: "upstream-task", status: "queued" });
         if (request.path === "/v1/audio/speech") return response.type("audio/mpeg").send(bytes);
-        if (request.path === "/v1/chat/completions") return response.type("text/event-stream").send('data: {"choices":[{"delta":{"content":"hello"}}]}\n\ndata: [DONE]\n\n');
+        if (request.path === "/v1/chat/completions") return response.type("text/event-stream").send('data: {"id":"chat","created":1,"model":"chat-model","choices":[{"index":0,"delta":{"role":"assistant","content":"hello"},"finish_reason":null}]}\n\ndata: {"id":"chat","created":1,"model":"chat-model","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
         return response.json({ data: [{ b64_json: "aGVsbG8=" }] });
     });
     const provider = await startTestServer(upstream);
-    const tasks = new Map<string, { user: string; upstream_id: string; model_id: string; base_url: string }>();
+    const tasks = new Map<string, { user: string; operation: unknown; model_id: string; base_url: string }>();
     const history = new Map<string, unknown>();
     let activeUser = userA;
     // SAFETY: this minimal Pool test double only implements the parameterized queries exercised by this router.
@@ -47,7 +47,7 @@ test("unified generation validates models, multipart references, task ownership 
         }
         if (sql.includes("FROM user_credentials")) return { rows: [{ encrypted_api_key: encryptCredential(values[0] === userA ? "test-key-A" : "test-key-B", secret) }] };
         if (sql.includes("INSERT INTO user_generation_tasks")) {
-            tasks.set(values[0], { user: values[1], upstream_id: values[2], model_id: values[4], base_url: values[3] }); return { rows: [] };
+            tasks.set(values[0], { user: values[1], operation: JSON.parse(values[2]), model_id: values[4], base_url: values[3] }); return { rows: [] };
         }
         if (sql.includes("FROM user_generation_tasks")) {
             const task = tasks.get(values[0]); return { rows: task?.user === values[1] ? [task] : [] };
@@ -62,8 +62,8 @@ test("unified generation validates models, multipart references, task ownership 
     } } as unknown as Pool;
     const catalog = { models: [
         { id: "image", name: "Image 2.5", upstreamModel: "gpt-image-2.5", adapter: "openai-images" as const, capability: "image" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
-        { id: "video", name: "Seedance", upstreamModel: "doubao-seedance-2-0-mini", adapter: "openai-videos" as const, capability: "video" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
-        { id: "video-alt", name: "Seedance Alt", upstreamModel: "doubao-seedance-2-0", adapter: "openai-videos" as const, capability: "video" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
+        { id: "video", name: "Seedance", upstreamModel: "doubao-seedance-2-0-mini", adapter: "gateway-videos" as const, capability: "video" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
+        { id: "video-alt", name: "Seedance Alt", upstreamModel: "doubao-seedance-2-0", adapter: "gateway-videos" as const, capability: "video" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
     ] };
     const api = await startTestServer(createApp({ appOrigin: origin, apiRouter: createGenerationRouter(database, { catalog, encryptionKey: secret }) }));
     const post = (body: unknown) => fetch(`${api.baseUrl}/api/generations`, { method: "POST", headers: { origin, cookie: cookie(sidA), "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -113,8 +113,8 @@ test("unified generation validates models, multipart references, task ownership 
         const alt = await post({ capability: "video", modelId: "video-alt", input: { prompt: "video" } });
         assert.equal(alt.status, 201);
         const { id: altId } = await alt.json();
-        assert.equal(JSON.parse(calls[3].body.toString()).image, undefined);
-        const bigBuffer = await sharp({ create: { width: 2000, height: 2000, channels: 3, noise: { type: "gaussian", mean: 128, sigma: 30 } } }).png().toBuffer();
+        assert.equal(JSON.parse(calls[3].body.toString()).model, "doubao-seedance-2-0");
+        const bigBuffer = await sharp({ create: { width: 2000, height: 2000, channels: 3, background: { r: 128, g: 128, b: 128 }, noise: { type: "gaussian", mean: 128, sigma: 30 } } }).png().toBuffer();
         assert.ok(bigBuffer.length > 512 * 1024);
         const bigVideo = await post({ capability: "video", modelId: "video", input: { prompt: "video", images: [`data:image/png;base64,${bigBuffer.toString("base64")}`], seconds: "5" } });
         assert.equal(bigVideo.status, 201);
@@ -124,10 +124,11 @@ test("unified generation validates models, multipart references, task ownership 
         const multiVideo = await post({ capability: "video", modelId: "video", input: { prompt: "video", images: [ref, `data:image/png;base64,${bigBuffer.toString("base64")}`], seconds: "5" } });
         assert.equal(multiVideo.status, 201);
         const multiPayload = JSON.parse(calls.at(-1)!.body.toString());
-        assert.equal(multiPayload.image, undefined);
-        assert.equal(multiPayload.reference_images.length, 2);
-        assert.equal(multiPayload.reference_images[0].url, ref);
-        assert.ok(Buffer.from(multiPayload.reference_images[1].url.split(",")[1], "base64").length <= 512 * 1024);
+        assert.equal(multiPayload.model, "doubao-seedance-2-0-mini");
+        assert.deepEqual(multiPayload.image, { url: ref });
+        assert.match(multiPayload.last_frame.url, /^data:image\/jpeg;base64,/);
+        assert.ok(Buffer.from(multiPayload.last_frame.url.split(",")[1], "base64").length <= 512 * 1024);
+        assert.equal(multiPayload.reference_images, undefined);
         assert.equal((await fetch(`${api.baseUrl}/api/generations/${altId}`, { headers: { cookie: cookie(sidA) } })).status, 200);
         assert.equal(calls.at(-1)?.authorization, "Bearer test-key-A");
         const before = calls.length;
@@ -146,7 +147,11 @@ test("unified generation validates models, multipart references, task ownership 
         assert.deepEqual(Buffer.from(await audio.arrayBuffer()), bytes);
         const text = await post({ capability: "text", modelId: "chat-model", input: { messages: [{ role: "user", content: "hi" }], stream: true } });
         assert.equal(text.status, 200);
-        assert.match(await text.text(), /hello/);
+        const streamed = await text.text();
+        assert.match(streamed, /hello/);
+        assert.match(streamed, / world/);
+        assert.match(streamed, /\[DONE\]/);
+        assert.doesNotMatch(streamed, /UPSTREAM_ERROR/);
         assert.equal(calls.at(-1)?.path, "/v1/chat/completions");
         assert.equal(JSON.parse(calls.at(-1)!.body.toString()).model, "chat-model");
         const historyUrl = `${api.baseUrl}/api/generation-history/image`;

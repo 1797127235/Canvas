@@ -24,9 +24,9 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f server/sql/001-identity.sql
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f server/sql/002-identity-rate-limits.sql
 ```
 
-工作区、账号凭证、媒体、任务和历史表在启动时按 `003`～`005` 建立，不清理账号业务记录。过期身份记录只在启动时清理。
+工作区、账号凭证、媒体、任务和历史表在启动时按 `003`～`006` 建立，不清理账号业务记录。006 会把旧视频任务迁移为可恢复的 SDK operation；过期身份记录只在启动时清理。
 
-将 `server/config/catalog.example.json` 复制为 `server/config/catalog.json`，设置真实上游 `baseUrl`（含必要的 `/v1`），所有模型配置项使用同一地址。配置中没有 Key；配置项仅作模型能力和显示名称映射，不限制上游返回的其他模型。未配置 Key 时模型页提示先保存 Key，不能用示例地址生成。
+将 `server/config/catalog.example.json` 复制为 `server/config/catalog.json`，设置真实上游 `baseUrl`（含必要的 `/v1`），所有模型配置项使用同一地址。配置中没有 Key；配置项指定模型能力、SDK adapter、显示名称和启用状态，不限制上游返回的其他模型；示例已配置 Codex2API 的 Grok/H3，暂禁用不可用的 H3-Max。原 `openai-videos` 配置需改成 `gateway-videos`，Grok 视频使用 `xai-videos`。未配置 Key 时模型页提示先保存 Key，不能用示例地址生成。
 
 MinIO 可选；不配其环境变量就使用本地磁盘。不设置文件、账号容量或画布数量额度。
 
@@ -50,7 +50,7 @@ bun run dev
 
 使用 Vite 输出的实际地址，并让 `server/.env` 的 `APP_ORIGIN` 与之完全一致，`localhost` 和 `127.0.0.1` 不是同一来源。Vite 的 `/api` 默认代理到 `http://127.0.0.1:4100`；需要更改后端地址时设置 `VITE_API_PROXY_TARGET`。
 
-进入注册/登录后，在账号配置中保存上游 Key。图片、视频、文本和音频都使用账号 Key，视频保留原生参数面板，实际能力由上游模型决定。旧 IndexedDB 不会自动迁移。
+进入注册/登录后，在账号配置中保存上游 Key。图片、视频、文本和音频都使用账号 Key，并由服务端 Vercel AI SDK provider 适配层代发；Grok 使用 xAI provider，MiniMax-H3 使用中转 `/v1/videos` 兼容适配器。旧 IndexedDB 不会自动迁移。
 
 ## 旧本地工作区
 

@@ -96,7 +96,7 @@ test("discovers models separately for each account without leaking upstream fiel
     assert.deepEqual(publicModels({ models: accountB }), [{ id: "opaque-model", name: "opaque-model", capability: "audio" }]);
     assert.equal(accountA[0].upstreamModel, "gpt-image-2.5");
     assert.equal(accountA[0].adapter, "openai-images");
-    assert.equal(accountA[1].adapter, "openai-videos");
+    assert.equal(accountA[1].adapter, "gateway-videos");
     assert.equal(accountB[0].adapter, "openai-speech");
     assert.ok([...accountA, ...accountB].every(item => item.baseUrl === catalog.models[0].baseUrl));
     assert.ok(!JSON.stringify(publicModels({ models: accountA })).includes("key"));
@@ -119,19 +119,19 @@ test("uses valid capability metadata before the frontend keyword rules", async t
     t.mock.method(globalThis, "fetch", async () => Response.json({ data }));
     const discovered = await accountModels(catalog, "key");
     assert.deepEqual(discovered.map(item => item.capability), ["text", "audio", "video", "video", "video", "video", "video", "audio", "audio", "image", "image", "image", "text", "video", "video", "text"]);
-    assert.deepEqual(discovered.map(item => item.adapter), ["openai-chat", "openai-speech", "openai-videos", "openai-videos", "openai-videos", "openai-videos", "openai-videos", "openai-speech", "openai-speech", "openai-images", "openai-images", "openai-images", "openai-chat", "openai-videos", "openai-videos", "openai-chat"]);
+    assert.deepEqual(discovered.map(item => item.adapter), ["openai-chat", "openai-speech", "gateway-videos", "gateway-videos", "gateway-videos", "gateway-videos", "gateway-videos", "openai-speech", "openai-speech", "openai-images", "openai-images", "openai-images", "openai-chat", "gateway-videos", "gateway-videos", "openai-chat"]);
 });
 
 test("applies only configured overrides for models present upstream", async t => {
     const catalog = await loadCatalog(await write("overrides.json", { models: [
-        model({ id: "opaque", upstreamModel: "actual-video", name: "Custom Video", capability: "video", adapter: "openai-videos" }),
+        model({ id: "opaque", upstreamModel: "actual-video", name: "Custom Video", capability: "video", adapter: "gateway-videos" }),
         model({ id: "absent", upstreamModel: "not-available" }),
         model({ id: "hidden", upstreamModel: "hidden-model", enabled: false }),
     ] }));
     t.mock.method(globalThis, "fetch", async () => Response.json({ data: [{ id: "actual-video", capability: "text" }, { id: "new-model" }, { id: "hidden-model" }] }));
     const discovered = await accountModels(catalog, "key");
     assert.deepEqual(discovered[0], {
-        id: "opaque", name: "Custom Video", upstreamModel: "actual-video", capability: "video", adapter: "openai-videos",
+        id: "opaque", name: "Custom Video", upstreamModel: "actual-video", capability: "video", adapter: "gateway-videos",
         enabled: true, baseUrl: "https://api.example.com/v1",
     });
     assert.equal(discovered[1].id, "new-model");

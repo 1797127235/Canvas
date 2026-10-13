@@ -4,7 +4,7 @@ import i18n from "@/i18n";
 import { getNodeSpec, isRegisteredNodeType } from "@/lib/canvas/node-registry";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasNodeMetadata, type CanvasNodeTypeId, type ViewportTransform } from "@/types/canvas";
 
-export type CanvasAgentOp =
+export type CanvasOp =
     | { type: "add_node"; id?: string; nodeType?: CanvasNodeTypeId; title?: string; position?: { x: number; y: number }; x?: number; y?: number; width?: number; height?: number; metadata?: CanvasNodeMetadata }
     | { type: "update_node"; id: string; patch?: Partial<CanvasNodeData>; metadata?: CanvasNodeMetadata }
     | { type: "delete_node"; id?: string; ids?: string[]; nodeType?: CanvasNodeTypeId }
@@ -14,7 +14,7 @@ export type CanvasAgentOp =
     | { type: "select_nodes"; ids: string[] }
     | { type: "run_generation"; nodeId: string; mode?: "text" | "image" | "video" | "audio"; prompt?: string };
 
-export type CanvasAgentSnapshot = {
+export type CanvasOpsSnapshot = {
     projectId: string;
     title: string;
     nodes: CanvasNodeData[];
@@ -23,7 +23,7 @@ export type CanvasAgentSnapshot = {
     viewport: ViewportTransform;
 };
 
-export function summarizeCanvasAgentOps(ops?: CanvasAgentOp[]) {
+export function summarizeCanvasOps(ops?: CanvasOp[]) {
     const counts = (Array.isArray(ops) ? ops : []).reduce<Record<string, number>>((acc, op) => {
         if (!op?.type) return acc;
         acc[op.type] = (acc[op.type] || 0) + 1;
@@ -34,7 +34,7 @@ export function summarizeCanvasAgentOps(ops?: CanvasAgentOp[]) {
         .join("，");
 }
 
-export function applyCanvasAgentOps(snapshot: CanvasAgentSnapshot, ops?: CanvasAgentOp[]) {
+export function applyCanvasOps(snapshot: CanvasOpsSnapshot, ops?: CanvasOp[]) {
     let nodes = snapshot.nodes;
     let connections = snapshot.connections;
     let selectedNodeIds = snapshot.selectedNodeIds;
@@ -85,5 +85,5 @@ export function applyCanvasAgentOps(snapshot: CanvasAgentSnapshot, ops?: CanvasA
 }
 
 function opLabel(type: string) {
-    return i18n.t(`canvas.agentOps.${type}`, { defaultValue: type });
+    return i18n.t(`canvas.ops.${type}`, { defaultValue: type });
 }

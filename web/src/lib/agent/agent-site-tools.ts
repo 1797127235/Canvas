@@ -5,7 +5,7 @@ import { fetchPrompts } from "@/services/api/prompts";
 import { uploadImage } from "@/services/image-storage";
 import { imageAspectOptions, imageQualityOptions, imageScaleOptions } from "@/components/image-settings-panel";
 import { videoResolutionOptions, videoSecondsRange, videoSizeOptions } from "@/components/video-settings-panel";
-import type { CanvasAgentSnapshot } from "@/lib/canvas/canvas-agent-ops";
+import type { CanvasOpsSnapshot } from "@/lib/canvas/canvas-ops";
 import { clampVideoSeconds } from "@/lib/media-size";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useAssetStore } from "@/stores/use-asset-store";
@@ -50,7 +50,7 @@ export const SITE_TOOL_LABELS: Record<SiteToolName, string> = {
 };
 
 type SiteToolInput = Record<string, unknown>;
-type SiteToolContext = { canvasSnapshot?: CanvasAgentSnapshot | null };
+type SiteToolContext = { canvasSnapshot?: CanvasOpsSnapshot | null };
 type GenerationStatus = "idle" | "queued" | "running" | "succeeded" | "failed";
 type GenerationStatusItem = { id: string; source: "canvas" | "image" | "video"; status: GenerationStatus; kind?: string; title?: string; prompt?: string; projectId?: string; createdAt?: string; updatedAt?: string; successCount?: number; failCount?: number; error?: string };
 
@@ -79,7 +79,7 @@ export async function runSiteTool(name: SiteToolName, input: SiteToolInput, navi
     }
 }
 
-function getGenerationStatus(input: SiteToolInput, canvasSnapshot?: CanvasAgentSnapshot | null) {
+function getGenerationStatus(input: SiteToolInput, canvasSnapshot?: CanvasOpsSnapshot | null) {
     const scope = input.scope === "canvas" || input.scope === "image" || input.scope === "video" ? input.scope : "all";
     const taskId = typeof input.taskId === "string" ? input.taskId : "";
     const nodeIds = new Set(Array.isArray(input.nodeIds) ? input.nodeIds.filter((id): id is string => typeof id === "string") : []);

@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 import { navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer";
 import { AppConfigModal } from "@/components/layout/app-config-modal";
-import { bypassLocalAuth } from "@/lib/auth-access";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
@@ -27,8 +26,9 @@ export function AppTopNav() {
     const slug = pathname.split("/").filter(Boolean)[0];
     const activeToolSlug = navigationTools.some((tool) => tool.slug === slug) ? (slug as NavigationToolSlug) : undefined;
 
+    // 已配置过 Agent 地址和 token 时自动重连；未配置时不发起连接，避免无效请求。
     useEffect(() => {
-        if (!bypassLocalAuth || autoConnectRef.current || agentEnabled || agentConnected || !agentToken.trim()) return;
+        if (autoConnectRef.current || agentEnabled || agentConnected || !agentToken.trim()) return;
         autoConnectRef.current = true;
         connectAgent({ silent: true });
     }, [agentConnected, agentEnabled, agentToken, connectAgent]);
@@ -84,11 +84,9 @@ export function AppTopNav() {
                         </div>
 
                         <div className="my-auto flex h-9 min-w-0 items-center justify-end gap-2 justify-self-end whitespace-nowrap">
-                            {bypassLocalAuth ? (
-                                <Tooltip title={t(panelOpen ? "topNav.closeAgent" : "topNav.openAgent")}>
-                                    <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" icon={<Bot className="size-4" />} onClick={togglePanel} aria-label={t(panelOpen ? "topNav.closeAgent" : "topNav.openAgent")} />
-                                </Tooltip>
-                            ) : null}
+                            <Tooltip title={t(panelOpen ? "topNav.closeAgent" : "topNav.openAgent")}>
+                                <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" icon={<Bot className="size-4" />} onClick={togglePanel} aria-label={t(panelOpen ? "topNav.closeAgent" : "topNav.openAgent")} />
+                            </Tooltip>
                             <UserStatusActions />
                         </div>
                     </div>
