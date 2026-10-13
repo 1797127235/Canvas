@@ -54,6 +54,16 @@ test("account media streams raw uploads and isolates Range, HEAD and stale-accou
         assert.equal((await head.arrayBuffer()).byteLength, 0);
         const stale = await fetch(`${api.baseUrl}/api/media`, { method: "POST", headers: { ...headers(sidB), origin, "x-account-id": userA, "content-type": "image/png" }, body: bytes });
         assert.equal(stale.status, 409);
+        const imageBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+        const imageUpload = await fetch(`${api.baseUrl}/api/media`, { method: "POST", headers: { ...headers(sidA), origin, "content-type": "image/png" }, body: imageBytes });
+        assert.equal(imageUpload.status, 201);
+        const { id: imageId } = await imageUpload.json() as { id: string };
+        const preview = await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: headers(sidA) });
+        assert.equal(preview.status, 200);
+        assert.equal(preview.headers.get("content-type")?.split(";", 1)[0], "image/webp");
+        assert.ok((await preview.arrayBuffer()).byteLength > 0);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: headers(sidB) })).status, 404);
+
         const json = '{"raw":true}';
         const jsonUpload = await fetch(`${api.baseUrl}/api/media`, { method: "POST", headers: { ...headers(sidA), origin, "content-type": "application/json" }, body: json });
         assert.equal(jsonUpload.status, 201);

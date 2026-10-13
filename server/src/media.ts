@@ -6,12 +6,52 @@ import { dirname, resolve, sep } from "node:path";
 import { Router, type Request, type Response } from "express";
 import type { Pool } from "pg";
 import { Client } from "minio";
+import sharp from "sharp";
 
 import { requireUser } from "./identity/auth-middleware.js";
 
 type ByteRange = { start: number; end: number };
 type MediaStore = { put(key: string, body: Readable, mimeType: string): Promise<void>; get(key: string, range?: ByteRange): Promise<Readable>; remove(key: string): Promise<void> };
 export type MediaOptions = { client?: Client; bucket?: string; directory?: string };
+
+const CANVAS_PREVIEW_PROFILE = {
+    version: "canvas-preview-v1",
+    maxLongEdge: 768,
+    quality: 82,
+} as const;
+const previewJobs = new Map<string, Promise<Buffer>>();
+const MAX_IMAGE_INPUT_PIXELS = 40_000_000;
+
+async function createCanvasPreview(input: Readable) {
+    const output = sharp({ limitInputPixels: MAX_IMAGE_INPUT_PIXELS })
+        .rotate()
+        .resize({ width: CANVAS_PREVIEW_PROFILE.maxLongEdge, height: CANVAS_PREVIEW_PROFILE.maxLongEdge, fit: "inside", withoutEnlargement: true })
+        .webp({ quality: CANVAS_PREVIEW_PROFILE.quality });
+    const chunks: Buffer[] = [];
+    const collector = new Transform({ transform(chunk, _encoding, callback) { chunks.push(Buffer.from(chunk)); callback(null, chunk); } });
+    await pipeline(input, output, collector);
+    return Buffer.concat(chunks);
+}
+
+async function createStoredPreview(store: MediaStore, objectKey: string, input: () => Promise<Readable>) {
+    const key = `${objectKey}.preview.${CANVAS_PREVIEW_PROFILE.version}.webp`;
+    let job = previewJobs.get(key);
+    if (!job) {
+        job = input().then(createCanvasPreview);
+        previewJobs.set(key, job);
+    }
+    try {
+        const preview = await job;
+        await store.put(key, Readable.from(preview), "image/webp");
+        return preview;
+    } finally {
+        if (previewJobs.get(key) === job) previewJobs.delete(key);
+    }
+}
+
+function previewObjectKey(objectKey: string) {
+    return `${objectKey}.preview.${CANVAS_PREVIEW_PROFILE.version}.webp`;
+}
 
 // 供生成任务等服务端流程落盘媒体：写入与 /api/media 上传相同的存储和 user_media 表。
 export async function storeAccountMedia(database: Pool, options: MediaOptions, userId: string, bytes: Buffer, mimeType: string) {
@@ -28,6 +68,7 @@ export function createMediaRouter(database: Pool, options: MediaOptions) {
     const router = Router();
     router.use(requireUser(database));
     router.post("/media", (request, response) => uploadMedia(request, response, database, options));
+    router.get("/media/:id/preview", (request, response) => readPreview(request, response, database, options));
     router.get("/media/:id", (request, response) => readMedia(request, response, database, options));
     router.delete("/media/:id", (request, response) => deleteMedia(request, response, database, options));
     return router;
@@ -80,6 +121,30 @@ async function uploadMedia(request: Request, response: Response, database: Pool,
     return response.status(201).json({ id, mimeType, bytes });
 }
 
+async function readStreamBytes(stream: Readable) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    return Buffer.concat(chunks);
+}
+
+async function readPreview(request: Request, response: Response, database: Pool, options: MediaOptions) {
+    const store = mediaStore(options);
+    if (!store) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
+    const result = await database.query<{ object_key: string; mime_type: string }>("SELECT object_key, mime_type FROM user_media WHERE id = $1 AND user_id = $2", [request.params.id, response.locals.user.id]);
+    const row = result.rows[0];
+    if (!row) return response.status(404).json({ error: { code: "MEDIA_NOT_FOUND", message: "媒体不存在" } });
+    if (!row.mime_type.startsWith("image/")) return response.status(415).json({ error: { code: "MEDIA_PREVIEW_UNSUPPORTED", message: "该媒体不支持图片预览" } });
+
+    const previewKey = previewObjectKey(row.object_key);
+    let bytes: Buffer;
+    try {
+        bytes = await readStreamBytes(await store.get(previewKey));
+    } catch {
+        bytes = await createStoredPreview(store, row.object_key, () => store.get(row.object_key));
+    }
+    return response.type("image/webp").set({ "Cache-Control": "private, no-store", "Content-Length": String(bytes.length) }).send(bytes);
+}
+
 async function readMedia(request: Request, response: Response, database: Pool, options: MediaOptions) {
     const store = mediaStore(options);
     if (!store) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
@@ -120,6 +185,9 @@ async function deleteMedia(request: Request, response: Response, database: Pool,
     if (!store) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
     const result = await database.query<{ object_key: string }>("DELETE FROM user_media WHERE id = $1 AND user_id = $2 RETURNING object_key", [request.params.id, response.locals.user.id]);
     const row = result.rows[0];
-    if (row) await store.remove(row.object_key);
+    if (row) {
+        await store.remove(row.object_key);
+        await store.remove(previewObjectKey(row.object_key)).catch(() => undefined);
+    }
     return response.status(204).end();
 }
