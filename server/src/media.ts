@@ -137,13 +137,21 @@ async function readPreview(request: Request, response: Response, database: Pool,
 
     const previewKey = previewObjectKey(row.object_key);
     let bytes: Buffer;
+    let mimeType = "image/webp";
+    let preview = true;
     try {
         bytes = await readStreamBytes(await store.get(previewKey));
     } catch {
-        bytes = await createStoredPreview(store, row.object_key, () => store.get(row.object_key));
+        try {
+            bytes = await createStoredPreview(store, row.object_key, () => store.get(row.object_key));
+        } catch {
+            bytes = await readStreamBytes(await store.get(row.object_key));
+            mimeType = row.mime_type;
+            preview = false;
+        }
     }
-    const etag = `"${request.params.id}-${CANVAS_PREVIEW_PROFILE.version}"`;
-    response.type("image/webp").set({ "Cache-Control": "private, no-cache", ETag: etag });
+    const etag = `"${request.params.id}-${preview ? CANVAS_PREVIEW_PROFILE.version : "original"}"`;
+    response.type(mimeType).set({ "Cache-Control": "private, no-cache", ETag: etag });
     if (request.header("if-none-match") === etag) return response.status(304).end();
     return response.set("Content-Length", String(bytes.length)).send(bytes);
 }
