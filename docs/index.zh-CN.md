@@ -15,6 +15,7 @@
 ## 开发与数据
 
 - [本地开发](/zh-CN/docs/development/local-development)
+- [线上部署](/zh-CN/docs/development/deployment)：生产地址、部署机、发布流程与注意事项。
 - [画布数据结构](/zh-CN/docs/development/canvas-data-structure)
 
 ## 支持与安全

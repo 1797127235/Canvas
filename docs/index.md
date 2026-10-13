@@ -23,6 +23,7 @@
 ## Development and Data
 
 - [Local Development](/docs/development/local-development)
+- [Deployment](/docs/development/deployment): production site, deploy machine, release steps, and pitfalls.
 - [Canvas Data Structure](/docs/development/canvas-data-structure)
 
 ## Support and Security

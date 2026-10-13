@@ -1,0 +1,58 @@
+---
+title: 线上部署
+description: 生产服务器地址、发布流程与注意事项
+---
+
+# 线上部署
+
+## 线上环境
+
+- 生产站点：<http://openai2api.com:3015/>，健康检查 `/api/health` 返回 `{"ok":true}`。
+- 部署机：`miaoda@192.168.6.78`（Windows，SSH 密钥登录，本机 `~/.ssh/config` 已有该主机）。
+- 部署目录：`D:\infinite-canvas-v2`，是仓库文件的完整拷贝，**不是 git 仓库**，更新靠打包覆盖。
+- Compose 栈（仓库根 `docker-compose.yml`）：`db`（PostgreSQL 16）、`api`（容器内 4100）、`web`（宿主 3015 → 容器 80）。
+- 数据全部在 docker volume（`db_data`、`media_data`）和服务器本地的 `.env`、`backups/` 里，发布流程不触碰。
+
+## 标准发布流程
+
+1. 本地提交并推送 GitHub。
+2. 本地打部署包，排除服务器侧维护的 catalog（见下方注意事项）：
+
+   ```bash
+   git archive --format=tar.gz -o deploy.tar.gz HEAD ':(exclude)server/config/catalog.json'
+   ```
+
+3. 上传到部署机（Windows OpenSSH 的 SFTP 子系统对这种路径有问题，必须用旧协议 `-O`）：
+
+   ```bash
+   scp -O deploy.tar.gz miaoda@192.168.6.78:D:/infinite-canvas-v2/
+   ```
+
+4. 服务器上解压覆盖，并删除部署包：
+
+   ```powershell
+   tar -xzf D:\infinite-canvas-v2\deploy.tar.gz -C D:\infinite-canvas-v2
+   Remove-Item D:\infinite-canvas-v2\deploy.tar.gz
+   ```
+
+   解压覆盖不会删除文件。本批在仓库里删掉的东西（例如整个 `canvas-agent/` 目录）要在服务器上手动 `Remove-Item -Recurse -Force`，否则会一直残留。
+
+5. 重建并启动（这台机器的 docker compose 不支持 `--progress` 参数）：
+
+   ```powershell
+   cd D:\infinite-canvas-v2
+   docker compose up -d --build
+   ```
+
+   SSH 前台执行时客户端加 `-o ServerAliveInterval=15`，构建完成前不要断开会话。
+
+6. 验证：`/api/health` 返回 `{"ok":true}`；`/templates/templates.json` 模板数量正确；随机抽一个模板封面或媒体文件返回 200。涉及生成链路的发布，再登录跑一单真实生成。
+
+## 注意事项
+
+- **catalog.json 是 api 容器的挂载文件**：常规发布不打进部署包，以服务器上的版本为准。但如果代码改了目录格式要求（例如 AI SDK 适配层要求 `gateway-videos` / `xai-videos` 等 adapter 字段），必须把仓库的 `server/config/catalog.json` 单独 `scp -O` 过去再重启 api，否则 api 启动报 `Invalid catalog configuration` 并崩溃循环。api 起不来先查容器日志里的这个报错。
+- `.env`（`WEB_PORT=3015`、`POSTGRES_PASSWORD`、`CREDENTIALS_ENCRYPTION_KEY`、`RATE_LIMIT_SECRET`、`IMAGE_TAG` 等）只存在于服务器，不在 git 里，打包天然不会覆盖；也不要把它的内容写进仓库。
+- 镜像 tag 取 `.env` 的 `IMAGE_TAG`（当前固定为 `dc131b4`），只是标签，与实际代码版本无关，不要用镜像 tag 判断线上版本。
+- 数据库表由 db-init 和后端启动迁移维护；`db` 容器保持运行，不要随发布重建，账号、画布和媒体数据都在它的 volume 里。
+- 服务器 PowerShell 控制台是 GBK 编码，直接 `Get-Content` 查看 UTF-8 中文文件会乱码，看起来像文件坏了；校验内容用 ASCII 字符串（例如模板 id）或比对 SHA256。
+- 发布完成后浏览器强刷一次，确认模板库和画布正常。
