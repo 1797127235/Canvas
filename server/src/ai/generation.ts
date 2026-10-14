@@ -111,7 +111,7 @@ function videoModel(adapter: VideoOperation["adapter"], modelId: string, baseUrl
 
 export async function createVideo(model: CatalogModel, apiKey: string, input: VideoInput, signal: AbortSignal) {
     const adapter = model.adapter === "xai-videos" ? "xai-videos" : "gateway-videos";
-    const images = await Promise.all((input.images || []).map(normalizeVideoImage));
+    const images = await normalizeVideoImages(input.images || []);
     const videos = input.videos || [], audios = input.audios || [];
     const frames = input.mode !== "reference" && images.length <= 2 && !videos.length && !audios.length;
     const inputReferences = frames ? undefined : [
@@ -150,16 +150,23 @@ export function mediaAspectRatio(size?: string, ratios: readonly `${number}:${nu
     });
 }
 
-// 保留已确认的中转参考图压缩规则，避免 SDK 原样发送大图导致上游拒绝。
+// 单张沿用已确认的 512KB 上限；多张参考图还有总请求体积上限，实测三张合计超过约 975KB 会被上游拒绝。
 const VIDEO_IMAGE_MAX_BYTES = 512 * 1024;
-const VIDEO_IMAGE_STEPS = [{ side: 2048, quality: 85 }, { side: 1536, quality: 80 }, { side: 1024, quality: 75 }, { side: 768, quality: 70 }];
-async function normalizeVideoImage(dataUrl: string) {
+const VIDEO_IMAGES_TOTAL_BYTES = 700 * 1024;
+const VIDEO_IMAGE_STEPS = [{ side: 2048, quality: 85 }, { side: 1536, quality: 80 }, { side: 1024, quality: 75 }, { side: 768, quality: 70 }, { side: 512, quality: 60 }];
+function normalizeVideoImages(dataUrls: string[]) {
+    const limit = Math.min(VIDEO_IMAGE_MAX_BYTES, Math.floor(VIDEO_IMAGES_TOTAL_BYTES / Math.max(1, dataUrls.length)));
+    return Promise.all(dataUrls.map((dataUrl) => normalizeVideoImage(dataUrl, limit)));
+}
+async function normalizeVideoImage(dataUrl: string, limit: number) {
     const bytes = Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64");
-    if (bytes.length <= VIDEO_IMAGE_MAX_BYTES) return dataUrl;
+    if (bytes.length <= limit) return dataUrl;
     const source = sharp(bytes).rotate();
+    let smallest = dataUrl;
     for (const { side, quality } of VIDEO_IMAGE_STEPS) {
         const buffer = await source.clone().resize({ width: side, height: side, fit: "inside", withoutEnlargement: true }).flatten({ background: "#ffffff" }).jpeg({ quality }).toBuffer();
-        if (buffer.length <= VIDEO_IMAGE_MAX_BYTES) return `data:image/jpeg;base64,${buffer.toString("base64")}`;
+        smallest = `data:image/jpeg;base64,${buffer.toString("base64")}`;
+        if (buffer.length <= limit) return smallest;
     }
-    return dataUrl;
+    return smallest;
 }

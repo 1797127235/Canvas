@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { deflateSync } from "node:zlib";
 import { test } from "node:test";
 import express from "express";
 import { createImages, createVideo, readVideo } from "../src/ai/generation.js";
@@ -73,6 +74,57 @@ test("SDK providers map Grok and H3 media roles, resume serialized operations an
         assert.equal(calls.length, count + 2);
     } finally { await upstream.close(); }
 });
+
+test("多张视频参考图按总大小压缩，避免三张中等图片合计超过上游限制", async () => {
+    const large = `data:image/png;base64,${png(960, 1280).toString("base64")}`;
+    const calls: Array<{ body: Record<string, any> }> = [];
+    const app = express();
+    app.use(express.json({ limit: "20mb" }));
+    app.post("/v1/videos/generations", (request, response) => {
+        calls.push({ body: request.body });
+        response.json({ request_id: "compressed" });
+    });
+    const upstream = await startTestServer(app);
+    try {
+        await createVideo({
+            id: "grok", name: "Grok", upstreamModel: "grok-imagine-video-1.5", adapter: "xai-videos", capability: "video", enabled: true, baseUrl: `${upstream.baseUrl}/v1`,
+        }, "account-key", { prompt: "三张参考图", mode: "reference", images: [large, large, large] }, signal());
+        const images = calls[0].body.reference_images as Array<{ url: string }>;
+        const total = images.reduce((sum, item) => sum + Buffer.from(item.url.slice(item.url.indexOf(",") + 1), "base64").length, 0);
+        assert.equal(images.length, 3);
+        assert.ok(total <= 700 * 1024, `compressed total ${total}`);
+    } finally { await upstream.close(); }
+});
+
+function png(width: number, height: number) {
+    const raw = Buffer.alloc(height * (1 + width * 3));
+    for (let y = 0; y < height; y += 1) {
+        const offset = y * (1 + width * 3);
+        for (let x = 0; x < width; x += 1) {
+            const pixel = offset + 1 + x * 3;
+            raw[pixel] = (x * 13 + y * 7) % 256; raw[pixel + 1] = (x * 3 + y * 11) % 256; raw[pixel + 2] = (x + y * 5) % 256;
+        }
+    }
+    const compressed = deflateSync(raw);
+    const chunk = (type: string, data: Buffer) => {
+        const body = Buffer.concat([Buffer.from(type), data]);
+        const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
+        const checksum = Buffer.alloc(4); checksum.writeUInt32BE(crc32(body));
+        return Buffer.concat([length, body, checksum]);
+    };
+    const header = Buffer.alloc(13);
+    header.writeUInt32BE(width); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 2;
+    return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", header), chunk("IDAT", compressed), chunk("IEND", Buffer.alloc(0))]);
+}
+
+function crc32(value: Buffer) {
+    let crc = 0xffffffff;
+    for (const byte of value) {
+        crc ^= byte;
+        for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+}
 
 test("model discovery selects SDK providers and keeps unavailable H3-Max disabled unless explicitly enabled", async t => {
     t.mock.method(globalThis, "fetch", async () => Response.json({ data: [
