@@ -2,6 +2,12 @@
 
 ## Unreleased
 
++ [修复] 审计日志不再记录用户素材原始字节：请求里的参考图/视频/音频是内联 data URL、生图结果里的 `b64_json` 是裸 base64，此前都会被写进请求/响应体日志（只被 16KiB 上限截断，且截掉的正好是后面的参数），导致用户素材二进制落盘、同时日志里只剩一段无意义的 base64、看不到参考素材数量和其余参数；现统一换成「`data:<mime>;base64,<省略 N 字节>`」摘要，并顺手修掉截断方向（先摘要再截断），请求体基本能完整落进日志。
+
++ [调整] 删除旧本地 Codex Agent 通信壳（外部地址/Token、SSE、MCP、线程审批和本机权限），保留 Agent 对话面板、消息渲染、画布引用与 Canvas 操作桥接，等待接入同源多用户 Agent 后端。
+
++ [修复] 生成失败提示不再回显上游原文：画布上视频/图片生成失败时，节点错误提示此前直接把上游英文错误（如 `model "seedance-2.0-fast-offical" ... parameter "duration_seconds" is outside ... request id: ...`）甚至数据库报错（`column "upstream_id" ... does not exist`）显示给用户；现按状态码和错误类型统一换成可读中文（时长不支持、上游繁忙、上游服务不可用、生成超时、Key 失效、请求频繁），上游网关返回 HTML 错误页（如 Cloudflare 502）时也不再回显整页 HTML，自己写的中文提示保持原样，原始错误仍完整记进服务端日志。
+
 + [优化] 仓库配置清理与统一：删掉已废弃的单服务 `docker-compose.local.yml`、空 `plugins/` 目录、文档站被移除后遗留的 12 个导航元数据 `meta.json` 和图表 QA 产物；根目录的 `CAPABILITY-MAP.md`、`SPEC-identity.md`、`SPEC-catalog.md` 和 `tasks/` 下的计划/任务清单统一搬到 `docs/specs/`（英文小写短横线命名）并修正全部交叉引用；`docs/index.md` 改用仓库内真实相对路径，修掉失效的文档站路由链接和指向已删除 changelog 页的死链；`.dockerignore` 清掉不存在的条目并补上真实需要排除的目录；`web/components.json` 修正为 Vite 实际路径（`src/styles/globals.css`、`rsc: false`）；Bun 版本统一为 `1.3.14`（Dockerfile、Dockerfile.api、workflow、`web/package.json`）。
 + [调整] 文档统一为简体中文单份：`docs/content/docs/` 下 12 篇正文原先每篇都有一个 `.zh-CN` 重复副本（其中 4 篇的副本还是过时子集），现每篇只保留一份中文文档，`docs/index.zh-CN.md` 同理删除；`pending-test.mdx` 此前是中英混排，已与中文副本合并成一份完整中文清单。
 + [新增] 前后端镜像改由 GitHub Actions 构建并推送到 GHCR（`.github/workflows/publish-images.yml`）：推 main 或打 `v*` tag 时先跑质量门禁（前端类型检查与测试、后端类型检查与测试，用 postgres:16 服务容器建测试库），通过后构建并推送 `infinite-canvas-web` / `infinite-canvas-api` 两个镜像；服务器改为 `docker compose pull && docker compose up -d`，不再本地构建。

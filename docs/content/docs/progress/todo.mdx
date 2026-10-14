@@ -11,7 +11,7 @@ description: Planned follow-up work
 - identity 主流程已由用户确认。生产部署栈已完成：compose（PostgreSQL + 后端 + 前端）、数据库自动建表、健康检查、每日备份脚本和部署文档。上线环境允许直接 http 访问，不再要求 HTTPS。剩余部署事项：反向代理/容器网络下的限流 IP 识别（当前取 socket 地址，会按同一出口 IP 集体计数）、过期数据定期清理周期、按用户节奏接入计划任务备份与可选的存活监控。镜像化发布已改为 GitHub Actions 构建并推送 GHCR、服务器只拉取启动（验收项见 Pending Tests）；仍需在仓库设置里开启分支保护并把该 workflow 设为必需检查。
 - 当前开发环境按实际运行环境交付：多用户核心链路、浏览器双账号隔离、真实文本/图片/视频生成与重启持久化已验证；后端专项 14/14、前端账号生成 5/5、两端类型检查通过。断网/双标签冲突、参考图编辑、多模态参数、ZIP 互导仍待逐项确认，当前 Key 无音频模型，真实音频生成尚未验收。详情见 Pending Tests。
 - 后续需根据真实上游返回的能力元数据完善未知模型分类与参数支持范围；当前无元数据时沿用现有关键词分类。账号模式已接入 AI SDK provider，改造和真实生成验证记录在 Pending Tests；H3 参考视频的实际采纳、Grok 视频编辑上游错误、H3-Max 原生端点仍需中转补齐。账号模式不执行本地渠道脚本，旧 IndexedDB 不迁移。
-- 画布 Agent：本地 Canvas Agent 进程和 Codex 插件已移除，前端 Agent 面板、消息模型和画布指令协议保留，连接层待改为同源后端接口；后端 Agent 运行时（会话、线程、工具循环）尚未开始设计。
+- 画布 Agent：已删除旧本地 Codex 通信壳，包括外部 Agent 地址/Token、SSE 连接、MCP 初始化、Codex 线程与审批、命令/文件/网络权限、浏览器站点工具和旧诊断面板；保留右侧对话面板、消息渲染、附件与画布 `@` 引用、消息归属/去重基础和 Canvas 操作桥接。下一步接入按账号 Cookie 鉴权的同源多用户 Agent 后端，补齐会话、线程、工具循环、方案确认和生成任务恢复。
 
 ## 统一模板库
 
@@ -27,4 +27,14 @@ description: Planned follow-up work
 - 「牛仔裤换装图片工作流」已整理并加入工作流模板：1 张商品裤装图 × 8 张模特参考图，八条分支只替换裤子、保留人物身份与场景；素材替换后的实际换装效果移入 Pending Tests。
 - 「3C产品宣传广告」「服装悬浮展示视频」「护肤广告宣传视频」「鞋类广告宣传视频」「人物舞蹈复刻视频」已从导出项目整理并加入工作流模板，均含成果封面、悬停视频与使用说明；素材替换后的实际生成效果移入 Pending Tests。
 - 模型下拉框逻辑按用户要求后续处理：区分模板推荐、账号默认与节点选择，模型不可用或目录失败时明确提示并提供重试，避免静默切换到列表首项。
+
+## 生成链路
+
+- **参考素材内联 base64，请求体可达数十 MB（已确认，待处理）**：画布视频生成把参考图、参考视频、参考音频一律以 data URL 内联进 `POST /api/generations` 的 JSON，每次生成都重传全部素材。
+  - 实测（线上 10:59 一次成功的三参考素材视频建任务）：请求体 **29,552,678 字节 ≈ 29.5MB**。依据是审计日志的截断标记：`truncateJson`（`server/src/log.ts`）输出 `…[truncated N chars]`，其中 N 为「原始 JSON 长度 − 16384」，该条日志 N = 29,536,294，故原始长度 = 29,536,294 + 16,384。
+  - 组成对它得上：该工作流当时的三个参考素材字节数为 19,878,018（参考视频 `8f326f68`）+ 1,292,809 + 989,256（两张参考图）= 22,160,083 字节，base64 膨胀 4/3 后为 29,546,777 字符，与实测 29,552,678 只差 5,901 字符（提示词和 JSON 结构），可认定膨胀源就是内联素材。
+  - 链路：`web/src/services/api/video.ts` 的 `createVideoGenerationTask` 用 `imageToDataUrl` / `referenceMediaToFile` + `readFileAsDataUrl` 把素材转成 data URL，再交给 `web/src/services/api/generation.ts` 的 `requestServerGeneration` 一次性 `JSON.stringify` 提交；`server/src/ai/input.ts` 的 `imageInput` / `videoInput` 校验规则本身就要求 data URL（如 `/^data:video\/(mp4|webm);base64,…$/`），所以是**接口契约层面**的形状，不是某处实现写歪了。
+  - 代价：浏览器每次生成都要重新读取并 base64 编码约 20MB 素材（`referenceMediaToFile` 会先 `getMediaBlob`、再 `readFileAsDataUrl`），建任务实测 17 秒；上游失败时同样白传一遍。
+  - 服务端现状：只有参考图会被压缩（`server/src/ai/generation.ts` 的 `normalizeVideoImage`，超 512KB 转 JPEG），但那是**收到请求之后**才做，不减小请求体；参考视频完全没有压缩。`server/src/app.ts` 的 `express.json({ limit: Infinity })` 也没有请求体上限，超大请求会直接缓冲进内存。
+  - 待定方向（未确认，不要直接改）：前端先 `POST /api/media` 上传素材，生成请求只传媒体 id，由服务端从媒体存储读出来转给上游；参考图的 512KB 压缩逻辑可以复用到这条路径。涉及接口契约、媒体归属校验和旧画布数据（节点里现有 `remote:` 引用仍需兼容读取），属于会改变实际行为的改动。
 
