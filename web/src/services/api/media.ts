@@ -63,3 +63,11 @@ export async function fetchAccountMedia(storageKey: string, options?: { signal?:
 export function accountMediaUrl(storageKey?: string) {
     return storageKey?.startsWith("remote:") ? `/api/media/${storageKey.slice("remote:".length)}` : "";
 }
+
+export function accountMediaPreviewUrl(storageKey?: string) {
+    return storageKey?.startsWith("remote:") ? `/api/media/${storageKey.slice("remote:".length)}/preview` : "";
+}
+
+export function accountMediaPosterUrl(storageKey?: string) {
+    return storageKey?.startsWith("remote:") ? `/api/media/${storageKey.slice("remote:".length)}/poster` : "";
+}

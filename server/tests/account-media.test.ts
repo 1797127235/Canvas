@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { test } from "node:test";
 import type { Pool } from "pg";
 
@@ -12,6 +14,12 @@ import { hashSid } from "../src/identity/session.js";
 import { startTestServer } from "./support/http.js";
 
 const origin = "http://localhost:3000";
+const execFileAsync = promisify(execFile);
+
+async function createVideoFixture(path: string) {
+    await execFileAsync("ffmpeg", ["-loglevel", "error", "-f", "lavfi", "-i", "color=c=red:s=16x16:d=0.2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-y", path]);
+    return readFile(path);
+}
 
 test("account media streams raw uploads and isolates Range, HEAD and stale-account operations", async () => {
     const directory = await mkdtemp(join(tmpdir(), "account-media-"));
@@ -54,6 +62,38 @@ test("account media streams raw uploads and isolates Range, HEAD and stale-accou
         assert.equal((await head.arrayBuffer()).byteLength, 0);
         const stale = await fetch(`${api.baseUrl}/api/media`, { method: "POST", headers: { ...headers(sidB), origin, "x-account-id": userA, "content-type": "image/png" }, body: bytes });
         assert.equal(stale.status, 409);
+        const imageBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
+        const imageUpload = await fetch(`${api.baseUrl}/api/media`, { method: "POST", headers: { ...headers(sidA), origin, "content-type": "image/png" }, body: imageBytes });
+        assert.equal(imageUpload.status, 201);
+        const { id: imageId } = await imageUpload.json() as { id: string };
+        const preview = await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: headers(sidA) });
+        assert.equal(preview.status, 200);
+        assert.equal(preview.headers.get("content-type")?.split(";", 1)[0], "image/webp");
+        assert.ok((await preview.arrayBuffer()).byteLength > 0);
+        assert.equal(preview.headers.get("cache-control"), "private, no-cache");
+        assert.match(preview.headers.get("etag") || "", /^"[0-9a-f-]+-canvas-preview-v1"$/);
+        const cachedPreview = await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: { ...headers(sidA), "if-none-match": preview.headers.get("etag") || "" } });
+        assert.equal(cachedPreview.status, 304);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: headers(sidB) })).status, 404);
+        const videoBytes = await createVideoFixture(join(directory, "poster-fixture.mp4"));
+        const videoUpload = await fetch(`${api.baseUrl}/api/media`, { method: "POST", headers: { ...headers(sidA), origin, "content-type": "video/mp4" }, body: videoBytes });
+        assert.equal(videoUpload.status, 201);
+        const { id: videoId } = await videoUpload.json() as { id: string };
+        const poster = await fetch(`${api.baseUrl}/api/media/${videoId}/poster`, { headers: headers(sidA) });
+        assert.equal(poster.status, 200);
+        assert.equal(poster.headers.get("content-type")?.split(";", 1)[0], "image/webp");
+        assert.ok((await poster.arrayBuffer()).byteLength > 0);
+        assert.equal(poster.headers.get("cache-control"), "private, no-cache");
+        assert.match(poster.headers.get("etag") || "", /^"[0-9a-f-]+-video-poster-canvas-v1"$/);
+        const cachedPoster = await fetch(`${api.baseUrl}/api/media/${videoId}/poster`, { headers: { ...headers(sidA), "if-none-match": poster.headers.get("etag") || "" } });
+        assert.equal(cachedPoster.status, 304);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${videoId}/poster`, { headers: headers(sidB) })).status, 404);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${imageId}/poster`, { headers: headers(sidA) })).status, 415);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${videoId}`, { method: "DELETE", headers: { ...headers(sidA), origin } })).status, 204);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${videoId}/poster`, { headers: headers(sidA) })).status, 404);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${imageId}`, { method: "DELETE", headers: { ...headers(sidA), origin } })).status, 204);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: headers(sidA) })).status, 404);
+
         const json = '{"raw":true}';
         const jsonUpload = await fetch(`${api.baseUrl}/api/media`, { method: "POST", headers: { ...headers(sidA), origin, "content-type": "application/json" }, body: json });
         assert.equal(jsonUpload.status, 201);

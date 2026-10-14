@@ -5,7 +5,7 @@ import i18n from "@/i18n";
 import { createImageThumbnail } from "@/lib/image-thumbnail";
 import { bypassLocalAuth } from "@/lib/auth-access";
 import { useUserStore } from "@/stores/use-user-store";
-import { uploadAccountMedia, accountMediaUrl, fetchAccountMedia } from "@/services/api/media";
+import { uploadAccountMedia, accountMediaUrl, accountMediaPreviewUrl, fetchAccountMedia } from "@/services/api/media";
 
 export type UploadedImage = {
     url: string;
@@ -178,7 +178,8 @@ export async function getImageBlob(storageKey: string, options?: ImageReadOption
 
 // 缩略图按图片的 storageKey 另存一份 WebP，只放在本地 IndexedDB 里，不写进节点数据，也不参与导出。
 export function previewUrlFor(storageKey?: string) {
-    return storageKey && !storageKey.startsWith("remote:") ? previewUrls.get(storageKey) : undefined;
+    if (!storageKey) return undefined;
+    return storageKey.startsWith("remote:") ? accountMediaPreviewUrl(storageKey) : previewUrls.get(storageKey);
 }
 
 // 模板预览等场景把不在本地 IndexedDB 的媒体 URL 直接注册进内存映射，不落盘；url 由调用方负责 revoke。
