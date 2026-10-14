@@ -13,6 +13,7 @@ const videoInput = z.strictObject({
     size: z.string().regex(/^\d+x\d+$/).optional(), resolution_name: z.string().optional(),
     generate_audio: z.boolean().optional(), watermark: z.boolean().optional(), mode: z.enum(["frames", "reference"]).optional(),
     images: z.array(imageData).optional(), videos: z.array(videoData).optional(), audios: z.array(audioData).optional(),
+    image_refs: z.array(z.string().regex(/^\/api\/media\/[0-9a-f-]{36}$/)).optional(),
 });
 const textInput = z.strictObject({
     messages: z.array(z.strictObject({

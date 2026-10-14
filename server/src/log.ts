@@ -55,7 +55,7 @@ function sanitizeField(key: string, item: unknown): LogValue {
     return sanitizeBody(item);
 }
 
-// 内联素材只记类型和体积：日志既不需要二进制内容，也不该保存用户素材，而且原始字节会吃掉截断配额、把真正有用的参数挤出去。
+// 日志行只留类型和体积，不保存图片正文；素材路径由请求里的 image_refs 单独记录。
 function summarizeDataUrl(value: string) {
     const match = DATA_URL.exec(value);
     if (!match) return value;

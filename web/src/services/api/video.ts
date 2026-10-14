@@ -9,6 +9,7 @@ import { imageToDataUrl } from "@/services/image-storage";
 import { boolConfig, buildApiUrl, modelOptionName, resolveModelRequestConfig, resolveModelScript, type AiConfig } from "@/stores/use-config-store";
 import { runModelPlugin } from "./model-plugin";
 import { fetchServerGenerationContent, pollServerGeneration, requestServerGeneration } from "./generation";
+import { accountMediaUrl } from "./media";
 import { bypassLocalAuth } from "@/lib/auth-access";
 import { catalogModel, useCatalogStore } from "@/stores/use-catalog-store";
 import type { ReferenceImage } from "@/types/image";
@@ -85,6 +86,7 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
             ...(normalizeVideoSize(config.size, config.vquality) ? { size: normalizeVideoSize(config.size, config.vquality) } : {}),
             resolution_name: normalizeVideoResolution(config.vquality), generate_audio: boolConfig(config.videoGenerateAudio, true),
             watermark: boolConfig(config.videoWatermark, false), mode: resolveVideoMode(config.videoMode, images.length), images,
+            image_refs: references.map((image) => accountMediaUrl(image.storageKey)).filter(Boolean),
             videos: await mediaData(options?.videos || [], "ref.mp4"), audios: await mediaData(options?.audios || [], "ref.mp3"),
         }, options?.signal, options?.taskId);
         const id = typeof payload.id === "string" ? payload.id : "";

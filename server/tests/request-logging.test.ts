@@ -30,7 +30,7 @@ function stubRouter(): Router {
     });
     router.post("/echo", (request, response) => response.json({ ok: true, echo: request.body }));
     router.get("/models", (_request, response) => response.json({ models: [{ id: "m-1" }] }));
-    router.post("/media/echo", (request, response) => response.json({ ok: true }));
+    router.post("/media/echo", (_request, response) => response.json({ ok: true }));
     router.post("/images", (_request, response) => response.json({ data: [{ b64_json: Buffer.alloc(1200).toString("base64"), mime_type: "image/png" }] }));
     return router;
 }
@@ -87,13 +87,14 @@ test("超长请求体和响应体按上限截断", async () => {
     assert.ok(typeof resBody === "string" && resBody.includes("[truncated"));
 });
 
-test("内联素材只记类型和体积，不把用户素材原始字节写进日志", async () => {
+test("内联素材只记类型和体积，素材路径原样保留", async () => {
     const image = `data:image/png;base64,${Buffer.alloc(1200).toString("base64")}`;
+    const mediaPath = "/api/media/7ea8813a-a41b-4cf7-9429-53f28dc3c56d";
     const lines = await withServer(async (baseUrl) => {
         const generated = await fetch(`${baseUrl}/api/echo`, {
             method: "POST",
             headers: { origin, "content-type": "application/json" },
-            body: JSON.stringify({ prompt: "画一只猫", images: [image], videos: [] }),
+            body: JSON.stringify({ prompt: "画一只猫", images: [image], image_refs: [mediaPath], videos: [] }),
         });
         assert.equal(generated.status, 200);
         assert.equal((await fetch(`${baseUrl}/api/images`, { method: "POST", headers: { origin, "content-type": "application/json" }, body: "{}" })).status, 200);
@@ -102,6 +103,7 @@ test("内联素材只记类型和体积，不把用户素材原始字节写进�
     const reqBody = request.reqBody as Record<string, unknown>;
     // 素材摘要后请求体不再超限，参数和素材数量都能留在日志里。
     assert.deepEqual(reqBody.images, ["data:image/png;base64,<省略 1200 字节>"]);
+    assert.deepEqual(reqBody.image_refs, [mediaPath]);
     assert.deepEqual(reqBody.videos, []);
     assert.equal(reqBody.prompt, "画一只猫");
     assert.ok(!JSON.stringify(request.reqBody).includes("AAAAAAAA"));
