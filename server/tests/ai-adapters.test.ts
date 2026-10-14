@@ -19,6 +19,7 @@ test("SDK providers map Grok and H3 media roles, resume serialized operations an
         const body = request.body || {};
         calls.push({ path: request.path, body, authorization: request.header("authorization") });
         if (body.prompt === "fail") return response.status(503).json({ error: { message: "temporary failure" } });
+        if (body.prompt === "gateway-down") return response.status(502).type("html").send("<!DOCTYPE html><title>codex2api.com | 502: Bad gateway</title>");
         if (request.path === "/v1/images/generations") return response.json({ data: [{ b64_json: "/9j/AA==" }] });
         if (request.path.endsWith("/content")) return response.type("video/mp4").send(Buffer.from("video-content"));
         if (request.path === "/v1/videos/generations") return response.json({ request_id: "grok-task" });
@@ -67,6 +68,9 @@ test("SDK providers map Grok and H3 media roles, resume serialized operations an
         assert.equal(calls.length, count);
         await assert.rejects(createVideo(h3, "account-key", { prompt: "fail" }, signal()), /temporary failure/);
         assert.equal(calls.length, count + 1);
+        // 上游网关返回 HTML 错误页时不能把页面当错误信息丢给用户，只留状态码结论。
+        await assert.rejects(createVideo(h3, "account-key", { prompt: "gateway-down" }, signal()), /上游服务暂时不可用/);
+        assert.equal(calls.length, count + 2);
     } finally { await upstream.close(); }
 });
 

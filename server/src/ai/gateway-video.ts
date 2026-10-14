@@ -27,7 +27,8 @@ export async function gatewayJson(url: string, apiKey: string, body?: unknown, s
             const payload = JSON.parse(text);
             message = payload.error?.message || payload.message || message;
         } catch {
-            message = "上游返回了不可解析的错误";
+            // 上游不可用时网关（Cloudflare 等）返回的是 HTML 错误页，只保留状态码，不回显 HTML 正文。
+            message = response.status >= 500 ? "上游服务暂时不可用，请稍后重试" : `上游返回了无法解析的错误（HTTP ${response.status}）`;
         }
         throw new APICallError({ message, url, requestBodyValues: undefined, statusCode: response.status, responseBody: text, isRetryable: false });
     }

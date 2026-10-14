@@ -144,7 +144,7 @@ async function runImageTask(context: { database: Pool; options: GenerationOption
         await context.database.query("UPDATE user_generation_tasks SET status = 'completed', result = $2 WHERE id = $1 AND user_id = $3", [context.id, JSON.stringify({ mediaIds }), context.userId]);
 
     } catch (error) {
-        const message = redactText((error instanceof Error ? error.message : "上游生成失败").replaceAll(context.apiKey, "[已隐藏]"), 300);
+        const message = generationErrorMessage(error);
         logError("image-task", error, { taskId: context.id });
         await context.database.query("UPDATE user_generation_tasks SET status = 'failed', error = $2 WHERE id = $1 AND user_id = $3", [context.id, message, context.userId]).catch(() => undefined);
     } finally {
@@ -165,14 +165,30 @@ async function readTask(request: Request, response: Response, database: Pool, op
     const signal = requestSignal(response);
     try {
         const state = await readVideo(row.operation, row.base_url, apiKey, signal);
-        if (!content) return response.json({ id: parsed.data, status: state.status === "error" ? "failed" : state.status, ...(state.status === "error" ? { error: { message: state.error } } : {}) });
-        if (state.status !== "completed") return response.status(409).json({ error: { code: "VIDEO_NOT_READY", message: state.status === "error" ? state.error : "视频尚未生成完成" } });
+        if (!content) return response.json({ id: parsed.data, status: state.status === "error" ? "failed" : state.status, ...(state.status === "error" ? { error: { message: generationErrorMessage(state.error) } } : {}) });
+        if (state.status !== "completed") return response.status(409).json({ error: { code: "VIDEO_NOT_READY", message: state.status === "error" ? generationErrorMessage(state.error) : "视频尚未生成完成" } });
         const video = state.videos[0];
         if (!video || video.type !== "url") throw new Error("上游没有返回视频下载地址");
         return response.type("video/mp4").send(await downloadGatewayVideo(video.url, row.base_url, apiKey, signal));
     } catch (error) {
         if (!signal.aborted) return generationFailure(response, error, apiKey);
     }
+}
+
+// 上游错误原文是英文提示加请求号，数据库异常更是直接抛 SQL 文本，显示给用户没有意义。
+// 这里统一换成可读提示；原始错误仍由 logError 连同上游响应体写进服务端日志，排查不受影响。
+export function generationErrorMessage(error: unknown) {
+    const raw = (typeof error === "string" ? error : error instanceof Error ? error.message : "").replace(/\s+/g, " ").trim();
+    // 我们自己写的提示都是中文（例如「Grok 当前不支持参考视频生成」），原样保留。
+    if (/[\u4e00-\u9fff]/.test(raw)) return raw.slice(0, 200);
+    const status = APICallError.isInstance(error) ? error.statusCode || 0 : 0;
+    if (status === 401 || status === 403) return "账号 API Key 无效或已过期，请重新保存后重试";
+    if (status === 429) return "请求过于频繁，请稍后重试";
+    if (/duration_seconds/i.test(raw)) return "该模型不支持所选视频时长，请调整时长后重试";
+    if (status === 503 || /NO_ELIGIBLE_ACCOUNT|concurrency slot/i.test(raw)) return "上游服务繁忙，请稍后重试";
+    if (/timeout/i.test(raw)) return "生成超时，请稍后重试";
+    if (/unsupported_parameter|not support/i.test(raw)) return "该模型不支持所选参数，请调整参数后重试";
+    return "生成失败，请稍后重试";
 }
 
 function requestSignal(response: Response) {
@@ -185,8 +201,7 @@ function taskNotFound(response: Response) { return response.status(404).json({ e
 function generationFailure(response: Response, error: unknown, apiKey: string) {
     const unauthorized = APICallError.isInstance(error) && [401, 403].includes(error.statusCode || 0);
     logError("generation", error, { upstream: upstreamLogDetails(error, apiKey) });
-    const message = unauthorized ? "上游认证失败，请检查账号 API Key" : (error instanceof Error ? error.message : "上游生成失败，请检查模型和参数").replaceAll(apiKey, "[已隐藏]").slice(0, 300);
-    const payload = { error: { code: unauthorized ? "UPSTREAM_AUTH_FAILED" : "UPSTREAM_ERROR", message } };
+    const payload = { error: { code: unauthorized ? "UPSTREAM_AUTH_FAILED" : "UPSTREAM_ERROR", message: generationErrorMessage(error) } };
     if (response.headersSent) return response.end(`data: ${JSON.stringify(payload)}\n\n`);
     return response.status(502).json(payload);
 }
