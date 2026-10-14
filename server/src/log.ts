@@ -31,17 +31,40 @@ export const RES_BODY_LIMIT = 4096;
 
 const SECRET_FIELDS = /^(password|currentpassword|newpassword)$/i;
 const KEY_FIELDS = /^(apikey|api_key)$/i;
+// 内联素材：请求里的参考图/视频/音频是 data URL，生图结果里的 b64_json 是裸 base64。
+const DATA_URL = /^data:[\w.+-]+\/[\w.+-]+;base64,/;
+const BASE64_FIELDS = /^b64_json$/i;
 
-export function sanitizeBody(value: unknown): unknown {
+// 日志里只出现可 JSON 序列化的值；脱敏不改变形状，只把字符串里的内联素材换成摘要。
+type LogValue = string | number | boolean | null | undefined | LogValue[] | { [key: string]: LogValue };
+
+export function sanitizeBody(value: unknown): LogValue {
+    if (typeof value === "string") return summarizeDataUrl(value);
     if (Array.isArray(value)) return value.map(sanitizeBody);
-    if (!value || typeof value !== "object") return value;
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, sanitizeField(key, item)]));
+    if (value === null || value === undefined) return value;
+    if (typeof value === "number" || typeof value === "boolean") return value;
+    // 请求体来自 JSON.parse，正常不会出现函数/symbol；真出现时落成文本比直接丢掉更好排查。
+    if (typeof value !== "object") return String(value);
+    return Object.fromEntries(Object.entries(value as Record<string, LogValue>).map(([key, item]) => [key, sanitizeField(key, item)]));
 }
 
-function sanitizeField(key: string, item: unknown): unknown {
+function sanitizeField(key: string, item: unknown): LogValue {
     if (SECRET_FIELDS.test(key) && typeof item === "string" && item) return "[redacted]";
     if (KEY_FIELDS.test(key) && typeof item === "string" && item) return `${item.slice(0, 6)}…(len ${item.length})`;
+    if (BASE64_FIELDS.test(key) && typeof item === "string" && item) return `<base64 省略 ${base64Bytes(item)} 字节>`;
     return sanitizeBody(item);
+}
+
+// 内联素材只记类型和体积：日志既不需要二进制内容，也不该保存用户素材，而且原始字节会吃掉截断配额、把真正有用的参数挤出去。
+function summarizeDataUrl(value: string) {
+    const match = DATA_URL.exec(value);
+    if (!match) return value;
+    return `${match[0]}<省略 ${base64Bytes(value.slice(match[0].length))} 字节>`;
+}
+
+function base64Bytes(payload: string) {
+    const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+    return Math.floor((payload.length * 3) / 4) - padding;
 }
 
 export function truncateJson(value: unknown, limit: number) {

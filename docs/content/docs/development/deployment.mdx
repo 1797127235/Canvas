@@ -73,7 +73,7 @@ docker compose up -d
 
 ## 接口审计日志
 
-api 对每个 `/api` 请求输出一行 JSON 日志（pino，stdout），包含方法、路径、状态码、耗时、账号 id、脱敏后的请求体和截断后的响应体；登录密码输出为 `[redacted]`，账号 API Key 只留前 6 位，请求体超过 16KiB、响应体超过 4KiB 截断，媒体接口只记元信息，`/api/health` 不记。查看与排查：
+api 对每个 `/api` 请求输出一行 JSON 日志（pino，stdout），包含方法、路径、状态码、耗时、账号 id、脱敏后的请求体和截断后的响应体；登录密码输出为 `[redacted]`，账号 API Key 只留前 6 位，请求里的参考素材（`data:` URL）和生图结果里的 base64 图片只记 MIME 与字节数、不落原始字节，请求体超过 16KiB、响应体超过 4KiB 截断，媒体接口只记元信息，`/api/health` 不记。查看与排查：
 
 ```powershell
 docker logs --tail 100 infinite-canvas-v2-api-1
