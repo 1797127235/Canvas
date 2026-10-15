@@ -1,25 +1,14 @@
 export const CANVAS_IMAGE_PREVIEW_MAX_EDGE = 768;
 
-type ImageSourceChoice = {
-    previewUrl?: string;
-    originalUrl: string;
-    naturalWidth?: number;
-    naturalHeight?: number;
-    renderedWidth: number;
-    renderedHeight: number;
-    scale: number;
-    devicePixelRatio?: number;
-    previewMaxEdge?: number;
-};
+// 画布上显示一张图需要多少像素：节点尺寸 × 画布缩放 × 屏幕像素比。
+export function requiredImageLongEdge(renderedWidth: number, renderedHeight: number, scale: number, devicePixelRatio = globalThis.devicePixelRatio || 1) {
+    return Math.max(renderedWidth, renderedHeight) * scale * devicePixelRatio;
+}
 
-// Small previews keep panning cheap, but they look soft once the node is magnified.
-// Use the original only when the on-screen size actually needs more pixels than the preview holds.
-export function pickImageSource({ previewUrl, originalUrl, naturalWidth, naturalHeight, renderedWidth, renderedHeight, scale, devicePixelRatio = globalThis.devicePixelRatio || 1, previewMaxEdge = CANVAS_IMAGE_PREVIEW_MAX_EDGE }: ImageSourceChoice) {
-    if (!previewUrl) return originalUrl;
-    const naturalLongEdge = Math.max(naturalWidth || 0, naturalHeight || 0);
-    const previewLongEdge = naturalLongEdge > 0 ? Math.min(previewMaxEdge, naturalLongEdge) : previewMaxEdge;
-    const requiredLongEdge = Math.max(renderedWidth, renderedHeight) * scale * devicePixelRatio;
-    return requiredLongEdge > previewLongEdge ? originalUrl : previewUrl;
+// 本地模式的缩略图只有一档 768px：够清晰就用，否则调用方回落到原图（blob）。
+// 账号模式的 remote: 素材走服务端分档接口，选档由服务端负责，不在客户端判断。
+export function fitsLocalPreview(requiredLongEdge: number, previewMaxEdge = CANVAS_IMAGE_PREVIEW_MAX_EDGE) {
+    return requiredLongEdge <= previewMaxEdge;
 }
 
 export function getThumbnailDimensions(width: number, height: number, maxEdge = CANVAS_IMAGE_PREVIEW_MAX_EDGE) {

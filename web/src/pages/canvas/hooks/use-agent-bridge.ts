@@ -29,8 +29,7 @@ type AgentBridgeParams = {
 };
 
 /**
- * Bridge between the canvas and local Agent: publish the current snapshot and apply/undo capabilities
- * to the Agent store for the local Codex panel. All members except applyAgentOps are internal.
+ * 为 Agent 提供当前画布快照与应用/撤销操作能力。除 applyAgentOps 外均为内部成员。
  */
 export function useAgentBridge(params: AgentBridgeParams) {
     const { projectId, title, nodes, connections, selectedNodeIds, viewport, nodesRef, connectionsRef, selectedNodeIdsRef, viewportRef, generateNodeRef, setNodes, setConnections, setSelectedNodeIds, setSelectedConnectionId, setViewport, setContextMenu } =

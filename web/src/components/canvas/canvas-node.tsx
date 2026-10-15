@@ -4,10 +4,11 @@ import { ChevronRight, Copy, Download, Group, Image as ImageIcon, Music2, Refres
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
-import { pickImageSource } from "@/lib/image-thumbnail";
+import { requiredImageLongEdge } from "@/lib/image-thumbnail";
 import { previewUrlFor, subscribeImagePreviews, getImagePreviewRevision } from "@/services/image-storage";
 import { mediaPosterUrl } from "@/services/file-storage";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
+import { expandedCardPosition, MAX_EXPANDED_BATCH_CARDS } from "@/lib/canvas/canvas-node-geometry";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { CanvasNodeType, type CanvasNodeData, type CanvasNodeImage, type CanvasNodeText, type Position } from "@/types/canvas";
@@ -737,32 +738,27 @@ function ImageContent({
     const primaryImageId = node.metadata?.primaryImageId || images[0]?.id;
     const primaryImage = images.find((image) => image.id === primaryImageId);
     const primaryContent = primaryImage?.content || node.metadata?.content;
-    const primaryPreviewUrl = previewUrlFor(primaryImage?.storageKey || node.metadata?.storageKey);
-    const primarySource = primaryContent
-        ? pickImageSource({
-              previewUrl: primaryPreviewUrl,
-              originalUrl: primaryContent,
-              naturalWidth: primaryImage?.naturalWidth || node.metadata?.naturalWidth,
-              naturalHeight: primaryImage?.naturalHeight || node.metadata?.naturalHeight,
-              renderedWidth: node.width,
-              renderedHeight: node.height,
-              scale,
-          })
-        : undefined;
+    // 账号模式交给服务端按需分档，客户端永不回落原图；本地模式超出 768 档时由 previewUrlFor 返回 undefined。
+    const primarySource = previewUrlFor(primaryImage?.storageKey || node.metadata?.storageKey, requiredImageLongEdge(node.width, node.height, scale)) || primaryContent;
+    const cardOrder = images.filter((image) => image.id !== primaryImageId).map((image) => image.id);
+    const visibleCardIds = cardOrder.slice(0, MAX_EXPANDED_BATCH_CARDS);
+    const hiddenCardCount = cardOrder.length - visibleCardIds.length;
+    const expandedCards = images.filter((image) => visibleCardIds.includes(image.id));
 
     return (
         <BatchFrame batchCount={batchCount} batchExpanded={batchExpanded}>
             {batchExpanded
-                ? images
-                      .filter((image) => image.id !== primaryImageId)
-                      .map((image, index) => <ExpandedImageCard key={image.id} node={node} image={image} index={index} scale={scale} onView={() => onViewBatchImage?.(image.id)} onSetPrimary={() => onSetBatchPrimary?.(image.id)} onDuplicate={() => onDuplicateBatchImage?.(image.id)} onDownload={() => onDownloadBatchImage?.(image.id)} onRetry={() => onRetryBatchImage?.(image.id)} onDelete={() => onDeleteBatchImage?.(image.id)} />)
+                ? expandedCards.map((image, index) => <ExpandedImageCard key={image.id} node={node} image={image} index={index} scale={scale} onView={() => onViewBatchImage?.(image.id)} onSetPrimary={() => onSetBatchPrimary?.(image.id)} onDuplicate={() => onDuplicateBatchImage?.(image.id)} onDownload={() => onDownloadBatchImage?.(image.id)} onRetry={() => onRetryBatchImage?.(image.id)} onDelete={() => onDeleteBatchImage?.(image.id)} />)
                 : null}
+            {batchExpanded && hiddenCardCount > 0 ? <ExpandedOverflowCard node={node} index={visibleCardIds.length} hiddenCount={hiddenCardCount} scale={scale} onToggleBatch={onToggleBatch} /> : null}
             <div className="h-full w-full overflow-hidden rounded-3xl">
                 {primaryContent ? (
                     <img
                         src={primarySource}
                         alt={node.title}
                         draggable={false}
+                        loading="lazy"
+                        decoding="async"
                         onDragStart={(event) => event.preventDefault()}
                         className={`pointer-events-none block h-full w-full select-none ${node.metadata?.freeResize ? "object-fill" : "object-contain"}`}
                     />
@@ -798,30 +794,34 @@ function ImageContent({
     );
 }
 
+// 展开卡片铺在节点外侧的网格上；几何计算与画布裁剪共用 canvas-node-geometry，避免两处不一致。
+function ExpandedOverflowCard({ node, index, hiddenCount, onToggleBatch }: { node: CanvasNodeData; index: number; hiddenCount: number; scale: number; onToggleBatch?: () => void }) {
+    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const { t } = useTranslation();
+    const { x, y } = expandedCardPosition(node, index);
+    return (
+        <button
+            type="button"
+            className="absolute z-20 grid place-items-center rounded-3xl border text-xs font-semibold shadow-[0_18px_50px_rgba(28,25,23,.18)] backdrop-blur-md transition hover:scale-[1.02]"
+            style={{ left: x, top: y, width: node.width, height: node.height, background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }}
+            onClick={(event) => {
+                event.stopPropagation();
+                onToggleBatch?.();
+            }}
+            onMouseDown={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+        >
+            {t("canvas.node.batchMore", { count: hiddenCount })}
+        </button>
+    );
+}
+
 function ExpandedImageCard({ node, image, index, scale, onView, onSetPrimary, onDuplicate, onDownload, onRetry, onDelete }: { node: CanvasNodeData; image: CanvasNodeImage; index: number; scale: number; onView: () => void; onSetPrimary: () => void; onDuplicate: () => void; onDownload: () => void; onRetry: () => void; onDelete: () => void }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const { t } = useTranslation();
     useSyncExternalStore(subscribeImagePreviews, getImagePreviewRevision);
-    const count = node.metadata?.images?.length || 0;
-    const columns = Math.min(count, 4);
-    const rows = Math.ceil(count / columns);
-    const rootSlot = (rows - 1) * columns;
-    const slot = index >= rootSlot ? index + 1 : index;
-    const column = slot % columns;
-    const row = Math.floor(slot / columns);
-    const x = column * (node.width + 18);
-    const y = (row - rows + 1) * (node.height + 18);
-    const source = image.content
-        ? pickImageSource({
-              previewUrl: previewUrlFor(image.storageKey),
-              originalUrl: image.content,
-              naturalWidth: image.naturalWidth,
-              naturalHeight: image.naturalHeight,
-              renderedWidth: node.width,
-              renderedHeight: node.height,
-              scale,
-          })
-        : undefined;
+    const { x, y } = expandedCardPosition(node, index);
+    const source = image.content ? previewUrlFor(image.storageKey, requiredImageLongEdge(node.width, node.height, scale)) || image.content : undefined;
 
     return (
         <div
@@ -848,7 +848,7 @@ function ExpandedImageCard({ node, image, index, scale, onView, onSetPrimary, on
                 onView();
             }}
         >
-            {image.content ? <img src={source} alt={node.title} draggable={false} className="pointer-events-none h-full w-full select-none object-contain" /> : <ImageSlotStatus image={image} />}
+            {image.content ? <img src={source} alt={node.title} draggable={false} loading="lazy" decoding="async" className="pointer-events-none h-full w-full select-none object-contain" /> : <ImageSlotStatus image={image} />}
             {image.content ? (
                 <div className="pointer-events-none absolute inset-x-2 top-2 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover/node:pointer-events-auto group-hover/node:opacity-100">
                     <button type="button" className="flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-lg border px-1.5 text-[10px] font-medium shadow-[0_6px_18px_rgba(15,23,42,.16)] backdrop-blur-md transition hover:scale-[1.02]" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.toolbar.activeText }} title={t("common.download")} onClick={(event) => (event.stopPropagation(), onDownload())}>

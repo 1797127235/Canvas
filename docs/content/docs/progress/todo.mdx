@@ -30,11 +30,30 @@ description: Planned follow-up work
 
 ## 生成链路
 
-- **参考素材内联 base64，请求体可达数十 MB（已确认，待处理）**：画布视频生成把参考图、参考视频、参考音频一律以 data URL 内联进 `POST /api/generations` 的 JSON，每次生成都重传全部素材。
+- **画布渲染 4K 原图导致标签页内存耗尽（本轮已修前三层）**：账号模式的 `remote:` 素材在画布上直接渲染原图，生图输出上限 3840×2160、单张解码约占 33MB，几十个节点即数百 MB，用户报告「浏览器标签页崩」。真正的放大器是三条叠加：
+  - ① 预览只有 768px 单档，`pickImageSource` 一旦判定需要像素超过 768 就回落原图，而 dpr=2 的屏幕上缩放 1.13× 以上就会触发（约 9 个可见节点 ≈ 300MB）；
+  - ② 批量图节点展开时把最多 15 张卡片全部渲染成 `<img>`（`canvas-node.tsx`），且卡片绝对定位铺在节点外、视口裁剪只按节点自身尺寸判断，铺到屏幕外的卡片不会被裁掉（约 500MB，单个节点即可崩）；
+  - ③ 批量生成用 `Promise.allSettled` 一次性发出全部槽位（最多 15 个），每个槽位各持一份参考素材副本，瞬时峰值与并发数成正比。
+  - 已完成：服务端预览改为 `512/1024/2048` 三档（`GET /api/media/:id/preview?w=`，取满足需求的最小档、超上限封顶），画布永不回落原图；批量展开封顶 8 张、超出显示「还有 N 张」，视口裁剪改用展开后的实际包围盒；三处批量生成统一限 3 并发（`web/src/lib/concurrency.ts`）。验收项见 Pending Tests。
+  - 仍待做：单档 2048 在最大缩放下可能偏模糊，档位与是否引入更高档需按实际画布数据评估；`previewUrls` / `objectUrls` 仍无 LRU 上限（会话内单调增长，只增不减）；媒体读取仍全 `no-store`，每次进页面重复全量下载。
+
+- **参考素材内联 base64，请求体可达数十 MB（本轮已修）**：画布视频生成把参考图、参考视频、参考音频一律以 data URL 内联进 `POST /api/generations` 的 JSON，每次生成都重传全部素材。
   - 实测（线上 10:59 一次成功的三参考素材视频建任务）：请求体 **29,552,678 字节 ≈ 29.5MB**。依据是审计日志的截断标记：`truncateJson`（`server/src/log.ts`）输出 `…[truncated N chars]`，其中 N 为「原始 JSON 长度 − 16384」，该条日志 N = 29,536,294，故原始长度 = 29,536,294 + 16,384。
   - 组成对它得上：该工作流当时的三个参考素材字节数为 19,878,018（参考视频 `8f326f68`）+ 1,292,809 + 989,256（两张参考图）= 22,160,083 字节，base64 膨胀 4/3 后为 29,546,777 字符，与实测 29,552,678 只差 5,901 字符（提示词和 JSON 结构），可认定膨胀源就是内联素材。
   - 链路：`web/src/services/api/video.ts` 的 `createVideoGenerationTask` 用 `imageToDataUrl` / `referenceMediaToFile` + `readFileAsDataUrl` 把素材转成 data URL，再交给 `web/src/services/api/generation.ts` 的 `requestServerGeneration` 一次性 `JSON.stringify` 提交；`server/src/ai/input.ts` 的 `imageInput` / `videoInput` 校验规则本身就要求 data URL（如 `/^data:video\/(mp4|webm);base64,…$/`），所以是**接口契约层面**的形状，不是某处实现写歪了。
   - 代价：浏览器每次生成都要重新读取并 base64 编码约 20MB 素材（`referenceMediaToFile` 会先 `getMediaBlob`、再 `readFileAsDataUrl`），建任务实测 17 秒；上游失败时同样白传一遍。
   - 服务端现状：只有参考图会被压缩（`server/src/ai/generation.ts` 的 `normalizeVideoImage`，超 512KB 转 JPEG），但那是**收到请求之后**才做，不减小请求体；参考视频完全没有压缩。`server/src/app.ts` 的 `express.json({ limit: Infinity })` 也没有请求体上限，超大请求会直接缓冲进内存。
   - 待定方向（未确认，不要直接改）：前端先 `POST /api/media` 上传素材，生成请求只传媒体 id，由服务端从媒体存储读出来转给上游；参考图的 512KB 压缩逻辑可以复用到这条路径。涉及接口契约、媒体归属校验和旧画布数据（节点里现有 `remote:` 引用仍需兼容读取），属于会改变实际行为的改动。
+  - **本轮已按此方向实现**（方案见 `docs/specs/resource-identity.md`）：`server/src/ai/input.ts` 只接受 `remote:<uuid>`，服务端 `readAccountMediaBytes` 按身份读字节后仍由 `normalizeVideoImage` 做同样的 512KB / 合计 700KB 压缩；文本链路的 `image_url` 同样支持身份。实测断言：服务端测试确认提交身份后上游收到等价 data URL。验收项见 Pending Tests。
+- **【根因】项目缺少资源抽象，媒体相关改动都受它影响（第一轮已收敛，未完全消除）**：完整审计见 `docs/specs/media-data-flow-audit.md`，实现方案见 `docs/specs/resource-identity.md`。全仓库没有 `Resource` 类型、资源表或资源注册表，资源只是一段字节加一个字符串键，由各处自己约定。由此导致五类后果：
+  - **身份靠字符串前缀**：`remote:` / `image:` / `video:` / `audio:` / `file:` 由 `startsWith` 解码，同一个前缀判断被反复重写（`remote:` 8 处以上、`image:` 6 处以上），没有任何一处定义这些前缀是什么。同一资源同时挂 `storageKey` + `url`/`content` + `dataUrl` 三个名字，而 `content` 的含义随模式漂移（账号模式 `/api/media/<id>` 持久，本地模式 `blob:` 刷新即失效）；`ReferenceImage.id` 也有三套身份空间（画布 `node.id`、工作台 `nanoid()`、Agent `canvas:<id>`）。
+  - **字节真的存了多份**：图片生成结果被重复落库（服务端 `runImageTask` 落 `user_media(id=A)` → 前端 `readAccountMediaDataUrl` 读回成 base64 → `uploadImage` 再 `POST /api/media` 生成 `id=B`，同一张图过 3 次网络、磁盘存 2 份，`id=A` 成为孤儿）；视频用 `Buffer.from(await response.arrayBuffer())` 整块读进 api 进程内存再流给浏览器，前端 `storeGeneratedVideo` 又传回服务端（视频未落 `user_media`，这一跳连引用都没有），音频同理；图片任务还把整个 `input`（含内联 base64 参考图）写进 `user_generation_tasks.operation`，而该列对图片任务只写不读，同样的字节在 `user_media` 和任务表各存一份（视频任务的同列只存 `{version, adapter, modelId, operation:{id}}`，两条链路不一致）。
+  - **引用被抄在很多地方且无权威**：6 个客户端 localforage 容器加服务端 4 个位置（`user_media`、`user_workspaces`、`user_generation_history`、`user_generation_tasks`），一张图可在 6 个以上地方留痕，没有一处能回答「这个资源现在被谁引用」。
+  - **「搬字节 + 重写引用」重复实现四遍**：上传（`storeImage` / `uploadMediaFile`）、导入包（`media-package.ts` 递归替换并按 `storageKey` 改 `content`/`dataUrl`/`url`）、模板克隆（`templates.ts` 的 `rewriteMediaReferences` 做同一件事的另一份实现）、导出（`canvas-export.ts` 用 `storageKey.startsWith("image:")` 猜该用哪个存储）；每新增一个入口就再抄一遍，字段漏改就是静默坏引用。
+  - **没有所有者就没有回收**：前端没有 `DELETE /api/media` 封装，`cleanupUnusedImages` / `cleanupUnusedMedia` 对账号模式直接 return，服务端清理只删会话和限流；删画布、删记录、删素材都不动服务端，叠加重复落库后磁盘双份单调增长。
+  - 同时 `bypassLocalAuth` 让上述每一项都 ×2：两条路径的资源语义完全不同（`blob:` 对 `/api/media/`）却共用同一套字段与函数签名。
+  - **处理顺序（待确认后动手）**：① 先定义资源模型——一个资源一个 id、一处权威位置、单一读写入口、明确归属与引用关系，先只落服务端、不动外部契约；② 收敛字节副本（生成结果直接返回 id、视频流式落盘、任务表不存 input）；③ 收敛引用副本（节点、工作区、历史、导入导出只引用资源 id，删掉并行字段与各自的搬运实现）；④ 按引用关系建立回收，前端补删除入口；⑤ 入参改素材 id 并收紧请求体上限（`express.json({ limit: Infinity })` 与 nginx `client_max_body_size 0` 两层都放开，属会改变实际行为的边界值，需先确认具体数字）。第 ① 步会改变接口契约与存储布局，与上面「参考素材内联 base64」的待定方向是同一处。
+  - **本轮已完成 ①（只做身份，不引入新抽象）、②③（生成上行与下行均改传身份）、④⑤**：入参改 `remote:<uuid>`、结果只返回身份与元数据、视频流式落盘、音频落库、删除 `/generations/:id/content`、请求体分档上限（生成 1 MiB / 身份 4 KiB / 工作区 8 MiB，nginx `/api/` 8 MiB）、新增 `user_media_references` 与每日回收（宽限 7 天）。
+  - **仍未做**：③ 只做了生成链路，导入包（`media-package.ts`）、模板克隆（`templates.ts`）、导出（`canvas-export.ts`）仍在自行「搬字节 + 重写引用」，四条重复实现还剩三条；仓库仍无 `Resource` 类型或资源注册表（这是有意不做的抽象）；前端仍无主动 `DELETE /api/media` 入口（目前靠宽限期回收兼顾）。
+  - 另有若干与资源建模无关的独立缺陷（媒体读取全 `no-store`；工作区 409 冲突后永久拦住保存；生成历史无分页；浏览器仍拼上游方言；`requestServerImageGeneration` 是死代码），一并记在审计文档第七节。
 

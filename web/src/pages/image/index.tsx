@@ -8,6 +8,7 @@ import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
 
 import { takeWorkbenchPrompt } from "@/lib/workbench-prompt";
+import { GENERATION_CONCURRENCY, mapWithConcurrencySettled } from "@/lib/concurrency";
 
 import { ImageSettingsPanel } from "@/components/image-settings-panel";
 import { ModelPicker } from "@/components/model-picker";
@@ -21,7 +22,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
 import { requestEdit, requestGeneration } from "@/services/api/image";
-import { deleteStoredImages, ensureImagePreview, getImagePreviewRevision, previewUrlFor, resolveImageUrl, subscribeImagePreviews, uploadImage } from "@/services/image-storage";
+import { deleteStoredImages, ensureImagePreview, getImagePreviewRevision, previewUrlFor, resolveGeneratedImage, resolveImageUrl, subscribeImagePreviews, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
 import type { ReferenceImage } from "@/types/image";
@@ -188,9 +189,7 @@ export default function ImagePage() {
         const batchStartedAt = performance.now();
         setStartedAt(batchStartedAt);
 
-        const tasks = Array.from({ length: generationCount }, (_, index) => runGenerationSlot(index, snapshot));
-
-        const result = await Promise.allSettled(tasks);
+        const result = await mapWithConcurrencySettled(Array.from({ length: generationCount }, (_, index) => index), GENERATION_CONCURRENCY, (index) => runGenerationSlot(index, snapshot));
         if (requestController.current.signal.aborted || (!bypassLocalAuth && userId !== useUserStore.getState().user?.id)) return;
         const successImages = result.filter((item): item is PromiseFulfilledResult<GeneratedImage> => item.status === "fulfilled").map((item) => item.value);
         const successCount = successImages.length;
@@ -247,13 +246,13 @@ export default function ImagePage() {
     };
 
     const addResultToReferences = async (image: GeneratedImage, index: number) => {
-        const stored = await uploadImage(image.dataUrl);
+        const stored = await resolveGeneratedImage(image);
         setReferences((value) => [...value, { id: nanoid(), name: `result-${index + 1}.png`, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey }]);
         message.success(t("imageWorkbench.addedReference"));
     };
 
     const saveResultToAssets = async (image: GeneratedImage, index: number) => {
-        const stored = await uploadImage(image.dataUrl);
+        const stored = await resolveGeneratedImage(image);
         addAsset({
             kind: "image",
             title: t("imageWorkbench.resultTitle", { count: index + 1 }),
@@ -346,7 +345,7 @@ export default function ImagePage() {
             if (!bypassLocalAuth && userId !== useUserStore.getState().user?.id) throw new DOMException("账号已切换", "AbortError");
             const image = result[0];
             if (!image) throw new Error(t("imageWorkbench.missingResult"));
-            const stored = await uploadImage(image.dataUrl, { signal: requestController.current.signal });
+            const stored = await resolveGeneratedImage(image, { signal: requestController.current.signal });
             const nextImage: GeneratedImage = {
                 id: image.id,
                 dataUrl: stored.url,

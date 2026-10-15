@@ -1,24 +1,20 @@
 import { expect, test } from "bun:test";
 
-import { pickImageSource } from "../src/lib/image-thumbnail";
+import { CANVAS_IMAGE_PREVIEW_MAX_EDGE, fitsLocalPreview, getThumbnailDimensions, requiredImageLongEdge } from "../src/lib/image-thumbnail";
 
-const base = {
-    previewUrl: "data:image/webp;base64,preview",
-    originalUrl: "data:image/png;base64,original",
-    naturalWidth: 4000,
-    naturalHeight: 3000,
-    renderedWidth: 420,
-    renderedHeight: 315,
-};
-
-test("uses the preview while it has enough pixels for the rendered size", () => {
-    expect(pickImageSource({ ...base, scale: 1, devicePixelRatio: 1 })).toBe(base.previewUrl);
+test("computes the long edge a node needs on screen", () => {
+    expect(requiredImageLongEdge(340, 240, 1, 1)).toBe(340);
+    expect(requiredImageLongEdge(340, 240, 1, 2)).toBe(680);
+    // 画布放大后需要的像素超过本地 768 单档缩略图。
+    expect(requiredImageLongEdge(340, 240, 1.5, 2)).toBe(1020);
 });
 
-test("falls back to the original once the rendered size outgrows the preview", () => {
-    expect(pickImageSource({ ...base, scale: 3, devicePixelRatio: 2 })).toBe(base.originalUrl);
+test("local previews are only used while they hold enough pixels", () => {
+    expect(fitsLocalPreview(680, CANVAS_IMAGE_PREVIEW_MAX_EDGE)).toBe(true);
+    expect(fitsLocalPreview(1020, CANVAS_IMAGE_PREVIEW_MAX_EDGE)).toBe(false);
 });
 
-test("uses the original when no preview exists", () => {
-    expect(pickImageSource({ ...base, previewUrl: undefined, scale: 1, devicePixelRatio: 1 })).toBe(base.originalUrl);
+test("thumbnail dimensions never upscale", () => {
+    expect(getThumbnailDimensions(4000, 3000)).toEqual({ width: 768, height: 576 });
+    expect(getThumbnailDimensions(400, 300)).toEqual({ width: 400, height: 300 });
 });

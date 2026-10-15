@@ -66,6 +66,16 @@ test("rejects invalid JSON, unsupported encoding, and oversized identity bodies"
         });
         assert.equal(oversized.response.status, 413);
         assert.equal(oversized.body?.error.code, "PAYLOAD_TOO_LARGE");
+
+        // 生成请求以前和身份接口一样不设上限（limit: Infinity）。素材改传身份后只需 KB 级，
+        // 这里确认超过 1 MiB 会在进业务路由前就被拒，而不是先缓冲进 api 进程内存。
+        const oversizedGeneration = await requestJson<{ error: { code: string } }>(server.baseUrl, "/api/generations", {
+            method: "POST",
+            headers: { "content-type": "application/json", origin: appOrigin },
+            body: JSON.stringify({ value: "x".repeat(2 * 1024 * 1024) }),
+        });
+        assert.equal(oversizedGeneration.response.status, 413);
+        assert.equal(oversizedGeneration.body?.error.code, "PAYLOAD_TOO_LARGE");
     } finally {
         await server.close();
     }

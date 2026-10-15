@@ -2,7 +2,7 @@ import localforage from "localforage";
 
 import { nanoid } from "nanoid";
 import i18n from "@/i18n";
-import { createImageThumbnail } from "@/lib/image-thumbnail";
+import { createImageThumbnail, fitsLocalPreview } from "@/lib/image-thumbnail";
 import { bypassLocalAuth } from "@/lib/auth-access";
 import { useUserStore } from "@/stores/use-user-store";
 import { uploadAccountMedia, accountMediaUrl, accountMediaPreviewUrl, fetchAccountMedia } from "@/services/api/media";
@@ -15,6 +15,14 @@ export type UploadedImage = {
     bytes: number;
     mimeType: string;
 };
+
+// 生成结果统一解析成 UploadedImage：账号模式的结果已经在服务端 media 里，直接用身份引用，
+// 尺寸与体积由服务端落库时一并给出（sharp 只读文件头，不解码整图），客户端不再取回字节；
+// 本地模式没有服务端可代管，仍要把本地字节存进 IndexedDB。
+export async function resolveGeneratedImage(image: { url?: string; dataUrl?: string; storageKey?: string; width?: number; height?: number; bytes?: number; mimeType?: string }, options?: ImageReadOptions): Promise<UploadedImage> {
+    if (image.storageKey?.startsWith("remote:") && image.url) return { url: image.url, storageKey: image.storageKey, width: image.width || 0, height: image.height || 0, bytes: image.bytes || 0, mimeType: image.mimeType || "" };
+    return uploadImage(image.dataUrl || image.url || "", options);
+}
 
 const store = localforage.createInstance({ name: "infinite-canvas", storeName: "image_files" });
 const previewStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_previews" });
@@ -177,9 +185,13 @@ export async function getImageBlob(storageKey: string, options?: ImageReadOption
 }
 
 // 缩略图按图片的 storageKey 另存一份 WebP，只放在本地 IndexedDB 里，不写进节点数据，也不参与导出。
-export function previewUrlFor(storageKey?: string) {
+// requiredLongEdge 是「屏幕上需要多少像素」；本地模式不够清晰时返回 undefined 由调用方回落原图，
+// 账号模式的 remote: 素材交给服务端分档，不会回落原图。
+export function previewUrlFor(storageKey?: string, requiredLongEdge?: number) {
     if (!storageKey) return undefined;
-    return storageKey.startsWith("remote:") ? accountMediaPreviewUrl(storageKey) : previewUrls.get(storageKey);
+    if (storageKey.startsWith("remote:")) return accountMediaPreviewUrl(storageKey, requiredLongEdge) || undefined;
+    if (requiredLongEdge !== undefined && !fitsLocalPreview(requiredLongEdge)) return undefined;
+    return previewUrls.get(storageKey);
 }
 
 // 模板预览等场景把不在本地 IndexedDB 的媒体 URL 直接注册进内存映射，不落盘；url 由调用方负责 revoke。

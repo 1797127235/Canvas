@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
 import { Router, type Request, type Response } from "express";
 import type { Pool } from "pg";
 import { APICallError } from "ai";
@@ -7,15 +8,27 @@ import { requireUser } from "./identity/auth-middleware.js";
 import { accountModels, resolveModel, type Catalog, type CatalogModel } from "./catalog/catalog.js";
 import { readUserApiKey } from "./credentials.js";
 import { generationInput } from "./ai/input.js";
-import { createImages, createSpeech, createText, createTextStream, createVideo, readVideo } from "./ai/generation.js";
+import { createImages, createSpeech, createText, createTextStream, createVideo, mediaReader, readVideo } from "./ai/generation.js";
 import { type ImageInput } from "./ai/input.js";
 import { downloadGatewayVideo } from "./ai/gateway-video.js";
 import { logError, redactText } from "./log.js";
-import { storeAccountMedia, type MediaOptions } from "./media.js";
+import { readAccountMediaBytes, storeAccountMedia, storeAccountMediaStream, type MediaOptions } from "./media.js";
 
 type GenerationOptions = { catalog: Catalog; encryptionKey?: string; media?: MediaOptions };
+
+// 参考素材按身份（remote:<uuid>）从账号媒体读取；类型校验在 mediaReader 里统一把关。
+// 未配置媒体存储只在真的需要取素材时报错，无参考素材的生成不受影响（该回调不会被调用）。
+function referenceReader(database: Pool, options: GenerationOptions, userId: string) {
+    return mediaReader(async (mediaId) => {
+        if (!options.media) throw new Error("媒体存储尚未配置");
+        return readAccountMediaBytes(database, options.media, userId, mediaId);
+    });
+}
 const taskIdSchema = z.string().uuid();
-const IMAGE_TASK_TIMEOUT_MS = 15 * 60_000;
+// 图片任务结果：只存素材身份与元数据，字节留在 user_media。
+const imageTaskResult = z.object({ images: z.array(z.object({ id: z.string(), mimeType: z.string(), bytes: z.number(), width: z.number(), height: z.number() })) });
+// 视频任务结果：只存已落库的素材身份与元数据。
+const videoResult = z.object({ mediaId: z.string(), mimeType: z.string(), bytes: z.number() });const IMAGE_TASK_TIMEOUT_MS = 15 * 60_000;
 const IMAGE_TASK_STALE_MS = 20 * 60_000;
 
 export function createGenerationRouter(database: Pool, options: GenerationOptions) {
@@ -31,14 +44,18 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
             const model = resolveModel({ models }, parsed.data.modelId, parsed.data.capability);
             if (!model) return response.status(404).json({ error: { code: "MODEL_NOT_FOUND", message: "模型不可用" } });
             const generation = parsed.data;
-            if (generation.capability === "image") return response.json(await createImages(model, apiKey, generation.input, signal));
+            const media = referenceReader(database, options, response.locals.user.id);
+            if (generation.capability === "image") return response.json(await createImages(model, apiKey, generation.input, signal, media));
             if (generation.capability === "audio") {
+                // 音频也落进账号媒体后返回身份：客户端不再接收字节再传回服务端。
+                if (!options.media) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
                 const audio = await createSpeech(model, apiKey, generation.input, signal);
-                return response.type(audio.mediaType).send(Buffer.from(audio.uint8Array));
+                const stored = await storeAccountMedia(database, options.media, response.locals.user.id, Buffer.from(audio.uint8Array), audio.mediaType);
+                return response.json({ mediaId: stored.id, mimeType: stored.mimeType, bytes: stored.bytes });
             }
             if (generation.capability === "text") {
-                if (!generation.input.stream) return response.json(await createText(model, apiKey, generation.input, signal));
-                const result = createTextStream(model, apiKey, generation.input, signal);
+                if (!generation.input.stream) return response.json(await createText(model, apiKey, generation.input, signal, media));
+                const result = await createTextStream(model, apiKey, generation.input, signal, media);
                 for await (const part of result.fullStream) {
                     if (part.type === "error") throw part.error;
                     if (part.type !== "text-delta") continue;
@@ -49,7 +66,7 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
                 response.end("data: [DONE]\n\n");
                 return;
             }
-            const result = await createVideo(model, apiKey, generation.input, signal);
+            const result = await createVideo(model, apiKey, generation.input, signal, media);
             // 任务号由前端预生成，节点在建任务的几秒里就已持有它，刷新后可直接恢复。
             const id = generation.taskId ?? randomUUID();
             await database.query(
@@ -81,8 +98,8 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
         await database.query("DELETE FROM user_generation_history WHERE user_id = $1 AND kind = $2 AND id = $3", [response.locals.user.id, kind.data, request.params.id]);
         return response.status(204).end();
     });
-    router.get("/generations/:id", requireUser(database), (request, response) => readTask(request, response, database, options, false));
-    router.get("/generations/:id/content", requireUser(database), (request, response) => readTask(request, response, database, options, true));
+    router.get("/generations/:id", requireUser(database), (request, response) => readTask(request, response, database, options));
+    // 视频结果不再提供单独的内容端点：完成时服务端已把它落进账号媒体，客户端凭 mediaId 读取。
     // 图片异步任务：创建后立即返回，服务端后台执行并把结果落进账号媒体，刷新页面后仍可按任务号恢复。
     router.post("/generation-tasks", requireUser(database), async (request, response) => {
         const parsed = generationInput.safeParse(request.body);
@@ -114,8 +131,8 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
         const row = task.rows[0];
         if (!row || row.kind !== "image") return taskNotFound(response);
         if (row.status === "completed") {
-            const result = z.object({ mediaIds: z.array(z.string()) }).safeParse(row.result);
-            if (result.success) return response.json({ id: parsed.data, status: "completed", mediaIds: result.data.mediaIds });
+            const result = imageTaskResult.safeParse(row.result);
+            if (result.success) return response.json({ id: parsed.data, status: "completed", images: result.data.images });
         }
         if (row.status === "failed") return response.json({ id: parsed.data, status: "failed", error: row.error || "上游生成失败" });
         // 进程重启会丢失进行中的后台执行，超过单次生成上限即标记失败，避免客户端无限轮询。
@@ -134,14 +151,16 @@ async function runImageTask(context: { database: Pool; options: GenerationOption
     if (imageTasks.has(context.id)) return;
     imageTasks.add(context.id);
     try {
-        const result = await createImages(context.model, context.apiKey, context.input, AbortSignal.timeout(IMAGE_TASK_TIMEOUT_MS));
-        const mediaIds: string[] = [];
+        const result = await createImages(context.model, context.apiKey, context.input, AbortSignal.timeout(IMAGE_TASK_TIMEOUT_MS), referenceReader(context.database, context.options, context.userId));
+        // 结果直接返回素材元数据：客户端凭 id 就能引用，不必再取回字节、换名字重新上传。
+        const images = [];
         for (const image of result.data) {
             const stored = await storeAccountMedia(context.database, context.options.media!, context.userId, Buffer.from(image.b64_json, "base64"), image.mime_type);
-            mediaIds.push(stored.id);
+            const { width, height } = "width" in stored ? stored : { width: 0, height: 0 };
+            images.push({ id: stored.id, mimeType: stored.mimeType, bytes: stored.bytes, width, height });
         }
         // 任务号现在可由客户端提供，所有后台写入都限定在本人行，避免跨账号覆盖。
-        await context.database.query("UPDATE user_generation_tasks SET status = 'completed', result = $2 WHERE id = $1 AND user_id = $3", [context.id, JSON.stringify({ mediaIds }), context.userId]);
+        await context.database.query("UPDATE user_generation_tasks SET status = 'completed', result = $2 WHERE id = $1 AND user_id = $3", [context.id, JSON.stringify({ images }), context.userId]);
 
     } catch (error) {
         const message = generationErrorMessage(error);
@@ -152,11 +171,15 @@ async function runImageTask(context: { database: Pool; options: GenerationOption
     }
 }
 
-async function readTask(request: Request, response: Response, database: Pool, options: GenerationOptions, content: boolean) {
+// 视频任务：完成时把结果落进账号媒体一次，任务行只存 mediaId；
+// 重复轮询直接复用已存结果，不重复下载上游视频。
+const videoTaskStores = new Map<string, Promise<z.infer<typeof videoResult>>>();
+
+async function readTask(request: Request, response: Response, database: Pool, options: GenerationOptions) {
     const parsed = taskIdSchema.safeParse(request.params.id);
     if (!parsed.success) return taskNotFound(response);
-    const task = await database.query<{ operation: unknown; base_url: string }>(
-        "SELECT operation, base_url FROM user_generation_tasks WHERE id = $1 AND user_id = $2", [parsed.data, response.locals.user.id],
+    const task = await database.query<{ operation: unknown; base_url: string; result: unknown }>(
+        "SELECT operation, base_url, result FROM user_generation_tasks WHERE id = $1 AND user_id = $2", [parsed.data, response.locals.user.id],
     );
     const row = task.rows[0];
     if (!row) return taskNotFound(response);
@@ -165,13 +188,36 @@ async function readTask(request: Request, response: Response, database: Pool, op
     const signal = requestSignal(response);
     try {
         const state = await readVideo(row.operation, row.base_url, apiKey, signal);
-        if (!content) return response.json({ id: parsed.data, status: state.status === "error" ? "failed" : state.status, ...(state.status === "error" ? { error: { message: generationErrorMessage(state.error) } } : {}) });
-        if (state.status !== "completed") return response.status(409).json({ error: { code: "VIDEO_NOT_READY", message: state.status === "error" ? generationErrorMessage(state.error) : "视频尚未生成完成" } });
+        if (state.status === "error") return response.json({ id: parsed.data, status: "failed", error: { message: generationErrorMessage(state.error) } });
+        if (state.status !== "completed") return response.json({ id: parsed.data, status: state.status });
+        // 已落过盘的任务直接复用，避免每次轮询重复下载。
+        const saved = videoResult.safeParse(row.result);
+        if (saved.success) return response.json({ id: parsed.data, status: "completed", ...saved.data });
         const video = state.videos[0];
         if (!video || video.type !== "url") throw new Error("上游没有返回视频下载地址");
-        return response.type("video/mp4").send(await downloadGatewayVideo(video.url, row.base_url, apiKey, signal));
+        const stored = await storeVideoOnce(parsed.data, response.locals.user.id, database, options, () => downloadGatewayVideo(video.url, row.base_url, apiKey, signal));
+        return response.json({ id: parsed.data, status: "completed", ...stored });
     } catch (error) {
         if (!signal.aborted) return generationFailure(response, error, apiKey);
+    }
+}
+
+// 同一次任务的并发轮询共享一次下载；进程内加锁避免重复落盘。
+async function storeVideoOnce(taskId: string, userId: string, database: Pool, options: GenerationOptions, download: () => Promise<Readable>) {
+    const existing = videoTaskStores.get(taskId);
+    if (existing) return existing;
+    const job = (async () => {
+        if (!options.media) throw new Error("媒体存储尚未配置");
+        const stored = await storeAccountMediaStream(database, options.media, userId, await download(), "video/mp4");
+        const result = { mediaId: stored.id, mimeType: stored.mimeType, bytes: stored.bytes };
+        await database.query("UPDATE user_generation_tasks SET result = $2 WHERE id = $1 AND user_id = $3", [taskId, JSON.stringify(result), userId]);
+        return result;
+    })();
+    videoTaskStores.set(taskId, job);
+    try {
+        return await job;
+    } finally {
+        if (videoTaskStores.get(taskId) === job) videoTaskStores.delete(taskId);
     }
 }
 

@@ -22,6 +22,10 @@
 - [身份任务清单](specs/identity-todo.md)：此前的身份验收结论和多用户实现追踪；新改动需重新验收，不继承早先测试结果。
 - [上游目录规格](specs/catalog.md)：账号上游模型发现、四类生成协议、账号历史和本地开发契约。
 - [模板库规格](specs/template-library.md)：提示词库改名为模板库入口那一版的阶段性规格；完整工作流模板库在其后落地。
+- [生成请求内联素材（问题）](specs/generation-media-payload.md)：账号模式把参考素材以 base64 内联进生成请求，实测单次请求体约 29.5MB；含实测数据、影响和根因。
+- [生成请求内联素材（初步调研）](specs/generation-media-payload-investigation.md)：上述问题的代码考古、现状梳理、可复用能力、方案对比和待确认项；未改动代码。
+- [服务端与网页端数据流向审计](specs/media-data-flow-audit.md)：根因是项目没有资源抽象，由此产生字节多份、引用多份、搬运重复实现、无回收等后果；含代码定位与处理顺序。
+- [资源身份单点化](specs/resource-identity.md)：上述问题的实现方案与落地结果；生成上行/下行改传 `remote:<uuid>`、视频流式落盘、引用表与回收、请求体分档上限。
 
 ## 开发与数据
 

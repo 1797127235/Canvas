@@ -38,6 +38,14 @@ export function mediaPosterUrl(storageKey?: string) {
     return accountMediaPosterUrl(storageKey) || undefined;
 }
 
+// 账号模式生成的结果已由服务端落库，这里只用身份合成 UploadedFile；
+// 尺寸与时长仍由浏览器读一次媒体头（浏览器会对 /api/media 发 Range 请求，只读文件头）。
+export async function resolveAccountGeneratedMedia(mediaId: string, mimeType: string, bytes = 0): Promise<UploadedFile> {
+    const url = `/api/media/${mediaId}`;
+    const meta = mimeType.startsWith("video/") ? await readVideoMeta(url) : mimeType.startsWith("audio/") ? await readAudioMeta(url) : {};
+    return { url, storageKey: `remote:${mediaId}`, bytes, mimeType, ...meta };
+}
+
 export async function resolveMediaUrl(storageKey?: string, fallback = "") {
     if (!storageKey) return fallback;
     const remote = accountMediaUrl(storageKey);

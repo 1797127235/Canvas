@@ -1,13 +1,13 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button, Image, Modal, Popover } from "antd";
-import { Brain, CheckCircle2, ChevronDown, ChevronRight, Circle, CircleAlert, Copy, ExternalLink, FilePenLine, FileText, ListChecks, LoaderCircle, Search, ShieldAlert, TerminalSquare, Wrench, XCircle } from "lucide-react";
+import { Brain, CheckCircle2, ChevronDown, ChevronRight, Circle, CircleAlert, Copy, ExternalLink, FilePenLine, FileText, ListChecks, LoaderCircle, Search, Wrench, XCircle } from "lucide-react";
 import { Streamdown, type LinkSafetyModalProps } from "streamdown";
 import { useTranslation } from "react-i18next";
 
 import i18n from "@/i18n";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { canvasThemes } from "@/lib/canvas-theme";
-import { useAgentStore, type AgentCanvasReference, type AgentPendingApproval } from "@/stores/use-agent-store";
+import { useAgentStore, type AgentCanvasReference } from "@/stores/use-agent-store";
 import { AgentCanvasReferencePreview, canvasReferenceIcon, canvasReferenceKindLabel } from "./agent-canvas-reference-preview";
 import { agentInlineTokenClass, agentInlineTokenIconClass, agentInlineTokenMediaClass, agentReferenceMarker, parseAgentInlineTokens } from "./agent-chat-inline-tokens";
 
@@ -161,37 +161,11 @@ export function AgentPendingToolCard({ summary, detail, theme, onReject, onAppro
     );
 }
 
-export function AgentApprovalCard({ approval, theme, onDecision }: { approval: AgentPendingApproval; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onDecision: (decision: "accept" | "acceptForSession" | "decline") => void }) {
-    const { t } = useTranslation();
-    const isFile = approval.method === "item/fileChange/requestApproval";
-    const isNetwork = Boolean(approval.networkApprovalContext);
-    const title = t(isNetwork ? "agent.message.networkApproval" : isFile ? "agent.message.fileApproval" : approval.method === "item/permissions/requestApproval" ? "agent.message.permissionApproval" : "agent.message.commandApproval");
-    const target = isNetwork ? approvalTarget(approval.networkApprovalContext) : isFile ? approval.grantRoot || approval.cwd : commandText(approval.command) || approval.cwd;
-    return (
-        <div className="min-w-0 rounded-xl border px-3 py-3" style={{ borderColor: "rgba(234,88,12,.32)", background: "rgba(234,88,12,.035)", color: theme.node.text }}>
-            <div className="flex items-start gap-2.5">
-                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-orange-600" />
-                <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{title}</div>
-                    {approval.reason ? <div className="mt-1 text-xs leading-5" style={{ color: theme.node.muted }}>{approval.reason}</div> : null}
-                    {target ? <div className="mt-1.5 break-all rounded-lg px-2.5 py-2 font-mono text-[11px] leading-4" style={{ background: theme.toolbar.panel, color: theme.node.text }}>{target}</div> : null}
-                </div>
-            </div>
-            <div className="mt-3 flex flex-wrap justify-end gap-1.5 border-t pt-3" style={{ borderColor: theme.node.stroke }}>
-                <Button danger type="text" className="!h-8" disabled={Boolean(approval.deciding)} loading={approval.deciding === "decline"} onClick={() => onDecision("decline")}>{t("agent.message.decline")}</Button>
-                <Button type="text" className="!h-8" disabled={Boolean(approval.deciding)} loading={approval.deciding === "accept"} onClick={() => onDecision("accept")}>{t("agent.message.allowOnce")}</Button>
-                <Button type="text" className="!h-8" disabled={Boolean(approval.deciding)} loading={approval.deciding === "acceptForSession"} style={{ color: "#ea580c" }} onClick={() => onDecision("acceptForSession")}>{t("agent.message.allowSession")}</Button>
-            </div>
-        </div>
-    );
-}
-
 export function AgentToolCard({ title, text, detail, theme }: { title: string; text: string; detail?: unknown; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
     const plan = planDetail(detail);
     if (plan) return <AgentPlanCard title={title} plan={plan} theme={theme} />;
     const kind = String(objectField(detail, "kind") || "");
     if (kind === "reasoning") return <AgentReasoningSummary text={text} detail={detail} theme={theme} />;
-    if (kind === "command") return <AgentCommandGroup items={[{ id: title, text, detail }]} theme={theme} />;
     const state = toolCardState(title, text, detail);
     const view = userDetail(detail);
     const showText = title !== "读取画布" || text !== "已读取当前画布内容";
@@ -241,81 +215,6 @@ function AgentReasoningSummary({ text, detail, theme }: { text: string; detail?:
     );
 }
 
-type AgentCommandItem = Pick<AgentChatMessageItem, "id" | "text" | "detail">;
-
-export function AgentCommandGroup({ items, theme }: { items: AgentCommandItem[]; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
-    const { t } = useTranslation();
-    const states = items.map((item) => commandViewState(item.detail));
-    const running = states.some((state) => state.running);
-    const failed = states.filter((state) => state.failed).length;
-    const expandable = items.some((item) => Boolean(item.text.trim() || userDetail(item.detail)));
-    const color = running ? "#d97706" : failed ? "#dc2626" : theme.node.muted;
-    const label = running ? t(items.length > 1 ? "agent.message.commandsRunning" : "agent.message.commandRunning", { count: items.length }) : t("agent.message.commandsCompleted", { count: items.length, failed: failed ? t("agent.message.commandsFailed", { count: failed }) : "" });
-    const header = (
-        <div className="flex min-w-0 items-center gap-2 text-sm" style={{ color }}>
-            {running ? <LoaderCircle className="size-4 shrink-0 animate-spin" /> : <TerminalSquare className="size-4 shrink-0" />}
-            <span className="font-medium">{label}</span>
-            {expandable ? <ChevronRight className="size-3.5 shrink-0 transition-transform group-open:rotate-90" /> : null}
-        </div>
-    );
-    if (!expandable) return <div className="min-w-0 py-1 text-left">{header}</div>;
-    return (
-        <details className="group min-w-0 text-left">
-            <summary className="cursor-pointer list-none py-1">{header}</summary>
-            {items.length === 1
-                ? <AgentSingleCommand item={items[0]} theme={theme} />
-                : <div className="ml-6 mt-1">{items.map((item, index) => <AgentCommandEntry key={item.id} item={item} index={index} theme={theme} />)}</div>
-            }
-        </details>
-    );
-}
-
-function AgentSingleCommand({ item, theme }: { item: AgentCommandItem; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
-    const view = userDetail(item.detail);
-    return (
-        <div className="ml-6 pb-1">
-            {item.text ? <div className="mt-1.5 whitespace-pre-wrap break-all font-mono text-[11px] leading-5" style={{ color: theme.node.text }}>{item.text}</div> : null}
-            {view ? <AgentDetailBlock detail={view} theme={theme} /> : null}
-        </div>
-    );
-}
-
-function AgentCommandEntry({ item, index, theme }: { item: AgentCommandItem; index: number; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
-    const { t } = useTranslation();
-    const [open, setOpen] = useState(false);
-    const detailId = useId();
-    const view = userDetail(item.detail);
-    const state = commandViewState(item.detail);
-    const status = t(state.failed ? "agent.message.failed" : state.running ? "agent.message.running" : "agent.message.completed");
-    const color = state.failed ? "#dc2626" : state.running ? "#d97706" : "#16a34a";
-    const content = (
-        <>
-            <span className="w-4 shrink-0 text-center text-[10px] tabular-nums opacity-50" style={{ color: theme.node.muted }}>{index + 1}</span>
-            <code className="min-w-0 flex-1 truncate text-[11px] leading-5" style={{ color: theme.node.text }} title={item.text}>{item.text || t("agent.message.command")}</code>
-            <span className="shrink-0" style={{ color }} title={status} aria-label={status}>
-                {state.running ? <LoaderCircle className="size-3.5 animate-spin" /> : state.failed ? <XCircle className="size-3.5" /> : <CheckCircle2 className="size-3.5" />}
-            </span>
-            {view ? <ChevronRight className={`size-3.5 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} style={{ color: theme.node.muted }} /> : null}
-        </>
-    );
-    return (
-        <div className={index ? "border-t" : ""} style={{ borderColor: theme.node.stroke }}>
-            {view
-                ? <button type="button" className="flex w-full min-w-0 items-center gap-2 py-2 text-left" aria-expanded={open} aria-controls={detailId} onClick={() => setOpen((value) => !value)}>{content}</button>
-                : <div className="flex min-w-0 items-center gap-2 py-2 text-left">{content}</div>}
-            {view && open ? <div id={detailId} className="pb-2 pl-6"><AgentDetailBlock detail={view} theme={theme} /></div> : null}
-        </div>
-    );
-}
-
-function commandViewState(detail: unknown) {
-    const status = String(objectField(detail, "status") || "").toLowerCase();
-    return {
-        running: ["inprogress", "in_progress", "running", "started", "pending"].includes(status),
-        failed: ["failed", "error"].includes(status),
-    };
-}
-
 function AgentPlanCard({ title, plan, theme }: { title: string; plan: PlanDetail; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
     const [open, setOpen] = useState(true);
     const completed = plan.tasks.filter((item) => item.status === "completed").length;
@@ -346,7 +245,7 @@ function AgentPlanCard({ title, plan, theme }: { title: string; plan: PlanDetail
     );
 }
 
-export function AgentWorkingMessage({ text, detail, status = "running", mcpStatuses = [], activityKey, theme }: { text: string; detail?: string; status?: "running" | "ready" | "error"; mcpStatuses?: Array<{ name: string; status: "running" | "ready" | "error"; detail: string }>; activityKey: string; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
+export function AgentWorkingMessage({ text, detail, status = "running", activityKey, theme }: { text: string; detail?: string; status?: "running" | "ready" | "error"; activityKey: string; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
     const { t } = useTranslation();
     const [elapsed, setElapsed] = useState(0);
     useEffect(() => {
@@ -363,19 +262,6 @@ export function AgentWorkingMessage({ text, detail, status = "running", mcpStatu
                 {status === "running" && elapsed >= 5 ? <span className="shrink-0 text-[11px] tabular-nums opacity-60">{waitingTime(elapsed)}</span> : null}
             </div>
             {detail ? <div className="ml-5.5 mt-1 text-xs leading-5 opacity-65" style={{ color: theme.node.muted }}>{detail}</div> : null}
-            {mcpStatuses.length ? (
-                <div className="ml-5.5 mt-3 space-y-2">
-                    {mcpStatuses.map((item) => (
-                        <div key={item.name} className="flex min-w-0 items-start gap-2 text-xs leading-5" style={{ color: theme.node.muted }}>
-                            {item.status === "running" ? <LoaderCircle className="mt-0.5 size-3.5 shrink-0 animate-spin" /> : item.status === "ready" ? <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" /> : <XCircle className="mt-0.5 size-3.5 shrink-0 text-red-600" />}
-                            <div className="min-w-0">
-                                <div className="font-medium" style={{ color: theme.node.text }}>{item.name}</div>
-                                <div className="opacity-65">{item.detail}</div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : null}
             {status === "running" && elapsed >= 30 ? <div className="mt-1 text-xs leading-5 opacity-65" style={{ color: theme.node.muted }}>{t("agent.message.slowResponse")}</div> : null}
         </div>
     );
@@ -385,18 +271,6 @@ function waitingTime(seconds: number) {
     if (seconds < 60) return tr("waitingSeconds", { seconds });
     const minutes = Math.floor(seconds / 60);
     return tr("waitingMinutes", { minutes, seconds: seconds % 60 });
-}
-
-function commandText(value: unknown) {
-    if (Array.isArray(value)) return value.map(String).join(" ");
-    return typeof value === "string" ? value : "";
-}
-
-function approvalTarget(value: unknown) {
-    const host = String(objectField(value, "host") || "");
-    const protocol = String(objectField(value, "protocol") || "");
-    const port = String(objectField(value, "port") || "");
-    return host ? `${protocol ? `${protocol}://` : ""}${host}${port ? `:${port}` : ""}` : "";
 }
 
 type PlanTask = { step: string; status: string };

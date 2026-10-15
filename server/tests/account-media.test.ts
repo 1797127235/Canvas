@@ -71,9 +71,19 @@ test("account media streams raw uploads and isolates Range, HEAD and stale-accou
         assert.equal(preview.headers.get("content-type")?.split(";", 1)[0], "image/webp");
         assert.ok((await preview.arrayBuffer()).byteLength > 0);
         assert.equal(preview.headers.get("cache-control"), "private, no-cache");
-        assert.match(preview.headers.get("etag") || "", /^"[0-9a-f-]+-canvas-preview-v1"$/);
+        // 默认取最小档；客户端会带 ?w= 上报实际需要显示的最长边。
+        assert.match(preview.headers.get("etag") || "", /^"[0-9a-f-]+-canvas-preview-v2-512"$/);
         const cachedPreview = await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: { ...headers(sidA), "if-none-match": preview.headers.get("etag") || "" } });
         assert.equal(cachedPreview.status, 304);
+        // 1020 需要 1024 档，超上限时封顶到 2048，两个档位各有独立 ETag（不会与 512 档串缓）。
+        const tieredPreview = await fetch(`${api.baseUrl}/api/media/${imageId}/preview?w=1020`, { headers: headers(sidA) });
+        assert.equal(tieredPreview.status, 200);
+        assert.match(tieredPreview.headers.get("etag") || "", /^"[0-9a-f-]+-canvas-preview-v2-1024"$/);
+        const cappedPreview = await fetch(`${api.baseUrl}/api/media/${imageId}/preview?w=5000`, { headers: headers(sidA) });
+        assert.equal(cappedPreview.status, 200);
+        assert.match(cappedPreview.headers.get("etag") || "", /^"[0-9a-f-]+-canvas-preview-v2-2048"$/);
+        const stalePreviewEtag = await fetch(`${api.baseUrl}/api/media/${imageId}/preview?w=1020`, { headers: { ...headers(sidA), "if-none-match": preview.headers.get("etag") || "" } });
+        assert.equal(stalePreviewEtag.status, 200);
         assert.equal((await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: headers(sidB) })).status, 404);
         const videoBytes = await createVideoFixture(join(directory, "poster-fixture.mp4"));
         const videoUpload = await fetch(`${api.baseUrl}/api/media`, { method: "POST", headers: { ...headers(sidA), origin, "content-type": "video/mp4" }, body: videoBytes });
