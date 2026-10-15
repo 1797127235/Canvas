@@ -48,6 +48,11 @@ jobs:
         working-directory: server
         run: bun install --frozen-lockfile
 
+      # 视频海报（server/src/media.ts）依赖 ffmpeg，生产镜像已装（Dockerfile.api）；
+      # runner 默认没有，不装则 account-media 测试报 spawn ffmpeg ENOENT。
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
       - name: Web type check
         working-directory: web
         run: bun run typecheck
