@@ -596,10 +596,6 @@ function InfiniteCanvasPage() {
 
     useEffect(() => {
         if (!projectLoaded) return;
-        if (effectiveConfig.channelMode === "remote") {
-            updateProject(projectId, { viewport });
-            return;
-        }
         if (viewportSaveTimerRef.current) clearTimeout(viewportSaveTimerRef.current);
         viewportSaveTimerRef.current = setTimeout(() => {
             updateProject(projectId, { viewport: viewportRef.current });
@@ -608,7 +604,7 @@ function InfiniteCanvasPage() {
         return () => {
             if (viewportSaveTimerRef.current) clearTimeout(viewportSaveTimerRef.current);
         };
-    }, [effectiveConfig.channelMode, projectId, projectLoaded, updateProject, viewport]);
+    }, [projectId, projectLoaded, updateProject, viewport]);
 
     useLayoutEffect(() => {
         nodesRef.current = nodes;
