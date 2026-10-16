@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
-import { Readable, Transform } from "node:stream";import { pipeline } from "node:stream/promises";
+import { Readable, Transform, Writable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { dirname, resolve, sep } from "node:path";
 import { Router, type Request, type Response } from "express";
 import type { Pool } from "pg";
@@ -31,13 +32,13 @@ const VIDEO_POSTER_PROFILE = {
 } as const;
 const MAX_IMAGE_INPUT_PIXELS = 40_000_000;
 
-async function createCanvasPreview(input: Readable, maxLongEdge: number) {
+export async function createCanvasPreview(input: Readable, maxLongEdge: number) {
     const output = sharp({ limitInputPixels: MAX_IMAGE_INPUT_PIXELS })
         .rotate()
         .resize({ width: maxLongEdge, height: maxLongEdge, fit: "inside", withoutEnlargement: true })
         .webp({ quality: CANVAS_PREVIEW_PROFILE.quality });
     const chunks: Buffer[] = [];
-    const collector = new Transform({ transform(chunk, _encoding, callback) { chunks.push(Buffer.from(chunk)); callback(null, chunk); } });
+    const collector = new Writable({ write(chunk, _encoding, callback) { chunks.push(Buffer.from(chunk)); callback(); } });
     await pipeline(input, output, collector);
     return Buffer.concat(chunks);
 }

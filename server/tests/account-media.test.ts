@@ -1,15 +1,17 @@
 import assert from "node:assert/strict";
+import { Readable } from "node:stream";
 import { execFile } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { randomFillSync, randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { test } from "node:test";
 import type { Pool } from "pg";
+import sharp from "sharp";
 
 import { createApp } from "../src/app.js";
-import { createMediaRouter } from "../src/media.js";
+import { createCanvasPreview, createMediaRouter } from "../src/media.js";
 import { hashSid } from "../src/identity/session.js";
 import { startTestServer } from "./support/http.js";
 
@@ -20,6 +22,16 @@ async function createVideoFixture(path: string) {
     await execFileAsync("ffmpeg", ["-loglevel", "error", "-f", "lavfi", "-i", "color=c=red:s=16x16:d=0.2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-y", path]);
     return readFile(path);
 }
+
+test("canvas preview consumes large sharp output without stalling", async () => {
+    const raw = randomFillSync(Buffer.alloc(512 * 512 * 3));
+    const source = await sharp(raw, { raw: { width: 512, height: 512, channels: 3 } }).png().toBuffer();
+    const preview = await Promise.race([
+        createCanvasPreview(Readable.from(source), 512),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("preview generation stalled")), 2_000)),
+    ]);
+    assert.ok(preview.length > 65_536);
+});
 
 test("account media streams raw uploads and isolates Range, HEAD and stale-account operations", async () => {
     const directory = await mkdtemp(join(tmpdir(), "account-media-"));
