@@ -1,4 +1,5 @@
 import { APICallError } from "ai";
+import { Readable } from "node:stream";
 import type { Experimental_VideoModelV4, Experimental_VideoModelV4File } from "@ai-sdk/provider";
 import { z } from "zod";
 
@@ -92,6 +93,7 @@ export function gatewayVideoModel(modelId: string, baseUrl: string, apiKey: stri
     };
 }
 
+// 返回流而不是完整 Buffer：调用方直接 pipeline 进媒体存储，不在 api 进程里整块持有视频。
 export async function downloadGatewayVideo(url: string, baseUrl: string, apiKey: string, signal?: AbortSignal) {
     let base: URL;
     let target: URL;
@@ -106,5 +108,6 @@ export async function downloadGatewayVideo(url: string, baseUrl: string, apiKey:
     const response = await gatewayFetch(target, { headers: { Authorization: `Bearer ${apiKey}` }, signal });
     if (!response.ok) throw new APICallError({ message: "视频下载失败", url: target.href, requestBodyValues: undefined, statusCode: response.status, isRetryable: false });
     if (!response.headers.get("content-type")?.startsWith("video/")) throw new Error("上游没有返回有效视频内容");
-    return Buffer.from(await response.arrayBuffer());
+    if (!response.body) throw new Error("上游没有返回有效视频内容");
+    return Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]);
 }

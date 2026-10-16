@@ -10,6 +10,9 @@ RUN bun run build
 
 FROM node:24-bookworm-slim
 ENV NODE_ENV=production
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/server
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

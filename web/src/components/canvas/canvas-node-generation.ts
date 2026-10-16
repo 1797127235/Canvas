@@ -1,5 +1,6 @@
 import type { AiTextMessage } from "@/services/api/image";
 import i18n from "@/i18n";
+import { bypassLocalAuth } from "@/lib/auth-access";
 import { imageReferenceLabel } from "@/lib/image-reference-prompt";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
@@ -164,12 +165,15 @@ export function buildNodeResponseMessages(context: NodeGenerationContext): AiTex
     return [
         {
             role: "user",
-            content: [{ type: "text" as const, text: context.prompt }, ...context.referenceImages.map((image) => ({ type: "image_url" as const, image_url: { url: image.dataUrl } }))],
+            content: [{ type: "text" as const, text: context.prompt }, ...context.referenceImages.map((image) => ({ type: "image_url" as const, image_url: { url: image.storageKey?.startsWith("remote:") ? image.storageKey : image.dataUrl } }))],
         },
     ];
 }
 
+// 账号模式的参考素材已持有 remote: 身份，直接交给服务端按身份读取，不必取回字节再 base64。
+// 本地模式没有服务端可代读，仍需在这里把本地素材转成 data URL。
 export async function hydrateNodeGenerationContext(context: NodeGenerationContext) {
+    if (!bypassLocalAuth) return context;
     const { imageToDataUrl } = await import("@/services/image-storage");
     return { ...context, referenceImages: await Promise.all(context.referenceImages.map(async (image) => ({ ...image, dataUrl: await imageToDataUrl(image) }))) };
 }

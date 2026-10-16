@@ -87,23 +87,22 @@ test("超长请求体和响应体按上限截断", async () => {
     assert.ok(typeof resBody === "string" && resBody.includes("[truncated"));
 });
 
-test("内联素材只记类型和体积，素材路径原样保留", async () => {
-    const image = `data:image/png;base64,${Buffer.alloc(1200).toString("base64")}`;
-    const mediaPath = "/api/media/7ea8813a-a41b-4cf7-9429-53f28dc3c56d";
+test("内联素材只记类型和体积，素材身份原样保留", async () => {
+    const inline = `data:image/png;base64,${Buffer.alloc(1200).toString("base64")}`;
+    const mediaRef = "remote:7ea8813a-a41b-4cf7-9429-53f28dc3c56d";
     const lines = await withServer(async (baseUrl) => {
         const generated = await fetch(`${baseUrl}/api/echo`, {
             method: "POST",
             headers: { origin, "content-type": "application/json" },
-            body: JSON.stringify({ prompt: "画一只猫", images: [image], image_refs: [mediaPath], videos: [] }),
+            body: JSON.stringify({ prompt: "画一只猫", images: [inline, mediaRef], videos: [] }),
         });
         assert.equal(generated.status, 200);
         assert.equal((await fetch(`${baseUrl}/api/images`, { method: "POST", headers: { origin, "content-type": "application/json" }, body: "{}" })).status, 200);
     });
     const [request] = lines;
     const reqBody = request.reqBody as Record<string, unknown>;
-    // 素材摘要后请求体不再超限，参数和素材数量都能留在日志里。
-    assert.deepEqual(reqBody.images, ["data:image/png;base64,<省略 1200 字节>"]);
-    assert.deepEqual(reqBody.image_refs, [mediaPath]);
+    // 素材摘要后请求体不再超限，参数和素材数量都能留在日志里；身份字符串本来就可读，原样保留。
+    assert.deepEqual(reqBody.images, ["data:image/png;base64,<省略 1200 字节>", mediaRef]);
     assert.deepEqual(reqBody.videos, []);
     assert.equal(reqBody.prompt, "画一只猫");
     assert.ok(!JSON.stringify(request.reqBody).includes("AAAAAAAA"));

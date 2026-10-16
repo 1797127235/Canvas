@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 import { bypassLocalAuth } from "@/lib/auth-access";
 import { localForageStorage } from "@/lib/localforage-storage";
 import { cleanupUnusedImages, ensureImagePreview, previewUrlFor, resolveImageUrl, uploadImage } from "@/services/image-storage";
-import { cleanupUnusedMedia, resolveMediaUrl } from "@/services/file-storage";
+import { cleanupUnusedMedia, mediaPosterUrl, resolveMediaUrl } from "@/services/file-storage";
 
 export type AssetKind = "text" | "image" | "video";
 export type TextAsset = AssetBase<"text"> & { data: { content: string } };
@@ -38,6 +38,7 @@ type AssetStore = {
 
 // 卡片用缩略图渲染，自定义封面（远程地址或单独上传的封面）保持原样。
 export function assetCoverUrl(asset: Asset) {
+    if (asset.kind === "video") return asset.coverUrl || mediaPosterUrl(asset.data.storageKey) || "";
     const own = asset.kind === "image" ? asset.data.dataUrl : "";
     const cover = asset.coverUrl || own;
     return asset.kind === "image" && cover === own ? previewUrlFor(asset.data.storageKey) || cover : cover;

@@ -20,14 +20,17 @@ test("text streams and speech use the account endpoint without local credentials
         expect(String(url)).toBe("/api/generations");
         const body = JSON.parse(String(init?.body));
         sent.push(body);
-        if (body.capability === "audio") return new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "audio/mpeg" } });
+        if (body.capability === "audio") return json({ mediaId: "audio-1", mimeType: "audio/mpeg", bytes: 3 });
         return new Response('data: {"choices":[{"delta":{"content":"你好"}}]}\n\ndata: [DONE]\n\n', { headers: { "content-type": "text/event-stream" } });
     }) as typeof fetch;
     const updates: string[] = [];
     expect(await requestImageQuestion({ ...obsoleteConfig, model: "chat" }, [{ role: "user", content: "hello" }], text => updates.push(text))).toBe("你好");
     expect(updates.at(-1)).toBe("你好");
+    // 账号模式音频也由服务端落库，客户端只拿身份，不再接收字节再传回。
     const audio = await requestAudioGeneration({ ...obsoleteConfig, model: "speech" }, "hello");
-    expect(new Uint8Array(await audio.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+    if (audio instanceof Blob) throw new Error("account mode must return media identity");
+    expect(audio.mediaId).toBe("audio-1");
+    expect(audio.mimeType).toBe("audio/mpeg");
     expect(JSON.stringify(sent)).not.toContain("old-local-key");
     expect(JSON.stringify(sent)).not.toContain("old.invalid");
 });
@@ -83,7 +86,8 @@ test("canvas and workbench send the same server image model without local keys o
         const isTaskCreate = init?.method === "POST" && path === "/api/generation-tasks";
         sent.push({ url: path, body: isTaskCreate ? JSON.parse(String(init?.body)) : {}, signal: init?.signal });
         if (isTaskCreate) return json({ id: `11111111-1111-4111-8111-${String(++taskSeq).padStart(12, "0")}` });
-        if (path.startsWith("/api/generation-tasks/")) return json({ status: "completed", mediaIds: [`22222222-2222-4222-8222-${String(taskSeq).padStart(12, "0")}`] });
+        // 任务完成后结果已存在账号媒体里，服务端只返回身份与元数据，客户端不再取回字节。
+        if (path.startsWith("/api/generation-tasks/")) return json({ status: "completed", images: [{ id: `22222222-2222-4222-8222-${String(taskSeq).padStart(12, "0")}`, mimeType: "image/jpeg", bytes: 5, width: 512, height: 512 }] });
         if (path.startsWith("/api/media/")) return new Response(mediaBytes, { headers: { "content-type": "image/jpeg" } });
         return json({ data: [{ b64_json: "aGVsbG8=", mime_type: "image/jpeg" }] });
     }) as typeof fetch;
@@ -93,30 +97,32 @@ test("canvas and workbench send the same server image model without local keys o
     const signal = new AbortController().signal;
     const first = await requestGeneration({ ...obsoleteConfig, count: "1" }, "workbench", { signal });
     const second = await requestGeneration({ ...canvasConfig, count: "1" }, "canvas", { signal });
-    await requestEdit(canvasConfig, "edit", [{ id: "ref", name: "ref.png", type: "image/png", dataUrl: "data:image/png;base64,aGVsbG8=" }], { signal });
+    const refKey = "remote:33333333-3333-4333-8333-333333333333";
+    await requestEdit(canvasConfig, "edit", [{ id: "ref", name: "ref.png", type: "image/png", dataUrl: "", storageKey: refKey }], { signal });
     const taskCreates = sent.filter(item => item.url === "/api/generation-tasks");
     expect(taskCreates.map(item => item.url)).toEqual(["/api/generation-tasks", "/api/generation-tasks", "/api/generation-tasks"]);
     expect(taskCreates.every(item => item.body.modelId === models[0].id && item.signal === signal)).toBe(true);
     expect(JSON.stringify(sent)).not.toContain("old-local-key");
     expect(JSON.stringify(sent)).not.toContain("old.invalid");
     expect(first[0].id).not.toBe(second[0].id);
-    expect(first[0].dataUrl).toBe("data:image/jpeg;base64,aGVsbG8=");
-    expect((taskCreates[2].body.input as Record<string, unknown>).images).toEqual(["data:image/png;base64,aGVsbG8="]);
+    // 账号模式结果直接持有 remote: 身份，不再取回字节转 base64。
+    expect(first[0].dataUrl).toBe("/api/media/22222222-2222-4222-8222-000000000001");
+    expect(first[0].storageKey).toBe("remote:22222222-2222-4222-8222-000000000001");
+    // 账号模式只提交素材身份，字节由服务端按 id 从账号媒体读取。
+    expect((taskCreates[2].body.input as Record<string, unknown>).images).toEqual([refKey]);
     expect(resolveModelForCapability(obsoleteConfig, "old-text", "text")).toBe("");
     await requestGeneration({ ...obsoleteConfig, count: "1", quality: "1k", size: "1:1" }, "preset");
     expect((taskCreates.at(-1)?.body.input as Record<string, unknown>).size).toBe("1024x1024");
 });
 
-test("canvas and workbench use one video create/poll path and preserve binary bytes", async () => {
+test("canvas and workbench use one video create/poll path and return media identity", async () => {
     useCatalogStore.setState({ models, status: "ready" });
     const sent: Array<{ url: string; body?: Record<string, unknown> }> = [];
-    const bytes = new Uint8Array([0, 255, 128, 1, 42]);
     globalThis.fetch = (async (url, init) => {
         const path = String(url);
         sent.push({ url: path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
         if (init?.method === "POST") return json({ id: "12345678-1234-4234-8234-123456789012" });
-        if (path.endsWith("/content")) return new Response(bytes, { headers: { "content-type": "video/mp4" } });
-        return json({ status: "completed" });
+        return json({ status: "completed", mediaId: "99999999-9999-4999-8999-999999999999", mimeType: "video/mp4", bytes: 5 });
     }) as typeof fetch;
     const config = { ...obsoleteConfig, model: "old::doubao", size: "auto" };
     const one = await createVideoGenerationTask(config, "workbench");
@@ -125,8 +131,12 @@ test("canvas and workbench use one video create/poll path and preserve binary by
     expect(two.model).toBe(models[1].id);
     const state = await pollVideoGenerationTask(config, one);
     expect(state.status).toBe("completed");
-    if (state.status !== "completed" || !state.result.blob) throw new Error("Missing video result");
-    expect(new Uint8Array(await state.result.blob.arrayBuffer())).toEqual(bytes);
+    // 视频结果由服务端落库，客户端只拿身份；字节不再经浏览器中转。
+    if (state.status !== "completed") throw new Error("Missing video result");
+    expect(state.result.mediaId).toBe("99999999-9999-4999-8999-999999999999");
+    expect(state.result.blob).toBeUndefined();
+    // 不再请求已删除的 /generations/:id/content。
+    expect(sent.some(item => item.url.endsWith("/content"))).toBe(false);
     expect(sent.filter(item => item.body).every(item => item.body?.modelId === models[1].id)).toBe(true);
     expect(JSON.stringify(sent)).not.toContain("old-local-key");
 });

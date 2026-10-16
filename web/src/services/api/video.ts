@@ -8,8 +8,9 @@ import { getMediaBlob, resolveMediaUrl, uploadMediaFile, type UploadedFile } fro
 import { imageToDataUrl } from "@/services/image-storage";
 import { boolConfig, buildApiUrl, modelOptionName, resolveModelRequestConfig, resolveModelScript, type AiConfig } from "@/stores/use-config-store";
 import { runModelPlugin } from "./model-plugin";
-import { fetchServerGenerationContent, pollServerGeneration, requestServerGeneration } from "./generation";
-import { accountMediaUrl } from "./media";
+import { pollServerGeneration, requestServerGeneration } from "./generation";
+import { resolveAccountGeneratedMedia } from "@/services/file-storage";
+import { requireAccountMediaRefs } from "./media";
 import { bypassLocalAuth } from "@/lib/auth-access";
 import { catalogModel, useCatalogStore } from "@/stores/use-catalog-store";
 import type { ReferenceImage } from "@/types/image";
@@ -22,7 +23,7 @@ type RequestOptions = { signal?: AbortSignal };
 type VideoMediaOptions = RequestOptions & { videos?: ReferenceVideo[]; audios?: ReferenceAudio[]; taskId?: string };
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
-export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
+export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string; mediaId?: string };
 export type VideoGenerationTask = { id: string; provider: "openai" | "gemini" | "plugin"; model: string };
 type GeminiInlineData = { bytesBase64Encoded: string; mimeType: string };
 type GeminiVideoOperation = {
@@ -79,15 +80,13 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
         await useCatalogStore.getState().load();
         const model = catalogModel("video", selectedModel);
         if (!model) throw new Error(useCatalogStore.getState().error || "暂无可用视频模型");
-        const images = await Promise.all(references.map((image) => imageToDataUrl(image, options)));
-        const mediaData = async (items: ReferenceVideo[] | ReferenceAudio[], name: string) => Promise.all(items.map(async (item) => readFileAsDataUrl(await referenceMediaToFile(item, name, "invalidReferenceVideo", options))));
+        const images = requireAccountMediaRefs(references);
         const payload = await requestServerGeneration("video", model.id, {
             prompt, seconds: normalizeVideoSeconds(config.videoSeconds),
             ...(normalizeVideoSize(config.size, config.vquality) ? { size: normalizeVideoSize(config.size, config.vquality) } : {}),
             resolution_name: normalizeVideoResolution(config.vquality), generate_audio: boolConfig(config.videoGenerateAudio, true),
             watermark: boolConfig(config.videoWatermark, false), mode: resolveVideoMode(config.videoMode, images.length), images,
-            image_refs: references.map((image) => accountMediaUrl(image.storageKey)).filter(Boolean),
-            videos: await mediaData(options?.videos || [], "ref.mp4"), audios: await mediaData(options?.audios || [], "ref.mp3"),
+            videos: requireAccountMediaRefs(options?.videos || []), audios: requireAccountMediaRefs(options?.audios || []),
         }, options?.signal, options?.taskId);
         const id = typeof payload.id === "string" ? payload.id : "";
         if (!id) throw new Error(apiText("noVideoTaskId"));
@@ -108,7 +107,11 @@ export async function pollVideoGenerationTask(config: AiConfig, task: VideoGener
             const error = payload.error as { message?: string } | undefined;
             return { status: "failed", error: error?.message || apiText("videoGenerationFailed") };
         }
-        if (payload.status === "completed") return { status: "completed", result: { blob: await fetchServerGenerationContent(task.id, options?.signal) } };
+        if (payload.status === "completed") {
+            const mediaId = typeof payload.mediaId === "string" ? payload.mediaId : "";
+            if (!mediaId) throw new Error(apiText("noPlayableVideo"));
+            return { status: "completed", result: { mediaId, mimeType: "video/mp4" } };
+        }
         return { status: "pending" };
     }
     if (task.provider === "plugin") {
@@ -165,7 +168,9 @@ function videoPluginResult(result: unknown): VideoGenerationResult {
     throw new Error(apiText("scriptNoVideo"));
 }
 
+// 账号模式的视频结果已由服务端落库，这里只用身份合成 UploadedFile；尺寸与时长仍需浏览器读一次媒体头。
 export async function storeGeneratedVideo(result: VideoGenerationResult): Promise<UploadedFile> {
+    if (result.mediaId) return resolveAccountGeneratedMedia(result.mediaId, result.mimeType || "video/mp4");
     if (result.blob) return uploadMediaFile(result.blob, "video");
     if (result.url) {
         if (!bypassLocalAuth) return uploadMediaFile(result.url, "video");

@@ -51,6 +51,40 @@ export function snapNodesIntoGroup(movedIds: Set<string>, nodes: CanvasNodeData[
 export const GROUP_WRAP_PADDING = 24;
 export const GROUP_WRAP_TOP_PADDING = 52;
 
+// 展开的批量卡片铺在节点外侧的网格上，会同时解码同数量的图片，因此必须封顶。
+export const MAX_EXPANDED_BATCH_CARDS = 8;
+const EXPANDED_BATCH_COLUMNS = 4;
+const EXPANDED_CARD_GAP = 18;
+
+// 展开的批量卡片排在主图之后（主图不占展开名额）：越过末行起点后往后错一格。
+export function expandedCardPosition(node: CanvasNodeData, index: number) {
+    const count = node.metadata?.images?.length || 0;
+    const columns = Math.min(count, EXPANDED_BATCH_COLUMNS);
+    const rows = Math.ceil(count / columns);
+    const rootSlot = (rows - 1) * columns;
+    const slot = index >= rootSlot ? index + 1 : index;
+    return { x: (slot % columns) * (node.width + EXPANDED_CARD_GAP), y: (Math.floor(slot / columns) - rows + 1) * (node.height + EXPANDED_CARD_GAP) };
+}
+
+// 节点在画布上真正占用的范围。批量图展开时卡片会铺到节点外面，裁剪必须按外扩后的
+// 包围盒算，否则铺到屏幕外的卡片仍会留在 DOM 里继续渲染并解码。
+export function nodeRenderBounds(node: CanvasNodeData, batchExpanded: boolean) {
+    if (!batchExpanded) return { left: node.position.x, top: node.position.y, right: node.position.x + node.width, bottom: node.position.y + node.height };
+    const cards = Math.min(Math.max((node.metadata?.images?.length || 0) - 1, 0), MAX_EXPANDED_BATCH_CARDS);
+    let left = 0;
+    let top = 0;
+    let right = node.width;
+    let bottom = node.height;
+    for (let index = 0; index < cards; index += 1) {
+        const { x, y } = expandedCardPosition(node, index);
+        left = Math.min(left, x);
+        top = Math.min(top, y);
+        right = Math.max(right, x + node.width);
+        bottom = Math.max(bottom, y + node.height);
+    }
+    return { left: node.position.x + left, top: node.position.y + top, right: node.position.x + right, bottom: node.position.y + bottom };
+}
+
 function selectedGroupIds(selectedIds: Set<string>, nodes: CanvasNodeData[]) {
     return new Set(nodes.filter((node) => selectedIds.has(node.id) && node.type === CanvasNodeType.Group).map((node) => node.id));
 }

@@ -1,3 +1,4 @@
+import i18n from "@/i18n";
 import { useUserStore } from "@/stores/use-user-store";
 
 async function withAccountMedia<T>(signal: AbortSignal | undefined, request: (signal: AbortSignal, userId: string) => Promise<T>) {
@@ -60,6 +61,32 @@ export async function fetchAccountMedia(storageKey: string, options?: { signal?:
     }));
 }
 
+// 生成请求的参考素材只传身份（remote:<uuid>），字节由服务端从账号媒体读取。
+// 账号模式下素材在上传时就已得到 remote: 身份；缺失说明上传未完成，直接报错而不是静默丢素材。
+export function requireAccountMediaRefs(items: readonly { storageKey?: string }[]) {
+    return items.map((item) => {
+        if (!item.storageKey?.startsWith("remote:")) throw new Error(i18n.t("apiErrors.referenceMediaNotUploaded"));
+        return item.storageKey;
+    });
+}
+
 export function accountMediaUrl(storageKey?: string) {
     return storageKey?.startsWith("remote:") ? `/api/media/${storageKey.slice("remote:".length)}` : "";
+}
+
+export const ACCOUNT_MEDIA_PREVIEW_TIERS = [512, 1024, 2048] as const;
+
+export function accountMediaPreviewTier(requiredLongEdge?: number) {
+    const edge = requiredLongEdge && Number.isFinite(requiredLongEdge) && requiredLongEdge > 0 ? requiredLongEdge : ACCOUNT_MEDIA_PREVIEW_TIERS[0];
+    return ACCOUNT_MEDIA_PREVIEW_TIERS.find((tier) => tier >= edge) || ACCOUNT_MEDIA_PREVIEW_TIERS[ACCOUNT_MEDIA_PREVIEW_TIERS.length - 1];
+}
+
+export function accountMediaPreviewUrl(storageKey?: string, requiredLongEdge?: number) {
+    if (!storageKey?.startsWith("remote:")) return "";
+    const id = storageKey.slice("remote:".length);
+    return `/api/media/${id}/preview?w=${accountMediaPreviewTier(requiredLongEdge)}`;
+}
+
+export function accountMediaPosterUrl(storageKey?: string) {
+    return storageKey?.startsWith("remote:") ? `/api/media/${storageKey.slice("remote:".length)}/poster` : "";
 }

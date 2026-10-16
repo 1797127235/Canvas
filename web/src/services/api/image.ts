@@ -12,6 +12,7 @@ import { useUserStore } from "@/stores/use-user-store";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
+import { requireAccountMediaRefs } from "./media";
 import { computeMediaSize, imageSizePresets, inferMediaRatio, inferMediaScale } from "@/lib/media-size";
 import type { ReferenceImage } from "@/types/image";
 
@@ -85,7 +86,7 @@ export type ImageRequestOptions = RequestOptions & {
 const IMAGE_TASK_POLL_MS = 2500;
 const IMAGE_TASK_TIMEOUT_MS = 15 * 60_000;
 
-// 账号模式图片生成走服务端异步任务：创建任务 → 轮询 → 从账号媒体取回图片。
+// 账号模式图片生成走服务端异步任务：创建任务 → 轮询 → 结果已存在账号媒体里，直接带身份返回。
 // 任务号在这里先生成并立刻交给调用方写进节点，然后才发请求：建任务要等上游模型发现，
 // 可能耗时数秒，若等响应回来才有号，这几秒内刷新就会把任务当成「已中断」。
 export async function requestServerImageTaskGeneration(modelId: string, input: Record<string, unknown>, options: ImageRequestOptions = {}) {
@@ -108,21 +109,12 @@ export async function requestServerImageTaskGeneration(modelId: string, input: R
     return state.images;
 }
 
-export type ServerImageTaskState = { status: "running" } | { status: "failed"; error: string } | { status: "completed"; images: Array<{ id: string; dataUrl: string }> };
+// 账号模式的生成结果直接以素材身份返回，不再取回字节再传回服务端。
+export type GeneratedAccountImage = { id: string; mimeType: string; bytes: number; width: number; height: number };
+export type GeneratedAccountResult = GeneratedAccountImage & { url: string; dataUrl: string; storageKey: string };
+export type ServerImageTaskState = { status: "running" } | { status: "failed"; error: string } | { status: "completed"; images: GeneratedAccountResult[] };
 
-async function readAccountMediaDataUrl(mediaId: string, signal?: AbortSignal) {
-    const userId = useUserStore.getState().user?.id;
-    const response = await fetch(`/api/media/${encodeURIComponent(mediaId)}`, { credentials: "same-origin", signal, headers: { Accept: "image/*", ...(userId ? { "X-Account-Id": userId } : {}) } });
-    if (userId !== useUserStore.getState().user?.id) throw new DOMException("账号已切换", "AbortError");
-    if (!response.ok) throw new Error("生成结果读取失败");
-    const buffer = new Uint8Array(await response.arrayBuffer());
-    const mimeType = response.headers.get("content-type")?.split(";")[0] || "image/png";
-    let binary = "";
-    for (let offset = 0; offset < buffer.length; offset += 0x8000) binary += String.fromCharCode(...buffer.subarray(offset, offset + 0x8000));
-    return `data:${mimeType};base64,${btoa(binary)}`;
-}
-
-// 轮询一次图片任务；completed 时把账号媒体取回并转为 dataURL。
+// 轮询一次图片任务；completed 时返回素材身份与元数据（不读取字节）。
 export async function pollServerImageTask(taskId: string, options: RequestOptions = {}): Promise<ServerImageTaskState> {
     const userId = useUserStore.getState().user?.id;
     const poll = await fetch(`/api/generation-tasks/${encodeURIComponent(taskId)}`, { credentials: "same-origin", signal: options.signal, headers: { Accept: "application/json", ...(userId ? { "X-Account-Id": userId } : {}) } });
@@ -131,14 +123,11 @@ export async function pollServerImageTask(taskId: string, options: RequestOption
     // 否则刷新恢复会把自己的任务误判成失败。
     if (poll.status === 404) return { status: "running" };
     if (!poll.ok) return { status: "failed", error: await readImageTaskError(poll) };
-    const state = await poll.json() as { status?: string; mediaIds?: string[]; error?: string };
+    const state = await poll.json() as { status?: string; images?: GeneratedAccountImage[]; error?: string };
     if (state.status === "failed") return { status: "failed", error: state.error || "上游生成失败" };
-    if (state.status !== "completed" || !state.mediaIds?.length) return { status: "running" };
-    const images = [];
-    for (const mediaId of state.mediaIds) {
-        images.push({ id: nanoid(), dataUrl: await readAccountMediaDataUrl(mediaId, options.signal) });
-    }
-    return { status: "completed", images };
+    if (state.status !== "completed" || !state.images?.length) return { status: "running" };
+    // 结果已存在账号媒体里，直接给出身份与元数据；content 用可直接展示的地址。
+    return { status: "completed", images: state.images.map((image) => ({ ...image, url: `/api/media/${image.id}`, dataUrl: `/api/media/${image.id}`, storageKey: `remote:${image.id}` })) };
 }
 
 async function readImageTaskError(response: Response) {
@@ -773,7 +762,7 @@ async function requestAccountImages(config: AiConfig, prompt: string, references
     const quality = normalizeQuality(config.quality);
     const size = accountImageSize(config.size);
     const background = normalizeBackground(config.background);
-    const images = await Promise.all(references.map((image) => imageToDataUrl(image, options)));
+    const images = requireAccountMediaRefs(references);
     return requestServerImageTaskGeneration(model.id, {
         prompt, n: Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1))),
         ...(quality ? { quality } : {}), ...(size ? { size } : {}), ...(background ? { background } : {}),

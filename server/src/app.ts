@@ -16,8 +16,11 @@ export function createApp(options: AppOptions) {
     app.use(logRequests());
     app.use(rejectUnsupportedEncoding);
     app.use(rejectCrossOriginStateChanges(options.appOrigin));
-    // 媒体走原始上传流；业务 JSON 不设容量额度，身份请求保留原有 4 KiB 校验。
-    app.use(express.json({ limit: Infinity, type: (request) => !request.url?.startsWith("/api/media") && Boolean(request.headers["content-type"]?.startsWith("application/json")), verify: rejectLargeIdentityBody }));
+    // 媒体走原始上传流不设限；业务 JSON 按用途分档。
+    // 素材改传身份后，生成请求体从 29.5MB 级降到 KB 级，1 MiB 仍有很宽余量；
+    // 工作区要装下全部画布与助手会话，留 8 MiB；身份接口沿用原有 4 KiB。
+    // 此前是 limit: Infinity，任何已登录账号都能用超大请求体把 api 进程内存打满。
+    app.use(express.json({ limit: JSON_BODY_LIMIT, type: (request) => !request.url?.startsWith("/api/media") && Boolean(request.headers["content-type"]?.startsWith("application/json")), verify: rejectLargeBody }));
     app.use((request, response, next) => {
         if (request.path.startsWith("/api/") && !request.path.startsWith("/api/media") && ["POST", "PUT", "PATCH"].includes(request.method) && !request.is("application/json")) {
             return response.status(415).json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "请求必须使用 JSON" } });
@@ -42,6 +45,10 @@ export function createApp(options: AppOptions) {
     app.use(handleError);
     return app;
 }
+
+const IDENTITY_BODY_LIMIT = 4 * 1024;
+const GENERATION_BODY_LIMIT = 1024 * 1024;
+const JSON_BODY_LIMIT = 8 * 1024 * 1024;
 
 const noStore: RequestHandler = (_request, response, next) => {
     response.setHeader("Cache-Control", "no-store");
@@ -97,16 +104,21 @@ function rejectCrossOriginStateChanges(appOrigin: string): RequestHandler {
     };
 }
 
-const rejectLargeIdentityBody = (request: Request, _response: Response, buffer: Buffer) => {
-    if (request.path.startsWith("/api/users") || request.path.startsWith("/api/sessions")) {
-        if (buffer.length > 4096) {
-            const error = new Error("identity body too large") as Error & { type: string; status: number };
-            error.type = "entity.too.large";
-            error.status = 413;
-            throw error;
-        }
+const rejectLargeBody = (request: Request, _response: Response, buffer: Buffer) => {
+    const limit = bodyLimitFor(request.path);
+    if (limit && buffer.length > limit) {
+        const error = new Error("request body too large") as Error & { type: string; status: number };
+        error.type = "entity.too.large";
+        error.status = 413;
+        throw error;
     }
 };
+
+function bodyLimitFor(path: string) {
+    if (path.startsWith("/api/users") || path.startsWith("/api/sessions")) return IDENTITY_BODY_LIMIT;
+    if (path.startsWith("/api/generations") || path.startsWith("/api/generation-tasks")) return GENERATION_BODY_LIMIT;
+    return 0;
+}
 
 function isBodyParserError(error: unknown): error is Error & { type: string } {
     return error instanceof Error && "type" in error && typeof error.type === "string";

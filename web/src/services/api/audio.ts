@@ -2,7 +2,7 @@ import axios from "axios";
 
 import i18n from "@/i18n";
 import { audioMimeType, normalizeAudioFormatValue, normalizeAudioSpeedValue, normalizeAudioVoiceValue } from "@/lib/audio-generation";
-import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
+import { resolveAccountGeneratedMedia, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, type AiConfig } from "@/stores/use-config-store";
 import { runModelPlugin } from "./model-plugin";
 import { bypassLocalAuth } from "@/lib/auth-access";
@@ -23,7 +23,7 @@ function aiHeaders(config: AiConfig) {
     };
 }
 
-export async function requestAudioGeneration(config: AiConfig, prompt: string, options?: RequestOptions): Promise<Blob> {
+export async function requestAudioGeneration(config: AiConfig, prompt: string, options?: RequestOptions): Promise<Blob | { mediaId: string; mimeType: string; bytes: number }> {
     if (!bypassLocalAuth) {
         await useCatalogStore.getState().load();
         const model = catalogModel("audio", config.model || config.audioModel);
@@ -34,9 +34,9 @@ export async function requestAudioGeneration(config: AiConfig, prompt: string, o
             speed: Number(normalizeAudioSpeedValue(config.audioSpeed)),
             ...(config.audioInstructions.trim() ? { instructions: config.audioInstructions.trim() } : {}),
         }, options?.signal);
-        const blob = await response.blob();
-        await assertAudioBlob(blob);
-        return blob.type.startsWith("audio/") ? blob : new Blob([blob], { type: audioMimeType(format) });
+        const payload = (await response.json()) as { mediaId?: string; mimeType?: string; bytes?: number };
+        if (!payload.mediaId) throw new Error(apiText("audioGenerationFailed"));
+        return { mediaId: payload.mediaId, mimeType: payload.mimeType || audioMimeType(format), bytes: payload.bytes || 0 };
     }
     const requestConfig = resolveModelRequestConfig(config, config.model || config.audioModel);
     const model = requestConfig.model.trim();
@@ -97,8 +97,10 @@ async function audioPluginBlob(result: unknown, format: string): Promise<Blob> {
     return blob.type.startsWith("audio/") ? blob : new Blob([blob], { type: audioMimeType(format) });
 }
 
-export async function storeGeneratedAudio(blob: Blob, format = "mp3"): Promise<UploadedFile> {
-    const audio = blob.type.startsWith("audio/") ? blob : new Blob([blob], { type: audioMimeType(format) });
+// 账号模式的音频结果已由服务端落库，这里只用身份合成 UploadedFile。
+export async function storeGeneratedAudio(input: Blob | { mediaId: string; mimeType: string; bytes: number }, format = "mp3"): Promise<UploadedFile> {
+    if (!(input instanceof Blob)) return resolveAccountGeneratedMedia(input.mediaId, input.mimeType || audioMimeType(format), input.bytes);
+    const audio = input.type.startsWith("audio/") ? input : new Blob([input], { type: audioMimeType(format) });
     return uploadMediaFile(audio, "audio");
 }
 

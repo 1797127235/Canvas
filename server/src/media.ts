@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
-import { Readable, Transform } from "node:stream";import { pipeline } from "node:stream/promises";
+import { Readable, Transform, Writable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { dirname, resolve, sep } from "node:path";
 import { Router, type Request, type Response } from "express";
 import type { Pool } from "pg";
 import { Client } from "minio";
+import sharp from "sharp";
 
 import { requireUser } from "./identity/auth-middleware.js";
 
@@ -13,7 +16,105 @@ type ByteRange = { start: number; end: number };
 type MediaStore = { put(key: string, body: Readable, mimeType: string): Promise<void>; get(key: string, range?: ByteRange): Promise<Readable>; remove(key: string): Promise<void> };
 export type MediaOptions = { client?: Client; bucket?: string; directory?: string };
 
+// 画布预览分档：客户端按「需要显示的最长边」取满足需求的最小档，画布上永不加载原图。
+const CANVAS_PREVIEW_PROFILE = {
+    version: "canvas-preview-v2",
+    quality: 82,
+} as const;
+export const CANVAS_PREVIEW_TIERS = [512, 1024, 2048];
+const DEFAULT_CANVAS_PREVIEW_TIER = CANVAS_PREVIEW_TIERS[0];
+const previewJobs = new Map<string, Promise<Buffer>>();
+const posterJobs = new Map<string, Promise<Buffer>>();
+const VIDEO_POSTER_PROFILE = {
+    version: "video-poster-canvas-v1",
+    maxLongEdge: 1024,
+    quality: 82,
+} as const;
+const MAX_IMAGE_INPUT_PIXELS = 40_000_000;
+
+export async function createCanvasPreview(input: Readable, maxLongEdge: number) {
+    const output = sharp({ limitInputPixels: MAX_IMAGE_INPUT_PIXELS })
+        .rotate()
+        .resize({ width: maxLongEdge, height: maxLongEdge, fit: "inside", withoutEnlargement: true })
+        .webp({ quality: CANVAS_PREVIEW_PROFILE.quality });
+    const chunks: Buffer[] = [];
+    const collector = new Writable({ write(chunk, _encoding, callback) { chunks.push(Buffer.from(chunk)); callback(); } });
+    await pipeline(input, output, collector);
+    return Buffer.concat(chunks);
+}
+
+async function createStoredPreview(store: MediaStore, objectKey: string, tier: number, input: () => Promise<Readable>) {
+    const key = previewObjectKey(objectKey, tier);
+    let job = previewJobs.get(key);
+    if (!job) {
+        job = input().then((stream) => createCanvasPreview(stream, tier));
+        previewJobs.set(key, job);
+    }
+    try {
+        const preview = await job;
+        await store.put(key, Readable.from(preview), "image/webp");
+        return preview;
+    } finally {
+        if (previewJobs.get(key) === job) previewJobs.delete(key);
+    }
+}
+
+function previewObjectKey(objectKey: string, tier: number) {
+    return `${objectKey}.preview.${CANVAS_PREVIEW_PROFILE.version}.${tier}.webp`;
+}
+
+function previewObjectKeys(objectKey: string) {
+    return CANVAS_PREVIEW_TIERS.map((tier) => previewObjectKey(objectKey, tier));
+}
+
+// 请求可以指定需要的显示边长；取满足需求的最小档，超上限时封顶，避免回落到原图。
+function previewTier(requested: unknown) {
+    const value = Number(requested);
+    if (!Number.isFinite(value) || value <= 0) return DEFAULT_CANVAS_PREVIEW_TIER;
+    return CANVAS_PREVIEW_TIERS.find((tier) => tier >= value) ?? CANVAS_PREVIEW_TIERS[CANVAS_PREVIEW_TIERS.length - 1];
+}
+
+function posterObjectKey(objectKey: string) {
+    return `${objectKey}.poster.${VIDEO_POSTER_PROFILE.version}.webp`;
+}
+
+async function createVideoPoster(input: Readable) {
+    const process = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-frames:v", "1", "-f", "image2pipe", "-vcodec", "png", "pipe:1"], { stdio: ["pipe", "pipe", "pipe"] });
+    const outputPromise = readStreamBytes(process.stdout);
+    const errorPromise = readStreamBytes(process.stderr);
+    try {
+        await pipeline(input, process.stdin);
+        const [png, errorOutput] = await Promise.all([outputPromise, errorPromise]);
+        const exitCode = await new Promise<number | null>((resolve) => process.once("close", resolve));
+        if (exitCode !== 0 || !png.length) throw new Error(`视频海报生成失败${errorOutput.length ? `: ${errorOutput.toString("utf8").trim()}` : ""}`);
+        return sharp(png, { limitInputPixels: MAX_IMAGE_INPUT_PIXELS })
+            .resize({ width: VIDEO_POSTER_PROFILE.maxLongEdge, height: VIDEO_POSTER_PROFILE.maxLongEdge, fit: "inside", withoutEnlargement: true })
+            .webp({ quality: VIDEO_POSTER_PROFILE.quality })
+            .toBuffer();
+    } catch (error) {
+        process.kill();
+        throw error;
+    }
+}
+
+async function createStoredPoster(store: MediaStore, objectKey: string, input: () => Promise<Readable>) {
+    const key = posterObjectKey(objectKey);
+    let job = posterJobs.get(key);
+    if (!job) {
+        job = input().then(createVideoPoster);
+        posterJobs.set(key, job);
+    }
+    try {
+        const poster = await job;
+        await store.put(key, Readable.from(poster), "image/webp");
+        return poster;
+    } finally {
+        if (posterJobs.get(key) === job) posterJobs.delete(key);
+    }
+}
+
 // 供生成任务等服务端流程落盘媒体：写入与 /api/media 上传相同的存储和 user_media 表。
+// 顺带返回宽高（sharp.metadata 只读文件头，不解码整图），让客户端不必为了拿尺寸再把字节取回去。
 export async function storeAccountMedia(database: Pool, options: MediaOptions, userId: string, bytes: Buffer, mimeType: string) {
     const store = mediaStore(options);
     if (!store) throw new Error("媒体存储尚未配置");
@@ -21,13 +122,73 @@ export async function storeAccountMedia(database: Pool, options: MediaOptions, u
     const objectKey = `${userId}/${id}`;
     await store.put(objectKey, Readable.from(bytes), mimeType);
     await database.query("INSERT INTO user_media (id, user_id, object_key, mime_type, byte_size) VALUES ($1, $2, $3, $4, $5)", [id, userId, objectKey, mimeType, bytes.length]);
+    const metadata = await sharp(bytes, { limitInputPixels: MAX_IMAGE_INPUT_PIXELS }).metadata().catch(() => null);
+    if (metadata?.width && metadata.height) return { id, mimeType, bytes: bytes.length, width: metadata.width, height: metadata.height };
     return { id, mimeType, bytes: bytes.length };
+}
+
+// 回收无人引用的账号媒体。三重保险，宁可少删不能误删：
+// ① 只动创建超过宽限期的媒体，刚生成、刚上传的永不入选；
+// ② 以 user_media_references 为索引（保存工作区时重建）；
+// ③ 再核对工作区与生成历史的原文——引用表是后来才加的，
+//    旧数据首次上线时表是空的，只看表会把还在用的媒体删光。
+export const MEDIA_GRACE_DAYS = 7;
+
+export async function clearUnusedMedia(database: Pool, options: MediaOptions) {
+    const store = mediaStore(options);
+    if (!store) return 0;
+    const result = await database.query<{ id: string; object_key: string }>(
+        `DELETE FROM user_media m
+         WHERE m.created_at < CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 day')
+           AND NOT EXISTS (SELECT 1 FROM user_media_references r WHERE r.user_id = m.user_id AND r.media_id = m.id)
+           AND NOT EXISTS (SELECT 1 FROM user_workspaces w WHERE w.user_id = m.user_id AND w.data::text LIKE '%remote:' || m.id::text || '%')
+           AND NOT EXISTS (SELECT 1 FROM user_generation_history h WHERE h.user_id = m.user_id AND h.data::text LIKE '%remote:' || m.id::text || '%')
+         RETURNING m.id, m.object_key`,
+        [MEDIA_GRACE_DAYS],
+    );
+    for (const row of result.rows) {
+        await store.remove(row.object_key).catch(() => undefined);
+        await Promise.all(previewObjectKeys(row.object_key).map((key) => store.remove(key).catch(() => undefined)));
+        await store.remove(posterObjectKey(row.object_key)).catch(() => undefined);
+    }
+    return result.rows.length;
+}
+
+// 视频等大媒体的流式落盘：不把整个文件读进 api 进程内存，边收边写存储并统计体积。
+export async function storeAccountMediaStream(database: Pool, options: MediaOptions, userId: string, body: Readable, mimeType: string) {
+    const store = mediaStore(options);
+    if (!store) throw new Error("媒体存储尚未配置");
+    const id = randomUUID();
+    const objectKey = `${userId}/${id}`;
+    let size = 0;
+    const counter = new Transform({ transform(chunk, _encoding, callback) { size += chunk.length; callback(null, chunk); } });
+    try {
+        await store.put(objectKey, body.pipe(counter), mimeType);
+        await database.query("INSERT INTO user_media (id, user_id, object_key, mime_type, byte_size) VALUES ($1, $2, $3, $4, $5)", [id, userId, objectKey, mimeType, size]);
+    } catch (error) {
+        await store.remove(objectKey).catch(() => undefined);
+        throw error;
+    }
+    return { id, mimeType, bytes: size };
+}
+
+// 素材字节的唯一读取入口：生成流程按 remote:<uuid> 取字节，与 /api/media 的读取共用同一套归属校验。
+// 查不到统一报错，不区分「不存在」与「不属于当前账号」，避免探测他人素材。
+export async function readAccountMediaBytes(database: Pool, options: MediaOptions, userId: string, mediaId: string) {
+    const store = mediaStore(options);
+    if (!store) throw new Error("媒体存储尚未配置");
+    const result = await database.query<{ object_key: string; mime_type: string }>("SELECT object_key, mime_type FROM user_media WHERE id = $1 AND user_id = $2", [mediaId, userId]);
+    const row = result.rows[0];
+    if (!row) throw new Error("参考素材不存在或不属于当前账号");
+    return { bytes: await readStreamBytes(await store.get(row.object_key)), mimeType: row.mime_type };
 }
 
 export function createMediaRouter(database: Pool, options: MediaOptions) {
     const router = Router();
     router.use(requireUser(database));
     router.post("/media", (request, response) => uploadMedia(request, response, database, options));
+    router.get("/media/:id/preview", (request, response) => readPreview(request, response, database, options));
+    router.get("/media/:id/poster", (request, response) => readPoster(request, response, database, options));
     router.get("/media/:id", (request, response) => readMedia(request, response, database, options));
     router.delete("/media/:id", (request, response) => deleteMedia(request, response, database, options));
     return router;
@@ -80,6 +241,67 @@ async function uploadMedia(request: Request, response: Response, database: Pool,
     return response.status(201).json({ id, mimeType, bytes });
 }
 
+async function readStreamBytes(stream: Readable) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    return Buffer.concat(chunks);
+}
+
+async function readPreview(request: Request, response: Response, database: Pool, options: MediaOptions) {
+    const store = mediaStore(options);
+    if (!store) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
+    const result = await database.query<{ object_key: string; mime_type: string }>("SELECT object_key, mime_type FROM user_media WHERE id = $1 AND user_id = $2", [request.params.id, response.locals.user.id]);
+    const row = result.rows[0];
+    if (!row) return response.status(404).json({ error: { code: "MEDIA_NOT_FOUND", message: "媒体不存在" } });
+    if (!row.mime_type.startsWith("image/")) return response.status(415).json({ error: { code: "MEDIA_PREVIEW_UNSUPPORTED", message: "该媒体不支持图片预览" } });
+
+    const tier = previewTier(request.query.w);
+    const previewKey = previewObjectKey(row.object_key, tier);
+    let bytes: Buffer;
+    let mimeType = "image/webp";
+    let preview = true;
+    try {
+        bytes = await readStreamBytes(await store.get(previewKey));
+    } catch {
+        try {
+            bytes = await createStoredPreview(store, row.object_key, tier, () => store.get(row.object_key));
+        } catch {
+            // 预览生成失败时退回原图，画布会重新解码大图，但至少不显示破图。
+            bytes = await readStreamBytes(await store.get(row.object_key));
+            mimeType = row.mime_type;
+            preview = false;
+        }
+    }
+    const etag = `"${request.params.id}-${preview ? `${CANVAS_PREVIEW_PROFILE.version}-${tier}` : "original"}"`;
+    response.type(mimeType).set({ "Cache-Control": "private, no-cache", ETag: etag });
+    if (request.header("if-none-match") === etag) return response.status(304).end();
+    return response.set("Content-Length", String(bytes.length)).send(bytes);
+}
+
+async function readPoster(request: Request, response: Response, database: Pool, options: MediaOptions) {
+    const store = mediaStore(options);
+    if (!store) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
+    const result = await database.query<{ object_key: string; mime_type: string }>("SELECT object_key, mime_type FROM user_media WHERE id = $1 AND user_id = $2", [request.params.id, response.locals.user.id]);
+    const row = result.rows[0];
+    if (!row) return response.status(404).json({ error: { code: "MEDIA_NOT_FOUND", message: "媒体不存在" } });
+    if (!row.mime_type.startsWith("video/")) return response.status(415).json({ error: { code: "MEDIA_POSTER_UNSUPPORTED", message: "该媒体不支持视频海报" } });
+
+    let bytes: Buffer;
+    try {
+        bytes = await readStreamBytes(await store.get(posterObjectKey(row.object_key)));
+    } catch {
+        try {
+            bytes = await createStoredPoster(store, row.object_key, () => store.get(row.object_key));
+        } catch {
+            return response.status(503).json({ error: { code: "MEDIA_POSTER_UNAVAILABLE", message: "视频海报暂时不可用" } });
+        }
+    }
+    const etag = `"${request.params.id}-${VIDEO_POSTER_PROFILE.version}"`;
+    response.type("image/webp").set({ "Cache-Control": "private, no-cache", ETag: etag });
+    if (request.header("if-none-match") === etag) return response.status(304).end();
+    return response.set("Content-Length", String(bytes.length)).send(bytes);
+}
+
 async function readMedia(request: Request, response: Response, database: Pool, options: MediaOptions) {
     const store = mediaStore(options);
     if (!store) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
@@ -120,6 +342,10 @@ async function deleteMedia(request: Request, response: Response, database: Pool,
     if (!store) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
     const result = await database.query<{ object_key: string }>("DELETE FROM user_media WHERE id = $1 AND user_id = $2 RETURNING object_key", [request.params.id, response.locals.user.id]);
     const row = result.rows[0];
-    if (row) await store.remove(row.object_key);
+    if (row) {
+        await store.remove(row.object_key);
+        await Promise.all(previewObjectKeys(row.object_key).map((key) => store.remove(key).catch(() => undefined)));
+        await store.remove(posterObjectKey(row.object_key)).catch(() => undefined);
+    }
     return response.status(204).end();
 }

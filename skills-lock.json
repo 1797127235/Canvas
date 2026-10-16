@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "next-best-practices": {
+      "source": "vercel-labs/openreview",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/next-best-practices/SKILL.md",
+      "computedHash": "db85045827ebeb83ac8dbc992b69188755eeb74dcf01cbf5e694d58aa494a106"
+    },
+    "open-code-review": {
+      "source": "alibaba/open-code-review",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/open-code-review/SKILL.md",
+      "computedHash": "d3a3a06ec51a1b1d8c4ff4cb5fbc963269446b1627178c1106c606868f5a4d29"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -22,6 +22,17 @@ const userA = randomUUID(), userB = randomUUID();
 const cookie = (sid: Buffer) => `infinite_canvas_session=${sid.toString("base64url")}`;
 
 test("unified generation validates models, multipart references, task ownership and binary content", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "generation-refs-"));
+    // 参考素材现在按身份（remote:<uuid>）提交，字节由服务端从账号媒体读取；这里用真实目录代替存储。
+    const mediaFiles = new Map<string, { user: string; object_key: string; mimeType: string }>();
+    const putMedia = async (user: string, mimeType: string, bytes: Buffer) => {
+        const id = randomUUID();
+        const objectKey = `${user}/${id}`;
+        await mkdir(join(directory, user), { recursive: true });
+        await writeFile(join(directory, objectKey), bytes);
+        mediaFiles.set(id, { user, object_key: objectKey, mimeType });
+        return `remote:${id}`;
+    };
     const calls: Array<{ path: string; authorization?: string; body: Buffer; contentType?: string }> = [];
     const bytes = Buffer.from([0, 255, 128, 17, 99]);
     const upstream = express();
@@ -40,8 +51,9 @@ test("unified generation validates models, multipart references, task ownership 
         return response.json({ data: [{ b64_json: "aGVsbG8=" }] });
     });
     const provider = await startTestServer(upstream);
-    const tasks = new Map<string, { user: string; operation: unknown; model_id: string; base_url: string }>();
+    const tasks = new Map<string, { user: string; operation: unknown; model_id: string; base_url: string; result?: unknown }>();
     const history = new Map<string, unknown>();
+    const storedMedia = new Map<string, { user: string; object_key: string; mimeType: string }>();
     let activeUser = userA;
     // SAFETY: this minimal Pool test double only implements the parameterized queries exercised by this router.
     const database = { query: async (sql: string, values: any[]) => {
@@ -50,8 +62,22 @@ test("unified generation validates models, multipart references, task ownership 
             return { rows: [{ id: activeUser, email: `${activeUser}@example.com`, expires_at: new Date("2099-01-01") }] };
         }
         if (sql.includes("FROM user_credentials")) return { rows: [{ encrypted_api_key: encryptCredential(values[0] === userA ? "test-key-A" : "test-key-B", secret) }] };
+        if (sql.includes("FROM user_media")) {
+            const file = mediaFiles.get(values[0]);
+            if (!file || file.user !== values[1]) return { rows: [] };
+            return { rows: [{ object_key: file.object_key, mime_type: file.mimeType }] };
+        }
+        if (sql.includes("INSERT INTO user_media")) {
+            storedMedia.set(values[0], { user: values[1], object_key: values[2], mimeType: values[3] });
+            return { rows: [] };
+        }
         if (sql.includes("INSERT INTO user_generation_tasks")) {
             tasks.set(values[0], { user: values[1], operation: JSON.parse(values[2]), model_id: values[4], base_url: values[3] }); return { rows: [] };
+        }
+        if (sql.startsWith("UPDATE user_generation_tasks SET result")) {
+            const task = tasks.get(values[0]);
+            if (task) task.result = JSON.parse(values[1]);
+            return { rows: [] };
         }
         if (sql.includes("FROM user_generation_tasks")) {
             const task = tasks.get(values[0]); return { rows: task?.user === values[1] ? [task] : [] };
@@ -69,7 +95,7 @@ test("unified generation validates models, multipart references, task ownership 
         { id: "video", name: "Seedance", upstreamModel: "doubao-seedance-2-0-mini", adapter: "gateway-videos" as const, capability: "video" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
         { id: "video-alt", name: "Seedance Alt", upstreamModel: "doubao-seedance-2-0", adapter: "gateway-videos" as const, capability: "video" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
     ] };
-    const api = await startTestServer(createApp({ appOrigin: origin, apiRouter: createGenerationRouter(database, { catalog, encryptionKey: secret }) }));
+    const api = await startTestServer(createApp({ appOrigin: origin, apiRouter: createGenerationRouter(database, { catalog, encryptionKey: secret, media: { directory } }) }));
     const post = (body: unknown) => fetch(`${api.baseUrl}/api/generations`, { method: "POST", headers: { origin, cookie: cookie(sidA), "content-type": "application/json" }, body: JSON.stringify(body) });
     try {
         assert.equal((await fetch(`${api.baseUrl}/api/generations/${randomUUID()}`)).status, 401);
@@ -91,7 +117,8 @@ test("unified generation validates models, multipart references, task ownership 
         assert.equal(calls[0].path, "/v1/images/generations");
         assert.equal(JSON.parse(calls[0].body.toString()).model, "gpt-image-2.5");
         assert.equal(calls[0].authorization, "Bearer test-key-A");
-        const ref = "data:image/png;base64,aGVsbG8=";
+        const ref = await putMedia(userA, "image/png", Buffer.from("hello"));
+        const resolvedRef = "data:image/png;base64,aGVsbG8=";
         assert.equal((await post({ capability: "image", modelId: "image", input: { prompt: "edit", images: [ref] } })).status, 200);
         const editCall = calls[1];
         assert.equal(editCall.path, "/v1/images/edits");
@@ -113,23 +140,24 @@ test("unified generation validates models, multipart references, task ownership 
         assert.equal(videoPayload.aspect_ratio, "9:16");
         assert.equal(videoPayload.generate_audio, true);
         assert.equal(videoPayload.watermark, false);
-        assert.deepEqual(videoPayload.image, { url: ref });
+        assert.deepEqual(videoPayload.image, { url: resolvedRef });
         const alt = await post({ capability: "video", modelId: "video-alt", input: { prompt: "video" } });
         assert.equal(alt.status, 201);
         const { id: altId } = await alt.json();
         assert.equal(JSON.parse(calls[3].body.toString()).model, "doubao-seedance-2-0");
         const bigBuffer = await sharp({ create: { width: 2000, height: 2000, channels: 3, background: { r: 128, g: 128, b: 128 }, noise: { type: "gaussian", mean: 128, sigma: 30 } } }).png().toBuffer();
         assert.ok(bigBuffer.length > 512 * 1024);
-        const bigVideo = await post({ capability: "video", modelId: "video", input: { prompt: "video", images: [`data:image/png;base64,${bigBuffer.toString("base64")}`], seconds: "5" } });
+        const bigRef = await putMedia(userA, "image/png", bigBuffer);
+        const bigVideo = await post({ capability: "video", modelId: "video", input: { prompt: "video", images: [bigRef], seconds: "5" } });
         assert.equal(bigVideo.status, 201);
         const normalizedUrl = JSON.parse(calls.at(-1)!.body.toString()).image.url as string;
         assert.match(normalizedUrl, /^data:image\/jpeg;base64,/);
         assert.ok(Buffer.from(normalizedUrl.split(",")[1], "base64").length <= 512 * 1024);
-        const multiVideo = await post({ capability: "video", modelId: "video", input: { prompt: "video", images: [ref, `data:image/png;base64,${bigBuffer.toString("base64")}`], seconds: "5" } });
+        const multiVideo = await post({ capability: "video", modelId: "video", input: { prompt: "video", images: [ref, bigRef], seconds: "5" } });
         assert.equal(multiVideo.status, 201);
         const multiPayload = JSON.parse(calls.at(-1)!.body.toString());
         assert.equal(multiPayload.model, "doubao-seedance-2-0-mini");
-        assert.deepEqual(multiPayload.image, { url: ref });
+        assert.deepEqual(multiPayload.image, { url: resolvedRef });
         assert.match(multiPayload.last_frame.url, /^data:image\/jpeg;base64,/);
         assert.ok(Buffer.from(multiPayload.last_frame.url.split(",")[1], "base64").length <= 512 * 1024);
         assert.equal(multiPayload.reference_images, undefined);
@@ -137,18 +165,28 @@ test("unified generation validates models, multipart references, task ownership 
         assert.equal(calls.at(-1)?.authorization, "Bearer test-key-A");
         const before = calls.length;
         assert.equal((await fetch(`${api.baseUrl}/api/generations/${id}`, { headers: { cookie: cookie(sidB) } })).status, 404);
-        assert.equal((await fetch(`${api.baseUrl}/api/generations/${id}/content`, { headers: { cookie: cookie(sidB) } })).status, 404);
         assert.equal(calls.length, before);
         const poll = await fetch(`${api.baseUrl}/api/generations/${id}`, { headers: { cookie: cookie(sidA) } });
         assert.equal(poll.status, 200);
-        assert.equal((await poll.json()).status, "completed");
+        const polled = await poll.json() as { status: string; mediaId?: string };
+        assert.equal(polled.status, "completed");
+        // 首次完成：先查状态，再下载一次视频存进账号媒体；字节不再经浏览器中转。
+        assert.equal(calls.at(-2)?.path, "/v1/videos/upstream-task");
+        assert.equal(calls.at(-1)?.path, "/v1/videos/upstream-task/content");
+        const videoMedia = storedMedia.get(polled.mediaId!)!;
+        assert.ok(videoMedia, "video must be stored in account media");
+        assert.equal(videoMedia.mimeType, "video/mp4");
+        assert.deepEqual(await readFile(join(directory, videoMedia.object_key)), bytes);
+        // 重复轮询直接复用已落库结果，不再重复下载上游视频。
+        const again = await fetch(`${api.baseUrl}/api/generations/${id}`, { headers: { cookie: cookie(sidA) } });
+        assert.equal((await again.json() as { mediaId?: string }).mediaId, polled.mediaId);
         assert.equal(calls.at(-1)?.path, "/v1/videos/upstream-task");
-        const content = await fetch(`${api.baseUrl}/api/generations/${id}/content`, { headers: { cookie: cookie(sidA) } });
-        assert.deepEqual(Buffer.from(await content.arrayBuffer()), bytes);
-        assert.equal(calls.at(-1)?.authorization, "Bearer test-key-A");
         const audio = await post({ capability: "audio", modelId: "speech-model", input: { input: "speech", voice: "alloy", response_format: "mp3" } });
-        assert.equal(audio.headers.get("content-type"), "audio/mpeg");
-        assert.deepEqual(Buffer.from(await audio.arrayBuffer()), bytes);
+        assert.equal(audio.status, 200);
+        const audioPayload = await audio.json() as { mediaId: string; mimeType: string; bytes: number };
+        assert.equal(audioPayload.mimeType, "audio/mpeg");
+        assert.equal(audioPayload.bytes, bytes.length);
+        assert.deepEqual(await readFile(join(directory, storedMedia.get(audioPayload.mediaId)!.object_key)), bytes);
         const text = await post({ capability: "text", modelId: "chat-model", input: { messages: [{ role: "user", content: "hi" }], stream: true } });
         assert.equal(text.status, 200);
         const streamed = await text.text();
@@ -166,7 +204,7 @@ test("unified generation validates models, multipart references, task ownership 
         assert.deepEqual(await (await fetch(historyUrl, { headers: { cookie: cookie(sidA) } })).json(), { logs: [{ id: "record", prompt: "private" }] });
         await fetch(`${historyUrl}/record`, { method: "DELETE", headers: historyHeaders });
         assert.deepEqual(await (await fetch(historyUrl, { headers: { cookie: cookie(sidA) } })).json(), { logs: [] });
-    } finally { await api.close(); await provider.close(); }
+    } finally { await api.close(); await provider.close(); await rm(directory, { recursive: true, force: true }); }
 });
 
 test("image generation runs as a background task, bridges url results and stores account media", async () => {
@@ -249,21 +287,29 @@ test("image generation runs as a background task, bridges url results and stores
         assert.equal(status, "running");
         const others = { origin, cookie: cookie(sidB) };
         assert.equal((await fetch(`${api.baseUrl}/api/generation-tasks/${id}`, { headers: others })).status, 404);
-        let state: { status: string; mediaIds?: string[]; error?: string } | undefined;
+        type ImageTaskState = { status: string; images?: Array<{ id: string; mimeType: string; bytes: number; width: number; height: number }>; error?: string };
+        let state: ImageTaskState | undefined;
         for (let index = 0; index < 40; index++) {
             const poll = await fetch(`${api.baseUrl}/api/generation-tasks/${id}`, { headers: { origin, cookie: cookie(sidA) } });
-            state = await poll.json() as { status: string; mediaIds?: string[]; error?: string };
+            state = await poll.json() as ImageTaskState;
 
             if (state.status !== "running") break;
             await new Promise((resolve) => setTimeout(resolve, 50));
         }
         assert.equal(state?.status, "completed");
-        assert.equal(state?.mediaIds?.length, 1);
+        assert.equal(state?.images?.length, 1);
+        const result = state!.images![0];
+        // 结果直接带素材元数据，客户端凭 id 引用即可，不必取回字节再重新上传。
+        assert.equal(result.mimeType, "image/png");
+        assert.equal(result.bytes, png.length);
+        // 测试用的 png 只有文件签名、没有可读的尺寸头；读不到尺寸时任务仍成功，宽高记为 0。
+        assert.equal(result.width, 0);
+        assert.equal(result.height, 0);
         assert.equal(imageCalls, baseline + 1);
         assert.equal(lastImageRequest?.model, "gpt-image-2.5");
         assert.equal(lastImageRequest?.authorization, "Bearer test-key-A");
-        const bytes = await (await fetch(`${api.baseUrl}/api/media/${state!.mediaIds![0]}`, { headers: { origin, cookie: cookie(sidA) } })).arrayBuffer();
+        const bytes = await (await fetch(`${api.baseUrl}/api/media/${result.id}`, { headers: { origin, cookie: cookie(sidA) } })).arrayBuffer();
         assert.deepEqual(new Uint8Array(bytes), new Uint8Array(png));
-        assert.equal((await fetch(`${api.baseUrl}/api/media/${state!.mediaIds![0]}`, { headers: { origin, cookie: cookie(sidB) } })).status, 404);
+        assert.equal((await fetch(`${api.baseUrl}/api/media/${result.id}`, { headers: { origin, cookie: cookie(sidB) } })).status, 404);
     } finally { await api.close(); await provider.close(); await rm(directory, { recursive: true, force: true }); }
 });

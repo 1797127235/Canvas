@@ -10,6 +10,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import type { CatalogModel } from "../catalog/catalog.js";
 import type { ImageInput, SpeechInput, TextInput, VideoInput } from "./input.js";
+import { mediaRefId } from "./input.js";
 import { gatewayFetch, gatewayVideoModel } from "./gateway-video.js";
 
 const operationSchema = z.strictObject({
@@ -18,19 +19,41 @@ const operationSchema = z.strictObject({
 });
 export type VideoOperation = Omit<z.infer<typeof operationSchema>, "operation"> & { operation: JSONValue };
 
+// 素材按能力做类型校验：身份字符串本身不带类型，用实际 mime 把关（等价于原先 data URL 正则的约束）。
+const MEDIA_TYPES: Record<"image" | "video" | "audio", RegExp> = {
+    image: /^image\/(png|jpeg|webp)$/,
+    video: /^video\/(mp4|webm)$/,
+    audio: /^audio\/(mpeg|mp3|wav|ogg|webm)$/,
+};
+
+// 生成流程按 remote:<uuid> 取素材字节的唯一入口。这里把字节转成 data URL 交给 SDK，
+// 浏览器到 api 这一段只传身份（KB 级）；api 到上游这一段仍是 base64，那是上游协议本身的形状。
+type MediaResolve = (ref: string) => Promise<string>;
+export type MediaReader = { image: MediaResolve; video: MediaResolve; audio: MediaResolve };
+
+export function mediaReader(read: (mediaId: string) => Promise<{ bytes: Buffer; mimeType: string }>): MediaReader {
+    const resolve = (category: keyof typeof MEDIA_TYPES): MediaResolve => async (ref) => {
+        const { bytes, mimeType } = await read(mediaRefId(ref));
+        if (!MEDIA_TYPES[category].test(mimeType)) throw new Error("参考素材类型不支持");
+        return `data:${mimeType};base64,${bytes.toString("base64")}`;
+    };
+    return { image: resolve("image"), video: resolve("video"), audio: resolve("audio") };
+}
+
 function providers(model: CatalogModel, apiKey: string) {
     const options = { apiKey, baseURL: model.baseUrl, fetch: gatewayFetch };
     return { openai: createOpenAI(options), xai: createXai(options) };
 }
 
-export async function createImages(model: CatalogModel, apiKey: string, input: ImageInput, signal: AbortSignal) {
+export async function createImages(model: CatalogModel, apiKey: string, input: ImageInput, signal: AbortSignal, media: MediaReader) {
     const { openai, xai } = providers(model, apiKey);
     const isXai = model.adapter === "xai-images";
     const { quality, background, output_format } = input;
+    const images = input.images?.length ? await Promise.all(input.images.map(media.image)) : [];
     try {
         const result = await generateImage({
             model: isXai ? xai.image(model.upstreamModel) : openai.image(model.upstreamModel),
-            prompt: input.images?.length ? { text: input.prompt, images: input.images } : input.prompt,
+            prompt: images.length ? { text: input.prompt, images } : input.prompt,
             n: input.n, maxImagesPerCall: input.n || 1,
             ...(isXai ? { aspectRatio: mediaAspectRatio(input.size, ["1:1", "2:3", "3:2", "4:3", "3:4", "16:9", "9:16", "21:9", "9:21"]) } : { size: input.size as `${number}x${number}` | undefined }),
             providerOptions: isXai ? { xai: { quality, output_format } } : { openai: { quality, background, outputFormat: output_format } },
@@ -82,26 +105,32 @@ export async function createSpeech(model: CatalogModel, apiKey: string, input: S
     return result.audio;
 }
 
-function messages(input: TextInput): ModelMessage[] {
-    return input.messages.map(message => {
-        if (typeof message.content === "string") return { role: message.role, content: message.content };
-        if (message.role === "system") return { role: "system", content: message.content.filter(part => part.type === "text").map(part => part.text).join("\n") };
-        if (message.role === "assistant") return { role: "assistant", content: message.content.map(part => part.type === "text" ? part : { type: "file" as const, data: part.image_url.url, mediaType: "image/png" }) };
-        return { role: "user", content: message.content.map(part => part.type === "text" ? part : { type: "image" as const, image: part.image_url.url }) };
-    });
+// 文本链路的图片引用也改传身份：url 为 remote:<uuid> 时按账号素材读取，其余（已是 data URL 或 http 地址）原样透传。
+async function resolveImageUrl(url: string, media: MediaReader) {
+    return url.startsWith("remote:") ? media.image(url) : url;
 }
 
-function textOptions(model: CatalogModel, apiKey: string, input: TextInput, signal: AbortSignal) {
+async function messages(input: TextInput, media: MediaReader): Promise<ModelMessage[]> {
+    return Promise.all(input.messages.map(async (message): Promise<ModelMessage> => {
+        if (typeof message.content === "string") return { role: message.role, content: message.content };
+        if (message.role === "system") return { role: "system", content: message.content.filter(part => part.type === "text").map(part => part.text).join("\n") };
+        const parts = await Promise.all(message.content.map(async (part) => (part.type === "text" ? part : { ...part, image_url: { url: await resolveImageUrl(part.image_url.url, media) } })));
+        if (message.role === "assistant") return { role: "assistant", content: parts.map(part => part.type === "text" ? part : { type: "file" as const, data: part.image_url.url, mediaType: "image/png" }) };
+        return { role: "user", content: parts.map(part => part.type === "text" ? part : { type: "image" as const, image: part.image_url.url }) };
+    }));
+}
+
+async function textOptions(model: CatalogModel, apiKey: string, input: TextInput, signal: AbortSignal, media: MediaReader) {
     return {
-        model: providers(model, apiKey).openai.chat(model.upstreamModel), messages: messages(input),
+        model: providers(model, apiKey).openai.chat(model.upstreamModel), messages: await messages(input, media),
         providerOptions: { openai: { reasoningEffort: input.reasoning_effort } }, maxRetries: 0, abortSignal: signal,
     };
 }
-export function createTextStream(model: CatalogModel, apiKey: string, input: TextInput, signal: AbortSignal) {
-    return streamText(textOptions(model, apiKey, input, signal));
+export async function createTextStream(model: CatalogModel, apiKey: string, input: TextInput, signal: AbortSignal, media: MediaReader) {
+    return streamText(await textOptions(model, apiKey, input, signal, media));
 }
-export async function createText(model: CatalogModel, apiKey: string, input: TextInput, signal: AbortSignal) {
-    const result = await generateText(textOptions(model, apiKey, input, signal));
+export async function createText(model: CatalogModel, apiKey: string, input: TextInput, signal: AbortSignal, media: MediaReader) {
+    const result = await generateText(await textOptions(model, apiKey, input, signal, media));
     return { choices: [{ message: { role: "assistant", content: result.text } }] };
 }
 
@@ -109,10 +138,13 @@ function videoModel(adapter: VideoOperation["adapter"], modelId: string, baseUrl
     return adapter === "xai-videos" ? createXai({ apiKey, baseURL: baseUrl, fetch: gatewayFetch }).video(modelId) : gatewayVideoModel(modelId, baseUrl, apiKey);
 }
 
-export async function createVideo(model: CatalogModel, apiKey: string, input: VideoInput, signal: AbortSignal) {
+export async function createVideo(model: CatalogModel, apiKey: string, input: VideoInput, signal: AbortSignal, media: MediaReader) {
     const adapter = model.adapter === "xai-videos" ? "xai-videos" : "gateway-videos";
-    const images = await normalizeVideoImages(input.images || []);
-    const videos = input.videos || [], audios = input.audios || [];
+    const [images, videos, audios] = await Promise.all([
+        normalizeVideoImages(await Promise.all((input.images || []).map(media.image))),
+        Promise.all((input.videos || []).map(media.video)),
+        Promise.all((input.audios || []).map(media.audio)),
+    ]);
     const frames = input.mode !== "reference" && images.length <= 2 && !videos.length && !audios.length;
     const inputReferences = frames ? undefined : [
         ...images.map(data => ({ data, mediaType: data.slice(5, data.indexOf(";")) })),

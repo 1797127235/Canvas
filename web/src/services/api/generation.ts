@@ -32,12 +32,6 @@ export async function pollServerGeneration(id: string, signal?: AbortSignal) {
     return responseSchema.parse(await response.json());
 }
 
-export async function fetchServerGenerationContent(id: string, signal?: AbortSignal) {
-    const response = await fetch(`/api/generations/${encodeURIComponent(id)}/content`, { credentials: "same-origin", signal });
-    if (!response.ok) throw await readGenerationError(response);
-    return response.blob();
-}
-
 export async function requestServerImageGeneration(modelId: string, input: Record<string, unknown>, signal?: AbortSignal) {
     const payload = await requestServerGeneration("image", modelId, input, signal);
     const parsed = imageResponseSchema.parse(payload);

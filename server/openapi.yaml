@@ -1,0 +1,764 @@
+openapi: 3.1.0
+info:
+  title: 无限画布账号接口
+  version: 0.0.0
+  description: 账号模式下的服务端接口。浏览器通过同源 `/api` 访问，登录态放在 HttpOnly Cookie 中。
+  contact:
+    name: 线上环境
+    url: http://openai2api.com:3015
+  license:
+    name: 仅供接口调试
+    url: http://openai2api.com:3015
+servers:
+  - url: http://openai2api.com:3015/api
+tags:
+  - name: 身份
+    description: 注册、登录、会话和健康检查。
+  - name: 账号配置
+    description: 保存并查看当前账号的上游 API Key。
+  - name: 工作区
+    description: 按账号读写画布和素材。
+  - name: 媒体
+    description: 上传、读取和删除当前账号的媒体文件。
+  - name: 模型与生成
+    description: 查询模型并代发图片、视频、文本和音频生成。
+security:
+  - sessionCookie: []
+paths:
+  /health:
+    get:
+      tags: [身份]
+      summary: 健康检查
+      description: 确认 API 进程可以响应。
+      security: []
+      operationId: getHealth
+      responses:
+        "200":
+          description: 进程存活。不检查数据库和对象存储。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean, const: true }
+  /users:
+    post:
+      tags: [身份]
+      summary: 注册并建立会话
+      description: 创建账号并同时写入 7 天会话 Cookie。
+      security: []
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CredentialsInput" }
+      responses:
+        "201":
+          description: 注册成功，响应包含会话 Cookie。
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SessionCookie" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionCreated" }
+        "409": { $ref: "#/components/responses/EmailExists" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /sessions:
+    post:
+      tags: [身份]
+      summary: 登录
+      description: 校验邮箱和密码，成功后写入新的会话 Cookie。
+      security: []
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CredentialsInput" }
+      responses:
+        "201":
+          description: 登录成功，响应包含新的会话 Cookie。
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SessionCookie" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionCreated" }
+        "401": { $ref: "#/components/responses/InvalidCredentials" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/LoginRestricted" }
+  /session:
+    get:
+      tags: [身份]
+      summary: 读取当前会话
+      description: 根据会话 Cookie 返回当前用户和到期时间。
+      operationId: getSession
+      responses:
+        "200":
+          description: 当前有效会话，不会延长到期时间。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CurrentSession" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+    delete:
+      tags: [身份]
+      summary: 退出当前会话
+      description: 撤销当前 Cookie 对应的会话。
+      operationId: logout
+      responses:
+        "204":
+          description: 当前会话已撤销。没有会话时同样返回 204。
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SessionCookie" }
+  /credentials:
+    get:
+      tags: [账号配置]
+      summary: 查看 API Key 是否已配置
+      description: 返回是否已保存 Key 及其掩码。
+      operationId: getCredential
+      responses:
+        "200":
+          description: 只返回掩码，不返回明文 Key。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CredentialStatus" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/AccountChanged" }
+        "503": { $ref: "#/components/responses/CredentialsNotConfigured" }
+    put:
+      tags: [账号配置]
+      summary: 保存或覆盖 API Key
+      description: 每个账号只保留一把 Key，重复保存会覆盖。
+      operationId: putCredential
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [apiKey]
+              properties:
+                apiKey: { type: string, minLength: 1, maxLength: 4096 }
+      responses:
+        "204": { description: 已加密保存。 }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/AccountChanged" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "503": { $ref: "#/components/responses/CredentialsNotConfigured" }
+    delete:
+      tags: [账号配置]
+      summary: 清除 API Key
+      description: 删除当前账号已保存的上游 API Key。
+      operationId: deleteCredential
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      responses:
+        "204": { description: 已清除。 }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/AccountChanged" }
+  /models:
+    get:
+      tags: [模型与生成]
+      summary: 使用账号 Key 获取上游模型
+      description: 用当前账号的 Key 查询唯一上游的模型列表。
+      operationId: listModels
+      responses:
+        "200":
+          description: 上游模型与本地目录合并后的公开信息。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [models]
+                properties:
+                  models:
+                    type: array
+                    items: { $ref: "#/components/schemas/PublicModel" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409":
+          description: 未保存 API Key，或请求期间账号已切换。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+  /workspace:
+    get:
+      tags: [工作区]
+      summary: 读取当前账号的全部画布和素材
+      description: 返回该账号工作区的完整 JSON 和版本号。
+      operationId: getWorkspace
+      responses:
+        "200":
+          description: 没有工作区时返回版本 0 和空数据。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workspace" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/AccountChanged" }
+    put:
+      tags: [工作区]
+      summary: 按版本覆盖保存工作区
+      description: 客户端必须携带读取时得到的版本号。
+      operationId: putWorkspace
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+        - name: If-Match-Version
+          in: header
+          required: true
+          description: 读取工作区时得到的版本。首次保存传 0。
+          schema: { type: string, pattern: "^\\d+$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WorkspaceData" }
+      responses:
+        "200":
+          description: 保存成功并返回新版本。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version]
+                properties:
+                  version: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409":
+          description: 版本不匹配或账号已切换。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /media:
+    post:
+      tags: [媒体]
+      summary: 上传原始媒体字节
+      description: 请求体是文件原文，不使用 JSON。
+      operationId: uploadMedia
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "201":
+          description: 已写入当前账号的媒体存储。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoredMedia" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/AccountChanged" }
+        "503": { $ref: "#/components/responses/MediaNotConfigured" }
+  /media/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: 上传媒体时返回的媒体 ID。
+        schema: { type: string, format: uuid }
+    get:
+      tags: [媒体]
+      summary: 读取媒体原文
+      description: 返回上传时保存的原始字节，支持单段 Range。
+      operationId: readMedia
+      parameters:
+        - $ref: "#/components/parameters/AccountId"
+        - name: Range
+          in: header
+          required: false
+          description: 可选的单段字节范围，用于分段读取媒体。
+          schema: { type: string }
+      responses:
+        "200":
+          description: 完整原文。响应为实际上传的媒体类型。
+          headers:
+            Accept-Ranges: { schema: { type: string, const: bytes } }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "206": { description: 满足单段 Range 的部分内容。 }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/MediaNotFound" }
+        "409": { $ref: "#/components/responses/AccountChanged" }
+        "416": { description: Range 超出文件大小。 }
+        "503": { $ref: "#/components/responses/MediaNotConfigured" }
+    head:
+      tags: [媒体]
+      summary: 读取媒体大小和类型
+      description: 只返回响应头，不返回文件内容。
+      operationId: readMediaMetadata
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      responses:
+        "200": { description: 仅返回头信息。 }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/MediaNotFound" }
+    delete:
+      tags: [媒体]
+      summary: 删除媒体
+      description: 删除当前账号名下的媒体记录和文件。
+      operationId: deleteMedia
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      responses:
+        "204": { description: 已删除，或不存在。 }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/AccountChanged" }
+        "503": { $ref: "#/components/responses/MediaNotConfigured" }
+  /generations:
+    post:
+      tags: [模型与生成]
+      summary: 发起一次生成
+      description: 图片、文本和音频会等待上游完成后返回。视频创建上游任务后立即返回任务号。
+      operationId: createGeneration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GenerationRequest" }
+      responses:
+        "200":
+          description: 图片 JSON、文本 JSON，或文本事件流、音频二进制。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompletedGeneration" }
+            text/event-stream:
+              schema: { type: string }
+            audio/mpeg:
+              schema: { type: string, format: binary }
+        "201":
+          description: 视频任务已创建。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoTaskCreated" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/ModelNotFound" }
+        "409": { $ref: "#/components/responses/GenerationConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+  /generations/{id}:
+    get:
+      tags: [模型与生成]
+      summary: 查询视频任务状态
+      description: 使用创建视频任务时返回的任务号查询。
+      operationId: getVideoGeneration
+      parameters: [{ $ref: "#/components/parameters/TaskId" }]
+      responses:
+        "200":
+          description: 上游任务的当前状态。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoTaskStatus" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/GenerationNotFound" }
+        "409": { $ref: "#/components/responses/GenerationConflict" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+  /generations/{id}/content:
+    get:
+      tags: [模型与生成]
+      summary: 下载已完成的视频
+      description: 仅在视频任务完成后返回视频内容。
+      operationId: getVideoContent
+      parameters: [{ $ref: "#/components/parameters/TaskId" }]
+      responses:
+        "200":
+          description: 视频原文。
+          content:
+            video/mp4:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/GenerationNotFound" }
+        "409": { description: 视频尚未完成，或账号状态不允许生成。 }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+  /generation-tasks:
+    post:
+      tags: [模型与生成]
+      summary: 创建可恢复的图片任务
+      description: 立即返回任务号，服务端在后台执行。只接受图片生成。
+      operationId: createImageTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ImageGenerationRequest" }
+      responses:
+        "201":
+          description: 任务已开始。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImageTaskCreated" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/ModelNotFound" }
+        "409": { $ref: "#/components/responses/GenerationConflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+        "503": { $ref: "#/components/responses/MediaNotConfigured" }
+  /generation-tasks/{id}:
+    get:
+      tags: [模型与生成]
+      summary: 查询图片任务
+      description: 查询后台图片任务的状态和结果媒体。
+      operationId: getImageTask
+      parameters: [{ $ref: "#/components/parameters/TaskId" }]
+      responses:
+        "200":
+          description: 运行中、已完成或失败。完成后返回账号媒体 ID。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImageTask" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/GenerationNotFound" }
+        "409": { $ref: "#/components/responses/AccountChanged" }
+  /generation-history/{kind}:
+    get:
+      tags: [模型与生成]
+      summary: 读取生成历史
+      description: 按图片或视频类型返回当前账号的历史记录。
+      operationId: listGenerationHistory
+      parameters: [{ $ref: "#/components/parameters/HistoryKind" }]
+      responses:
+        "200":
+          description: 当前账号指定类型的历史记录。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [logs]
+                properties:
+                  logs: { type: array, items: { type: object, additionalProperties: true } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: 类型不是 image 或 video。 }
+  /generation-history/{kind}/{id}:
+    parameters:
+      - $ref: "#/components/parameters/HistoryKind"
+      - name: id
+        in: path
+        required: true
+        description: 生成历史记录的 ID，必须与请求体中的 id 一致。
+        schema: { type: string }
+    put:
+      tags: [模型与生成]
+      summary: 保存一条生成历史
+      description: 以请求体中的 id 覆盖同一条历史记录。
+      operationId: putGenerationHistory
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: string }
+              additionalProperties: true
+      responses:
+        "204": { description: 已按账号、类型和记录 ID 覆盖保存。 }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "409": { $ref: "#/components/responses/AccountChanged" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [模型与生成]
+      summary: 删除一条生成历史
+      description: 删除当前账号下指定类型和 ID 的历史记录。
+      operationId: deleteGenerationHistory
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      responses:
+        "204": { description: 已删除。 }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { description: 类型无效。 }
+        "409": { $ref: "#/components/responses/AccountChanged" }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: infinite_canvas_session
+  parameters:
+    AccountId:
+      name: X-Account-Id
+      in: header
+      required: false
+      description: 传入时必须等于当前会话的用户 ID，用于拦截换号后的迟到请求。
+      schema: { type: string, format: uuid }
+    TaskId:
+      name: id
+      in: path
+      required: true
+      description: 创建生成任务时返回的任务 ID。
+      schema: { type: string, format: uuid }
+    HistoryKind:
+      name: kind
+      in: path
+      required: true
+      description: 生成历史类型，只接受 image 或 video。
+      schema: { type: string, enum: [image, video] }
+  headers:
+    SessionCookie:
+      description: 固定 7 天的 HttpOnly 会话 Cookie。
+      schema: { type: string }
+  responses:
+    Unauthenticated:
+      description: 未登录或会话已过期。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: { code: UNAUTHENTICATED, message: 请先登录 } }
+    ValidationError:
+      description: 请求字段无效。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    InvalidCredentials:
+      description: 邮箱或密码错误。两种情况返回相同错误。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    LoginRestricted:
+      description: 请求过于频繁，或账号处于登录锁定。
+      headers:
+        Retry-After: { schema: { type: string }, description: 仅频率限制时返回。 }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: 请求过于频繁。
+      headers:
+        Retry-After: { schema: { type: string } }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    EmailExists:
+      description: 邮箱已注册。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    AccountChanged:
+      description: 请求头中的账号与当前会话不一致。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    CredentialsNotConfigured:
+      description: 服务端未启用凭据加密。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    MediaNotConfigured:
+      description: 服务端未配置媒体存储。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    MediaNotFound:
+      description: 媒体不存在或不属于当前账号。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ModelNotFound:
+      description: 模型不存在或不支持所请求的能力。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    GenerationNotFound:
+      description: 任务不存在或不属于当前账号。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    GenerationConflict:
+      description: 未保存 API Key，或请求期间账号已切换。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    UpstreamError:
+      description: 上游请求失败或拒绝了账号 Key。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+    CredentialsInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, description: 服务端去除首尾空格并转成小写。 }
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: "^[\\x21-\\x7E]{8,128}$"
+          description: 8 到 128 位可打印 ASCII，不含空格和中文。
+    User:
+      type: object
+      required: [id, email]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+    SessionCreated:
+      type: object
+      required: [user, expiresAt]
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+        expiresAt: { type: string, format: date-time }
+    CurrentSession:
+      type: object
+      required: [user, expiresAt]
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+        expiresAt: { type: string, format: date-time }
+    CredentialStatus:
+      type: object
+      required: [configured, masked]
+      properties:
+        configured: { type: boolean }
+        masked: { type: ["string", "null"] }
+    PublicModel:
+      type: object
+      required: [id, name, capability]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        capability: { type: string, enum: [image, video, text, audio] }
+    WorkspaceData:
+      type: object
+      required: [projects, assets]
+      properties:
+        projects: { type: array, items: {} }
+        assets: { type: array, items: {} }
+    Workspace:
+      type: object
+      required: [version, data]
+      properties:
+        version: { type: string }
+        data: { $ref: "#/components/schemas/WorkspaceData" }
+    StoredMedia:
+      type: object
+      required: [id, mimeType, bytes]
+      properties:
+        id: { type: string, format: uuid }
+        mimeType: { type: string }
+        bytes: { type: integer, minimum: 0 }
+    DataUrl:
+      type: string
+      description: PNG、JPEG、WebP 图片，MP4、WebM 视频，或 MPEG、WAV、OGG 音频的 base64 Data URL。
+    GenerationRequest:
+      oneOf:
+        - { $ref: "#/components/schemas/ImageGenerationRequest" }
+        - { $ref: "#/components/schemas/VideoGenerationRequest" }
+        - { $ref: "#/components/schemas/TextGenerationRequest" }
+        - { $ref: "#/components/schemas/AudioGenerationRequest" }
+    ImageGenerationRequest:
+      type: object
+      required: [capability, modelId, input]
+      properties:
+        capability: { const: image }
+        modelId: { type: string }
+        input:
+          type: object
+          required: [prompt]
+          properties:
+            prompt: { type: string, minLength: 1 }
+            n: { type: integer, minimum: 1 }
+            size: { type: string, pattern: "^\\d+x\\d+$" }
+            quality: { type: string }
+            background: { type: string }
+            output_format: { type: string, enum: [png, jpeg, webp] }
+            images: { type: array, items: { $ref: "#/components/schemas/DataUrl" } }
+    VideoGenerationRequest:
+      type: object
+      required: [capability, modelId, input]
+      properties:
+        capability: { const: video }
+        modelId: { type: string }
+        input:
+          type: object
+          required: [prompt]
+          properties:
+            prompt: { type: string, minLength: 1 }
+            seconds: { type: string, pattern: "^\\d+(\\.\\d+)?$" }
+            size: { type: string, pattern: "^\\d+x\\d+$" }
+            resolution_name: { type: string }
+            generate_audio: { type: boolean }
+            watermark: { type: boolean }
+            mode: { type: string, enum: [frames, reference] }
+            images: { type: array, items: { $ref: "#/components/schemas/DataUrl" } }
+            videos: { type: array, items: { $ref: "#/components/schemas/DataUrl" } }
+            audios: { type: array, items: { $ref: "#/components/schemas/DataUrl" } }
+    TextGenerationRequest:
+      type: object
+      required: [capability, modelId, input]
+      properties:
+        capability: { const: text }
+        modelId: { type: string }
+        input:
+          type: object
+          required: [messages]
+          properties:
+            messages:
+              type: array
+              minItems: 1
+              items:
+                type: object
+                required: [role, content]
+                properties:
+                  role: { type: string, enum: [system, user, assistant] }
+                  content: {}
+            stream: { type: boolean }
+            reasoning_effort: { type: string }
+    AudioGenerationRequest:
+      type: object
+      required: [capability, modelId, input]
+      properties:
+        capability: { const: audio }
+        modelId: { type: string }
+        input:
+          type: object
+          required: [input, voice]
+          properties:
+            input: { type: string, minLength: 1 }
+            voice: { type: string, minLength: 1 }
+            response_format: { type: string }
+            speed: { type: number, exclusiveMinimum: 0 }
+            instructions: { type: string }
+    CompletedGeneration:
+      description: 图片返回 data；非流式文本返回 choices。具体字段随能力变化。
+      type: object
+      additionalProperties: true
+    VideoTaskCreated:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string, format: uuid }
+        status: { const: pending }
+        warnings: { type: array, items: {} }
+    VideoTaskStatus:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string }
+        error:
+          type: object
+          properties:
+            message: { type: string }
+    ImageTaskCreated:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string, format: uuid }
+        status: { const: running }
+    ImageTask:
+      type: object
+      required: [id, status]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [running, completed, failed] }
+        mediaIds: { type: array, items: { type: string } }
+        error: { type: string }

@@ -1,19 +1,22 @@
 import { z } from "zod";
 
-const imageData = z.string().regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/);
-const videoData = z.string().regex(/^data:video\/(mp4|webm);base64,[A-Za-z0-9+/]+={0,2}$/);
-const audioData = z.string().regex(/^data:audio\/(mpeg|mp3|wav|ogg|webm);base64,[A-Za-z0-9+/]+={0,2}$/);
+// 账号模式下的素材身份：浏览器只提交 remote:<uuid>，字节由服务端从 user_media 读取。
+// 这里不再接受内联 data URL——那会让每次生成都把全部素材重传一遍（实测单次 29.5MB）。
+export const mediaRef = z.string().regex(/^remote:[0-9a-f-]{36}$/);
+export function mediaRefId(ref: string) {
+    return ref.slice("remote:".length);
+}
+
 const imageInput = z.strictObject({
     prompt: z.string().min(1), n: z.number().int().positive().optional(),
     size: z.string().regex(/^\d+x\d+$/).optional(), quality: z.string().optional(), background: z.string().optional(),
-    output_format: z.enum(["png", "jpeg", "webp"]).optional(), images: z.array(imageData).optional(),
+    output_format: z.enum(["png", "jpeg", "webp"]).optional(), images: z.array(mediaRef).optional(),
 });
 const videoInput = z.strictObject({
     prompt: z.string().min(1), seconds: z.string().regex(/^\d+(\.\d+)?$/).optional(),
     size: z.string().regex(/^\d+x\d+$/).optional(), resolution_name: z.string().optional(),
     generate_audio: z.boolean().optional(), watermark: z.boolean().optional(), mode: z.enum(["frames", "reference"]).optional(),
-    images: z.array(imageData).optional(), videos: z.array(videoData).optional(), audios: z.array(audioData).optional(),
-    image_refs: z.array(z.string().regex(/^\/api\/media\/[0-9a-f-]{36}$/)).optional(),
+    images: z.array(mediaRef).optional(), videos: z.array(mediaRef).optional(), audios: z.array(mediaRef).optional(),
 });
 const textInput = z.strictObject({
     messages: z.array(z.strictObject({
