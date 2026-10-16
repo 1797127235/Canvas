@@ -74,12 +74,17 @@ export function accountMediaUrl(storageKey?: string) {
     return storageKey?.startsWith("remote:") ? `/api/media/${storageKey.slice("remote:".length)}` : "";
 }
 
+export const ACCOUNT_MEDIA_PREVIEW_TIERS = [512, 1024, 2048] as const;
+
+export function accountMediaPreviewTier(requiredLongEdge?: number) {
+    const edge = requiredLongEdge && Number.isFinite(requiredLongEdge) && requiredLongEdge > 0 ? requiredLongEdge : ACCOUNT_MEDIA_PREVIEW_TIERS[0];
+    return ACCOUNT_MEDIA_PREVIEW_TIERS.find((tier) => tier >= edge) || ACCOUNT_MEDIA_PREVIEW_TIERS[ACCOUNT_MEDIA_PREVIEW_TIERS.length - 1];
+}
+
 export function accountMediaPreviewUrl(storageKey?: string, requiredLongEdge?: number) {
     if (!storageKey?.startsWith("remote:")) return "";
     const id = storageKey.slice("remote:".length);
-    // 只报「需要显示的最长边」，具体挑哪一档由服务端决定，避免档位表在两端各存一份。
-    const edge = requiredLongEdge && Number.isFinite(requiredLongEdge) && requiredLongEdge > 0 ? requiredLongEdge : 0;
-    return edge ? `/api/media/${id}/preview?w=${Math.ceil(edge)}` : `/api/media/${id}/preview`;
+    return `/api/media/${id}/preview?w=${accountMediaPreviewTier(requiredLongEdge)}`;
 }
 
 export function accountMediaPosterUrl(storageKey?: string) {
