@@ -9,9 +9,10 @@ import type { JSONValue } from "@ai-sdk/provider";
 import sharp from "sharp";
 import { z } from "zod";
 import type { CatalogModel } from "../catalog/catalog.js";
+import { videoProtocols, type VideoProtocol } from "../catalog/catalog.js";
 import type { ImageInput, SpeechInput, TextInput, VideoInput } from "./input.js";
 import { mediaRefId } from "./input.js";
-import { gatewayFetch, gatewayVideoModel } from "./gateway-video.js";
+import { gatewayFetch, gatewayVideoModel, videoProtocolFor } from "./gateway-video.js";
 
 const operationSchema = z.strictObject({
     version: z.literal(1), adapter: z.enum(["xai-videos", "gateway-videos"]),
@@ -134,12 +135,13 @@ export async function createText(model: CatalogModel, apiKey: string, input: Tex
     return { choices: [{ message: { role: "assistant", content: result.text } }] };
 }
 
-function videoModel(adapter: VideoOperation["adapter"], modelId: string, baseUrl: string, apiKey: string) {
-    return adapter === "xai-videos" ? createXai({ apiKey, baseURL: baseUrl, fetch: gatewayFetch }).video(modelId) : gatewayVideoModel(modelId, baseUrl, apiKey);
+function videoModel(adapter: VideoOperation["adapter"], modelId: string, baseUrl: string, apiKey: string, protocol?: VideoProtocol) {
+    return adapter === "xai-videos" ? createXai({ apiKey, baseURL: baseUrl, fetch: gatewayFetch }).video(modelId) : gatewayVideoModel(modelId, baseUrl, apiKey, protocol);
 }
 
-export async function createVideo(model: CatalogModel, apiKey: string, input: VideoInput, signal: AbortSignal, media: MediaReader) {
+export async function createVideo(model: CatalogModel, apiKey: string, input: VideoInput, signal: AbortSignal, media: MediaReader, referenceUrls?: Record<string, string>) {
     const adapter = model.adapter === "xai-videos" ? "xai-videos" : "gateway-videos";
+    const imageUrls = (input.images || []).map(ref => referenceUrls?.[ref]).filter((url): url is string => Boolean(url));
     const [images, videos, audios] = await Promise.all([
         normalizeVideoImages(await Promise.all((input.images || []).map(media.image))),
         Promise.all((input.videos || []).map(media.video)),
@@ -155,13 +157,13 @@ export async function createVideo(model: CatalogModel, apiKey: string, input: Vi
     // xAI 当前 provider 支持图片 R2V，但不支持把视频作为 R2V 参考；H3 兼容端点负责 videos 参考输入。
     if (adapter === "xai-videos" && videos.length) throw new Error("Grok 当前不支持参考视频生成，请改用 MiniMax-H3；Grok 可使用图片参考或视频编辑接口");
     const result = await startVideo({
-        model: videoModel(adapter, model.upstreamModel, model.baseUrl, apiKey), prompt: input.prompt,
+        model: videoModel(adapter, model.upstreamModel, model.baseUrl, apiKey, model.videoProtocol), prompt: input.prompt,
         duration: input.seconds ? Number(input.seconds) : undefined,
         aspectRatio: mediaAspectRatio(input.size), frameImages, inputReferences,
         generateAudio: input.generate_audio,
         providerOptions: adapter === "xai-videos"
             ? { xai: { resolution: input.resolution_name, watermark: input.watermark } }
-            : { gateway: { resolution: input.resolution_name, watermark: input.watermark } },
+            : { gateway: { resolution: input.resolution_name, watermark: input.watermark, size: input.size, imageUrls } },
         maxRetries: 0, abortSignal: signal,
     });
     return { operation: { version: 1, adapter, modelId: model.upstreamModel, operation: result.operation } satisfies VideoOperation, warnings: result.warnings };
@@ -169,7 +171,9 @@ export async function createVideo(model: CatalogModel, apiKey: string, input: Vi
 
 export async function readVideo(operation: unknown, baseUrl: string, apiKey: string, signal: AbortSignal) {
     const saved = operationSchema.parse(operation);
-    return getVideoStatus(videoModel(saved.adapter, saved.modelId, baseUrl, apiKey), { operation: saved.operation as JSONValue, maxRetries: 0, abortSignal: signal });
+    // 协议随任务一起保存：上游登记或模型名变化后，历史任务仍走创建时的查询路径。
+    const protocol = z.object({ protocol: z.enum(videoProtocols) }).safeParse(saved.operation).data?.protocol;
+    return getVideoStatus(videoModel(saved.adapter, saved.modelId, baseUrl, apiKey, protocol), { operation: saved.operation as JSONValue, maxRetries: 0, abortSignal: signal });
 }
 
 export function mediaAspectRatio(size?: string, ratios: readonly `${number}:${number}`[] = ["1:1", "3:4", "4:3", "16:9", "9:16", "21:9"]): `${number}:${number}` | undefined {

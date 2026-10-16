@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
@@ -183,8 +183,31 @@ export async function readAccountMediaBytes(database: Pool, options: MediaOption
     return { bytes: await readStreamBytes(await store.get(row.object_key)), mimeType: row.mime_type };
 }
 
-export function createMediaRouter(database: Pool, options: MediaOptions) {
+const MEDIA_LINK_TTL_SECONDS = 10 * 60;
+function mediaLinkSignature(secret: string, id: string, expires: number) {
+    return createHmac("sha256", secret).update(`${id}.${expires}`).digest("base64url");
+}
+export function signedMediaUrl(origin: string, secret: string, id: string, now = Date.now()) {
+    const expires = Math.floor(now / 1000) + MEDIA_LINK_TTL_SECONDS;
+    const token = mediaLinkSignature(secret, id, expires);
+    return `${origin}/api/media/${id}?expires=${expires}&token=${token}`;
+}
+function validMediaLink(secret: string, id: string, expires: string | undefined, token: string | undefined) {
+    const expiry = Number(expires);
+    if (!secret || !Number.isSafeInteger(expiry) || expiry < Math.floor(Date.now() / 1000) || !token) return false;
+    const expected = Buffer.from(mediaLinkSignature(secret, id, expiry));
+    const actual = Buffer.from(token);
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+export function createMediaRouter(database: Pool, options: MediaOptions, linkSecret = "") {
     const router = Router();
+    router.get("/media/:id", (request, response, next) => {
+        const { expires, token } = request.query;
+        if (typeof expires !== "string" || typeof token !== "string") return next();
+        if (!validMediaLink(linkSecret, request.params.id, expires, token)) return response.status(401).json({ error: { code: "MEDIA_LINK_INVALID", message: "媒体链接无效或已过期" } });
+        return readSignedMedia(request, response, database, options);
+    });
     router.use(requireUser(database));
     router.post("/media", (request, response) => uploadMedia(request, response, database, options));
     router.get("/media/:id/preview", (request, response) => readPreview(request, response, database, options));
@@ -300,6 +323,26 @@ async function readPoster(request: Request, response: Response, database: Pool, 
     response.type("image/webp").set({ "Cache-Control": "private, no-cache", ETag: etag });
     if (request.header("if-none-match") === etag) return response.status(304).end();
     return response.set("Content-Length", String(bytes.length)).send(bytes);
+}
+
+async function readSignedMedia(request: Request, response: Response, database: Pool, options: MediaOptions) {
+    const store = mediaStore(options);
+    if (!store) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
+    const result = await database.query<{ object_key: string; mime_type: string; byte_size: string | number }>("SELECT object_key, mime_type, byte_size FROM user_media WHERE id = $1", [request.params.id]);
+    const row = result.rows[0];
+    if (!row) return response.status(404).json({ error: { code: "MEDIA_NOT_FOUND", message: "媒体不存在" } });
+    const bytes = Number(row.byte_size);
+    response.type(row.mime_type).set({ "Cache-Control": "private, no-store", "Content-Length": String(bytes) });
+    const stream = await store.get(row.object_key);
+    const close = () => stream.destroy();
+    response.on("close", close);
+    try {
+        if (response.destroyed) return;
+        await pipeline(stream, response);
+    } finally {
+        response.off("close", close);
+        stream.destroy();
+    }
 }
 
 async function readMedia(request: Request, response: Response, database: Pool, options: MediaOptions) {

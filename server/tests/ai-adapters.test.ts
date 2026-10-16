@@ -60,16 +60,20 @@ test("SDK providers map Grok and H3 media roles, resume serialized operations an
         assert.equal(calls.at(-1)?.body.aspect_ratio, "1:1");
 
         const frames = await createVideo(h3, "account-key", { prompt: "frames", mode: "frames", images: [ref(imageId), ref(imageId)], seconds: "5", resolution_name: "768p" }, signal(), media);
-        assert.deepEqual(calls.at(-1)?.body.image, { url: image });
-        assert.deepEqual(calls.at(-1)?.body.last_frame, { url: image });
-        assert.equal(calls.at(-1)?.body.duration, 5);
+        // MiniMax-H3 登记的是 [OI] Videos：时长发 seconds，多张参考图走 images 字符串数组。
+        assert.deepEqual(calls.at(-1)?.body.images, [image, image]);
+        assert.equal(calls.at(-1)?.body.seconds, 5);
         assert.equal(calls.at(-1)?.body.resolution, "768p");
+        assert.equal(calls.at(-1)?.body.duration, undefined);
 
         await createVideo(h3, "account-key", { prompt: "reference", mode: "reference", images: [ref(imageId), ref(imageId)], videos: [ref(videoId)], audios: [ref(audioId)] }, signal(), media);
-        assert.deepEqual(calls.at(-1)?.body.reference_images, [{ url: image }, { url: image }]);
+        assert.deepEqual(calls.at(-1)?.body.images, [image, image]);
         assert.deepEqual(calls.at(-1)?.body.videos, [{ url: video }]);
         assert.deepEqual(calls.at(-1)?.body.audios, [{ url: audio }]);
-        assert.equal(calls.at(-1)?.body.image, undefined);
+        assert.equal(calls.at(-1)?.body.input_reference, undefined);
+        // 单张参考图走该入口的 input_reference 字段。
+        await createVideo(h3, "account-key", { prompt: "single", mode: "reference", images: [ref(imageId)] }, signal(), media);
+        assert.deepEqual(calls.at(-1)?.body.input_reference, { image_url: image });
         const resumed = await readVideo(JSON.parse(JSON.stringify(frames.operation)), h3.baseUrl, "account-key", signal());
         assert.equal(resumed.status, "completed");
 
@@ -86,7 +90,8 @@ test("SDK providers map Grok and H3 media roles, resume serialized operations an
         assert.equal(Buffer.concat(chunks).toString(), "video-content");
         assert.equal(calls.at(-1)?.authorization, "Bearer account-key");
         const count = calls.length;
-        await assert.rejects(downloadGatewayVideo("https://other.invalid/video.mp4", grok.baseUrl, "account-key", signal()), /非当前网关/);
+        // 非当前网关的地址不再直接放行给账号 Key：校验不通过（或不可解析）时拒绝下载。
+        await assert.rejects(downloadGatewayVideo("https://other.invalid/video.mp4", grok.baseUrl, "account-key", signal()), /不安全的视频地址/);
         await assert.rejects(createVideo(grok, "account-key", { prompt: "reference", videos: [ref(videoId)] }, signal(), media), /不支持参考视频/);
         assert.equal(calls.length, count);
         await assert.rejects(createVideo(h3, "account-key", { prompt: "fail" }, signal(), media), /temporary failure/);

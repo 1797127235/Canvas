@@ -5,6 +5,9 @@ export const capabilities = ["image", "video", "text", "audio"] as const;
 export type Capability = typeof capabilities[number];
 export const adapterIds = ["openai-chat", "openai-images", "openai-speech", "xai-images", "xai-videos", "gateway-videos"] as const;
 export type AdapterId = typeof adapterIds[number];
+// 上游按模型登记的视频协议，字段不能互相套用；未配置时按模型名兜底推断。
+export const videoProtocols = ["openai", "ark", "minimax"] as const;
+export type VideoProtocol = typeof videoProtocols[number];
 // Each adapter serves exactly one capability; a mismatch is a configuration error, not a runtime surprise.
 const adapterCapabilities: Record<AdapterId, Capability> = {
     "openai-chat": "text", "openai-images": "image", "openai-speech": "audio",
@@ -13,6 +16,7 @@ const adapterCapabilities: Record<AdapterId, Capability> = {
 const modelSchema = z.strictObject({
     id: z.string().min(1), name: z.string().min(1), upstreamModel: z.string().min(1), adapter: z.enum(adapterIds),
     capability: z.enum(capabilities), enabled: z.boolean(), baseUrl: z.string().trim().min(1),
+    videoProtocol: z.enum(videoProtocols).optional(),
 });
 const schema = z.strictObject({ models: z.array(modelSchema) });
 export type CatalogModel = z.infer<typeof modelSchema>;
@@ -27,6 +31,7 @@ export async function loadCatalog(path?: string, production = false): Promise<Ca
             // 上游与上线环境一致允许 http/https，不再区分生产强制 https。
             if (url.username || url.password || url.search || url.hash || !["http:", "https:"].includes(url.protocol)) throw new Error();
             if (adapterCapabilities[model.adapter] !== model.capability) throw new Error();
+            if (model.videoProtocol && model.capability !== "video") throw new Error();
         }
         if (new Set(input.models.map(model => model.id)).size !== input.models.length) throw new Error();
         const models = input.models.map(model => ({ ...model, baseUrl: new URL(model.baseUrl).toString().replace(/\/+$/, "") }));

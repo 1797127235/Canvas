@@ -7,6 +7,7 @@
       "dependencies": {
         "@ai-sdk/openai": "4.0.91",
         "@ai-sdk/provider": "4.0.26",
+        "@ai-sdk/provider-utils": "5.0.58",
         "@ai-sdk/xai": "5.0.20",
         "ai": "7.0.137",
         "argon2": "0.45.1",

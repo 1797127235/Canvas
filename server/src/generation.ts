@@ -12,9 +12,9 @@ import { createImages, createSpeech, createText, createTextStream, createVideo, 
 import { type ImageInput } from "./ai/input.js";
 import { downloadGatewayVideo } from "./ai/gateway-video.js";
 import { logError, redactText } from "./log.js";
-import { readAccountMediaBytes, storeAccountMedia, storeAccountMediaStream, type MediaOptions } from "./media.js";
+import { readAccountMediaBytes, signedMediaUrl, storeAccountMedia, storeAccountMediaStream, type MediaOptions } from "./media.js";
 
-type GenerationOptions = { catalog: Catalog; encryptionKey?: string; media?: MediaOptions };
+type GenerationOptions = { catalog: Catalog; encryptionKey?: string; media?: MediaOptions; appOrigin?: string; mediaLinkSecret?: string };
 
 // 参考素材按身份（remote:<uuid>）从账号媒体读取；类型校验在 mediaReader 里统一把关。
 // 未配置媒体存储只在真的需要取素材时报错，无参考素材的生成不受影响（该回调不会被调用）。
@@ -67,7 +67,10 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
                 response.end("data: [DONE]\n\n");
                 return;
             }
-            const result = await createVideo(model, apiKey, generation.input, signal, media);
+            const referenceUrls = options.appOrigin && options.mediaLinkSecret
+                ? Object.fromEntries((generation.input.images || []).map(ref => [ref, signedMediaUrl(options.appOrigin!, options.mediaLinkSecret!, ref.slice("remote:".length))]))
+                : undefined;
+            const result = await createVideo(model, apiKey, generation.input, signal, media, referenceUrls);
             // 任务号由前端预生成，节点在建任务的几秒里就已持有它，刷新后可直接恢复。
             const id = generation.taskId ?? randomUUID();
             await database.query(
@@ -166,7 +169,8 @@ async function runImageTask(context: { database: Pool; options: GenerationOption
 
     } catch (error) {
         const message = generationErrorMessage(error);
-        logError("image-task", error, { taskId: context.id });
+        // 异步图片任务同样要带上游 URL/状态码/响应体：此前只记 taskId，上游报错时无法判断是哪个地址、什么状态。
+        logError("image-task", error, { taskId: context.id, upstream: upstreamLogDetails(error, context.apiKey) });
         await context.database.query("UPDATE user_generation_tasks SET status = 'failed', error = $2 WHERE id = $1 AND user_id = $3", [context.id, message, context.userId]).catch(() => undefined);
     } finally {
         imageTasks.delete(context.id);

@@ -44,8 +44,8 @@ async function start() {
         apiRouter.use(createCatalogRouter(catalog, database.pool, config.credentialsEncryptionKey));
         apiRouter.use(createCredentialRouter(database.pool, { encryptionKey: config.credentialsEncryptionKey }));
         apiRouter.use(createWorkspaceRouter(database.pool));
-        apiRouter.use(createMediaRouter(database.pool, minio));
-        apiRouter.use(createGenerationRouter(database.pool, { catalog, encryptionKey: config.credentialsEncryptionKey, media: minio }));
+        apiRouter.use(createMediaRouter(database.pool, minio, config.rateLimitSecret));
+        apiRouter.use(createGenerationRouter(database.pool, { catalog, encryptionKey: config.credentialsEncryptionKey, media: minio, appOrigin: config.appOrigin, mediaLinkSecret: config.rateLimitSecret }));
         const server = createApp({ appOrigin: config.appOrigin, apiRouter }).listen(config.port, config.host);
         let closing = false;
         const close = () => {
