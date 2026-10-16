@@ -104,6 +104,18 @@ test("discovers models separately for each account without leaking upstream fiel
     assert.equal(calls.length, 3);
 });
 
+test("uses the account upstream address when one is configured", async t => {
+    const catalog = await loadCatalog(await write("account-url.json", { models: [model()] }));
+    const urls: string[] = [];
+    t.mock.method(globalThis, "fetch", async (url: string) => {
+        urls.push(url);
+        return Response.json({ data: [{ id: "gpt-image-2.5", capability: "image" }] });
+    });
+    assert.equal((await accountModels(catalog, "key"))[0].baseUrl, "https://api.example.com/v1");
+    assert.equal((await accountModels(catalog, "key", "https://upstream.example.com/v1"))[0].baseUrl, "https://upstream.example.com/v1");
+    assert.deepEqual(urls, ["https://api.example.com/v1/models", "https://upstream.example.com/v1/models"]);
+});
+
 test("uses valid capability metadata before the frontend keyword rules", async t => {
     const catalog = await loadCatalog(await write("capabilities.json", { models: [model()] }));
     const data = [

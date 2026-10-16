@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Input, Select, Space } from "antd";
 
-import { clearCredential, getCredential, saveCredential } from "@/services/api/account";
+import { clearCredential, getCredential, saveBaseUrl, saveCredential, type CredentialStatus } from "@/services/api/account";
 import { useCatalogStore } from "@/stores/use-catalog-store";
 import { useConfigStore, type ModelCapability } from "@/stores/use-config-store";
 
@@ -14,7 +14,8 @@ const modelFields = [
 
 export function AccountCredentialsPanel() {
     const [key, setKey] = useState("");
-    const [status, setStatus] = useState<{ configured: boolean; masked: string | null } | null>(null);
+    const [baseUrl, setBaseUrl] = useState("");
+    const [status, setStatus] = useState<CredentialStatus | null>(null);
     const { models, status: catalogStatus, error: catalogError, load, reset } = useCatalogStore();
     const config = useConfigStore((state) => state.config);
     const updateConfig = useConfigStore((state) => state.updateConfig);
@@ -23,7 +24,9 @@ export function AccountCredentialsPanel() {
     useEffect(() => {
         let active = true;
         void getCredential().then((value) => {
-            if (active) setStatus(value);
+            if (!active) return;
+            setStatus(value);
+            setBaseUrl(value.baseUrl ?? "");
         }).catch((error) => {
             if (active) setNotice({ text: error instanceof Error ? error.message : "账号配置读取失败", type: "error" });
         });
@@ -45,13 +48,31 @@ export function AccountCredentialsPanel() {
             setBusy(false);
         }
     };
+    const saveUpstream = async () => {
+        setBusy(true);
+        try {
+            await saveBaseUrl(baseUrl.trim());
+            const next = await getCredential();
+            setStatus(next);
+            setBaseUrl(next.baseUrl ?? "");
+            // 换了上游就得重新按新地址发现模型。
+            reset();
+            await load();
+            setNotice({ text: "上游地址已保存", type: "success" });
+        } catch (error) {
+            setNotice({ text: error instanceof Error ? error.message : "上游地址保存失败", type: "error" });
+        } finally {
+            setBusy(false);
+        }
+    };
     const clear = async () => {
         setBusy(true);
         try {
             await clearCredential();
             reset();
             setKey("");
-            setStatus({ configured: false, masked: null });
+            setBaseUrl("");
+            setStatus({ configured: false, masked: null, baseUrl: null });
             setNotice({ text: "API Key 已清除", type: "success" });
         } catch (error) {
             setNotice({ text: error instanceof Error ? error.message : "API Key 清除失败", type: "error" });
@@ -70,6 +91,14 @@ export function AccountCredentialsPanel() {
             <Button type="primary" loading={busy} disabled={!key.trim()} onClick={() => void save()}>保存</Button>
         </Space.Compact>
         <Button danger disabled={!status?.configured || busy} onClick={() => void clear()}>清除 API Key</Button>
+        <div>
+            <h2 className="text-base font-semibold">上游地址</h2>
+            <p className="mt-1 text-sm text-muted-foreground">留空使用部署配置的默认上游。需带路径前缀，例如 https://api.example.com/v1。</p>
+        </div>
+        <Space.Compact block>
+            <Input disabled={busy || !status?.configured} value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="留空使用默认上游地址" onPressEnter={() => void saveUpstream()} />
+            <Button loading={busy} disabled={!status?.configured || baseUrl.trim() === (status.baseUrl ?? "")} onClick={() => void saveUpstream()}>保存</Button>
+        </Space.Compact>
         <div className="space-y-3">
             <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold">上游模型</h2>

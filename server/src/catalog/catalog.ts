@@ -59,9 +59,10 @@ function guessCapability(name: string): Capability {
     return "text";
 }
 
-export async function accountModels(catalog: Catalog, apiKey: string): Promise<CatalogModel[]> {
+// 账号自带上游地址时优先用它，未配置则沿用部署目录里的共用地址。
+export async function accountModels(catalog: Catalog, apiKey: string, accountBaseUrl?: string | null): Promise<CatalogModel[]> {
     try {
-        const baseUrl = catalog.models[0]?.baseUrl;
+        const baseUrl = accountBaseUrl || catalog.models[0]?.baseUrl;
         if (!baseUrl) throw new Error();
         const response = await fetch(`${baseUrl}/models`, {
             method: "GET", headers: { authorization: `Bearer ${apiKey}` }, redirect: "error",

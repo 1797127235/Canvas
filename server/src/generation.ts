@@ -6,7 +6,7 @@ import { APICallError } from "ai";
 import { z } from "zod";
 import { requireUser } from "./identity/auth-middleware.js";
 import { accountModels, resolveModel, type Catalog, type CatalogModel } from "./catalog/catalog.js";
-import { readUserApiKey } from "./credentials.js";
+import { readUserCredential } from "./credentials.js";
 import { generationInput } from "./ai/input.js";
 import { createImages, createSpeech, createText, createTextStream, createVideo, mediaReader, readVideo } from "./ai/generation.js";
 import { type ImageInput } from "./ai/input.js";
@@ -36,11 +36,12 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
     router.post("/generations", requireUser(database), async (request, response) => {
         const parsed = generationInput.safeParse(request.body);
         if (!parsed.success) return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "生成参数无效" } });
-        const apiKey = await readUserApiKey(database, response.locals.user.id, options.encryptionKey);
-        if (!apiKey) return apiKeyRequired(response);
+        const credential = await readUserCredential(database, response.locals.user.id, options.encryptionKey);
+        if (!credential) return apiKeyRequired(response);
+        const { apiKey } = credential;
         const signal = requestSignal(response);
         try {
-            const models = await accountModels(options.catalog, apiKey);
+            const models = await accountModels(options.catalog, apiKey, credential.baseUrl);
             const model = resolveModel({ models }, parsed.data.modelId, parsed.data.capability);
             if (!model) return response.status(404).json({ error: { code: "MODEL_NOT_FOUND", message: "模型不可用" } });
             const generation = parsed.data;
@@ -105,10 +106,11 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
         const parsed = generationInput.safeParse(request.body);
         if (!parsed.success || parsed.data.capability !== "image") return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "生成参数无效" } });
         if (!options.media) return response.status(503).json({ error: { code: "MEDIA_NOT_CONFIGURED", message: "媒体存储尚未配置" } });
-        const apiKey = await readUserApiKey(database, response.locals.user.id, options.encryptionKey);
-        if (!apiKey) return apiKeyRequired(response);
+        const credential = await readUserCredential(database, response.locals.user.id, options.encryptionKey);
+        if (!credential) return apiKeyRequired(response);
+        const { apiKey } = credential;
         try {
-            const models = await accountModels(options.catalog, apiKey);
+            const models = await accountModels(options.catalog, apiKey, credential.baseUrl);
             const model = resolveModel({ models }, parsed.data.modelId, "image");
             if (!model) return response.status(404).json({ error: { code: "MODEL_NOT_FOUND", message: "模型不可用" } });
             const id = parsed.data.taskId ?? randomUUID();
@@ -183,8 +185,9 @@ async function readTask(request: Request, response: Response, database: Pool, op
     );
     const row = task.rows[0];
     if (!row) return taskNotFound(response);
-    const apiKey = await readUserApiKey(database, response.locals.user.id, options.encryptionKey);
-    if (!apiKey) return apiKeyRequired(response);
+    const credential = await readUserCredential(database, response.locals.user.id, options.encryptionKey);
+    if (!credential) return apiKeyRequired(response);
+    const { apiKey } = credential;
     const signal = requestSignal(response);
     try {
         const state = await readVideo(row.operation, row.base_url, apiKey, signal);

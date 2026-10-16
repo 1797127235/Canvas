@@ -115,7 +115,7 @@ paths:
     get:
       tags: [账号配置]
       summary: 查看 API Key 是否已配置
-      description: 返回是否已保存 Key 及其掩码。
+      description: 返回是否已保存 Key、其掩码，以及账号自配的上游地址。
       operationId: getCredential
       responses:
         "200":
@@ -128,8 +128,8 @@ paths:
         "503": { $ref: "#/components/responses/CredentialsNotConfigured" }
     put:
       tags: [账号配置]
-      summary: 保存或覆盖 API Key
-      description: 每个账号只保留一把 Key，重复保存会覆盖。
+      summary: 保存 API Key 或上游地址
+      description: 两个字段可以单独提交。每个账号只保留一把 Key，重复保存会覆盖；baseUrl 缺省不动已配置地址，传空串回落到部署目录的默认上游，未保存 Key 时单独存地址返回 409。
       operationId: putCredential
       parameters: [{ $ref: "#/components/parameters/AccountId" }]
       requestBody:
@@ -138,13 +138,18 @@ paths:
           application/json:
             schema:
               type: object
-              required: [apiKey]
+              minProperties: 1
               properties:
                 apiKey: { type: string, minLength: 1, maxLength: 4096 }
+                baseUrl: { type: string, maxLength: 2048, description: 上游根地址，需带路径前缀，例如 https://api.example.com/v1；空串表示回落默认。 }
       responses:
-        "204": { description: 已加密保存。 }
+        "204": { description: 已保存。 }
         "401": { $ref: "#/components/responses/Unauthenticated" }
-        "409": { $ref: "#/components/responses/AccountChanged" }
+        "409":
+          description: 请求期间账号已切换，或只改上游地址但尚未保存 API Key。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "422": { $ref: "#/components/responses/ValidationError" }
         "503": { $ref: "#/components/responses/CredentialsNotConfigured" }
     delete:
@@ -161,7 +166,7 @@ paths:
     get:
       tags: [模型与生成]
       summary: 使用账号 Key 获取上游模型
-      description: 用当前账号的 Key 查询唯一上游的模型列表。
+      description: 用当前账号的 Key 查询上游模型列表；账号配了上游地址就用它，否则用部署目录里的地址。
       operationId: listModels
       responses:
         "200":
@@ -615,10 +620,11 @@ components:
         expiresAt: { type: string, format: date-time }
     CredentialStatus:
       type: object
-      required: [configured, masked]
+      required: [configured, masked, baseUrl]
       properties:
         configured: { type: boolean }
         masked: { type: ["string", "null"] }
+        baseUrl: { type: ["string", "null"], description: 账号自配的上游地址；为空时使用部署目录里的地址。 }
     PublicModel:
       type: object
       required: [id, name, capability]
