@@ -13,6 +13,7 @@ import { videoProtocols, type VideoProtocol } from "../catalog/catalog.js";
 import type { ImageInput, SpeechInput, TextInput, VideoInput } from "./input.js";
 import { mediaRefId } from "./input.js";
 import { gatewayFetch, gatewayVideoModel, videoProtocolFor } from "./gateway-video.js";
+import { arkImages } from "./gateway-image.js";
 
 const operationSchema = z.strictObject({
     version: z.literal(1), adapter: z.enum(["xai-videos", "gateway-videos"]),
@@ -47,10 +48,18 @@ function providers(model: CatalogModel, apiKey: string) {
 }
 
 export async function createImages(model: CatalogModel, apiKey: string, input: ImageInput, signal: AbortSignal, media: MediaReader) {
+    const images = input.images?.length ? await Promise.all(input.images.map(media.image)) : [];
+    // 方舟图片走原生同步协议（参考图在 JSON body 的 image 字段）；[OI] / xAI 仍走 SDK。
+    // 方舟一次请求只出一张图，面板的「生成 N 张」按 N 次独立调用展开，上限与面板一致（15）。
+    if (model.adapter === "ark-images") {
+        return arkImages({
+            baseUrl: model.baseUrl, apiKey, modelId: model.upstreamModel, prompt: input.prompt, images,
+            size: input.size, outputFormat: input.output_format, count: Math.min(15, Math.max(1, input.n || 1)), signal,
+        });
+    }
     const { openai, xai } = providers(model, apiKey);
     const isXai = model.adapter === "xai-images";
     const { quality, background, output_format } = input;
-    const images = input.images?.length ? await Promise.all(input.images.map(media.image)) : [];
     try {
         const result = await generateImage({
             model: isXai ? xai.image(model.upstreamModel) : openai.image(model.upstreamModel),

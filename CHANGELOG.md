@@ -2,6 +2,12 @@
 
 ## Unreleased
 
++ [新增] 图片生成接入火山方舟（Ark）原生协议：新增 `ark-images` 适配，走 `POST {base}/images/generations`，参考图与提示词放在同一个 JSON body 的 `image` 字段（`string | string[]`），不再套用 [OI] 的 `/images/edits` multipart —— 方舟没有该端点，此前图生图必然失败。结果按 `response_format: b64_json` 同步返回，方舟一次请求只出一张图，面板「生成 N 张」按 N 次独立调用展开。`doubao-seedream-*` 自动映射到该适配。
+
++ [修复] 面板尺寸自动夹进方舟区间：面板允许的档位超出方舟 `[921600, 4624220]` 的总像素范围（1k 4:3 = `1024x768` 偏小、4k 16:9 = `3840x2160` 偏大），原样发送会被上游以 `InvalidParameter` 拒绝。现按比例夹取并对齐 16，保证面板上任何档位都能发出一次成功的请求。
+
++ [修复] 模型发现过滤上游不可用模型：方舟把已下线模型也列在 `/models` 里（实测 135 个中 83 个 `Shutdown`、17 个 `Retiring`），且按创建时间正序返回，最老的一批排在最前；前端下拉默认取列表第一项，恰好落在已下线模型上，选中即调用失败。现跳过 `Shutdown` / `Retiring`，并用方舟的 `domain` 字段判定能力（`LLM`/`VLM` → 文本、`ImageGeneration` → 图片、`VideoGeneration` → 视频），`Embedding`/`3DGeneration`/`Router` 不映射即丢弃，不再依赖模型名关键词猜测。
+
 + [新增] 账号配置支持自配上游地址：配置页在 API Key 下方新增「上游地址」，保存后模型发现与四类生成都走该地址，留空沿用部署目录里的默认上游；地址明文保存，只接受带路径前缀的 http(s) 地址。
 
 + [优化] 画布视口保存统一增加 500ms 防抖，减少缩放过程中重复提交完整工作区。

@@ -116,6 +116,32 @@ test("uses the account upstream address when one is configured", async t => {
     assert.deepEqual(urls, ["https://api.example.com/v1/models", "https://upstream.example.com/v1/models"]);
 });
 
+test("drops models the upstream marks unavailable and classifies Ark models by domain", async t => {
+    const catalog = await loadCatalog(await write("ark.json", { models: [model()] }));
+    // 方舟把已下线模型也列在 /models 里，且按 created 正序排在前面：不过滤的话前端下拉默认就选中不可用模型。
+    const data = [
+        { id: "doubao-lite-128k-240428", domain: "", status: "Shutdown" },
+        { id: "doubao-seedream-3-0-t2i-250415", domain: "ImageGeneration", status: "Shutdown" },
+        { id: "doubao-seedream-4-0-250828", domain: "ImageGeneration", status: "Retiring" },
+        { id: "doubao-seedream-5-0-pro-260628", domain: "ImageGeneration" },
+        { id: "doubao-seedream-5-0-flash-260915", domain: "ImageGeneration" },
+        { id: "doubao-seedance-2-5-260628", domain: "VideoGeneration" },
+        { id: "doubao-seed-2-1-pro-260915", domain: "LLM" },
+        { id: "doubao-embedding-vision-251215", domain: "Embedding" },
+        { id: "doubao-seed3d-2-0-260328", domain: "3DGeneration" },
+        { id: "doubao-smart-router-250928", domain: "Router" },
+    ];
+    t.mock.method(globalThis, "fetch", async () => Response.json({ data }));
+    const discovered = await accountModels(catalog, "key");
+    // Embedding / 3DGeneration / Router 不映射到任何生成能力，直接丢弃。
+    assert.deepEqual(discovered.map(item => item.id), [
+        "doubao-seedream-5-0-pro-260628", "doubao-seedream-5-0-flash-260915",
+        "doubao-seedance-2-5-260628", "doubao-seed-2-1-pro-260915",
+    ]);
+    assert.deepEqual(discovered.map(item => item.capability), ["image", "image", "video", "text"]);
+    assert.deepEqual(discovered.map(item => item.adapter), ["ark-images", "ark-images", "gateway-videos", "openai-chat"]);
+});
+
 test("uses valid capability metadata before the frontend keyword rules", async t => {
     const catalog = await loadCatalog(await write("capabilities.json", { models: [model()] }));
     const data = [
