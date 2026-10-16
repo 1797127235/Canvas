@@ -676,14 +676,30 @@ function EmptyImageContent({ theme }: NodeContentRendererProps) {
 
 function VideoNodeContent({ node, theme }: NodeContentRendererProps) {
     const { t } = useTranslation();
-    if (!node.metadata?.content)
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const videoSource = node.metadata?.content;
+
+    const loadVideo = useCallback(() => {
+        const video = videoRef.current;
+        if (!video || !videoSource || video.currentSrc) return false;
+        video.src = videoSource;
+        video.load();
+        return true;
+    }, [videoSource]);
+
+    const handleVideoClick = useCallback(() => {
+        if (!loadVideo()) return;
+        void videoRef.current?.play().catch(() => undefined);
+    }, [loadVideo]);
+
+    if (!videoSource)
         return (
             <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
                 <Video className="size-7 opacity-35" />
                 <span className="text-sm">{t("canvas.node.emptyVideo")}</span>
             </div>
         );
-    return <video src={node.metadata.content} poster={mediaPosterUrl(node.metadata.storageKey)} controls className="h-full w-full rounded-[18px] bg-black object-contain" data-canvas-video={node.id} data-canvas-no-zoom />;
+    return <video ref={videoRef} poster={mediaPosterUrl(node.metadata?.storageKey)} preload="none" controls onClick={handleVideoClick} className="h-full w-full rounded-[18px] bg-black object-contain" data-canvas-video={node.id} data-canvas-no-zoom />;
 }
 
 function AudioNodeContent({ node, theme }: NodeContentRendererProps) {
