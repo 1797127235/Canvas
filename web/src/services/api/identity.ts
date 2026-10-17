@@ -44,6 +44,14 @@ export async function getSession() {
     return request<SessionResponse>("/api/session");
 }
 
+export async function requestPasswordReset(email: string) {
+    await send("/api/password-resets", { method: "POST", body: JSON.stringify({ email: email.trim().toLowerCase() }) });
+}
+
+export async function confirmPasswordReset(token: string, password: string) {
+    await send("/api/password-resets/confirm", { method: "POST", body: JSON.stringify({ token, password }) });
+}
+
 export async function logout() {
     const response = await fetch("/api/session", { method: "DELETE", credentials: "same-origin", headers: { Accept: "application/json" } });
     if (!response.ok && response.status !== 204) throw await toError(response);
@@ -57,6 +65,16 @@ async function request<T>(url: string, init: RequestInit = {}) {
     });
     if (!response.ok) throw await toError(response);
     return (await response.json()) as T;
+}
+
+// 204 响应没有响应体，单独包一层避免 JSON 解析报错。
+async function send(url: string, init: RequestInit = {}) {
+    const response = await fetch(url, {
+        ...init,
+        credentials: "same-origin",
+        headers: { Accept: "application/json", "Content-Type": "application/json", ...init.headers },
+    });
+    if (!response.ok) throw await toError(response);
 }
 
 async function toError(response: Response) {

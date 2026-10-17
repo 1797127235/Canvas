@@ -115,7 +115,7 @@ const rejectLargeBody = (request: Request, _response: Response, buffer: Buffer) 
 };
 
 function bodyLimitFor(path: string) {
-    if (path.startsWith("/api/users") || path.startsWith("/api/sessions")) return IDENTITY_BODY_LIMIT;
+    if (path.startsWith("/api/users") || path.startsWith("/api/sessions") || path.startsWith("/api/password-resets")) return IDENTITY_BODY_LIMIT;
     if (path.startsWith("/api/generations") || path.startsWith("/api/generation-tasks")) return GENERATION_BODY_LIMIT;
     return 0;
 }

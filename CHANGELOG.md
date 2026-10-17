@@ -2,6 +2,9 @@
 
 ## Unreleased
 
++ [新增] 账号支持自助重置密码：登录页新增「忘记密码」，凭注册邮箱收取 30 分钟内有效的重置链接，设新密码后该账号原有会话全部失效并解除登录锁定。令牌只在库中保存 SHA-256，一次有效；重复申请会让旧链接立即作废；发信失败时回收令牌，避免用户反复申请却收不到邮件。未配置 SMTP 时重置接口返回 503 并提示联系管理员，登录注册不受影响。
++ [新增] `password_reset_tokens` 表与 `010-password-resets.sql`，SMTP 配置项 `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`/`MAIL_FROM` 五项齐备才启用重置邮件。
+
 + [新增] 图片生成接入火山方舟（Ark）原生协议：新增 `ark-images` 适配，走 `POST {base}/images/generations`，参考图与提示词放在同一个 JSON body 的 `image` 字段（`string | string[]`），不再套用 [OI] 的 `/images/edits` multipart —— 方舟没有该端点，此前图生图必然失败。结果按 `response_format: b64_json` 同步返回，方舟一次请求只出一张图，面板「生成 N 张」按 N 次独立调用展开。`doubao-seedream-*` 自动映射到该适配。
 
 + [修复] 面板尺寸自动夹进方舟区间：面板允许的档位超出方舟 `[921600, 4624220]` 的总像素范围（1k 4:3 = `1024x768` 偏小、4k 16:9 = `3840x2160` 偏大），原样发送会被上游以 `InvalidParameter` 拒绝。现按比例夹取并对齐 16，保证面板上任何档位都能发出一次成功的请求。
