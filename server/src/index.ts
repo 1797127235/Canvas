@@ -6,6 +6,8 @@ import { readConfig } from "./config.js";
 import { createDatabase } from "./db.js";
 import { clearExpiredIdentityData } from "./identity/cleanup.js";
 import { createLoginRouter } from "./identity/login.js";
+import { createMailer } from "./identity/mailer.js";
+import { createPasswordResetRouter } from "./identity/password-reset.js";
 import { createRateLimiter } from "./identity/rate-limit.js";
 import { createRegisterRouter } from "./identity/register.js";
 import { createSessionRouter } from "./identity/session-routes.js";
@@ -22,7 +24,7 @@ async function start() {
     const database = createDatabase(config);
     try {
         // 启动时验证数据库/schema 并清理过期记录；认证拒绝过期凭证不依赖清理。
-        for (const file of ["003-workspace-credentials-media.sql", "004-generation-tasks.sql", "005-generation-history.sql", "006-generation-sdk-operations.sql", "007-image-generation-tasks.sql", "008-media-references.sql", "009-credential-base-url.sql"]) {
+        for (const file of ["003-workspace-credentials-media.sql", "004-generation-tasks.sql", "005-generation-history.sql", "006-generation-sdk-operations.sql", "007-image-generation-tasks.sql", "008-media-references.sql", "009-credential-base-url.sql", "010-password-resets.sql"]) {
             await database.pool.query(await readFile(new URL(`../sql/${file}`, import.meta.url), "utf8"));
         }
         await clearExpiredIdentityData(database.pool);
@@ -41,11 +43,18 @@ async function start() {
         const apiRouter = createSessionRouter(database.pool, dependencies.secureCookie);
         apiRouter.use(createRegisterRouter({ ...dependencies, limiter: createRateLimiter(database.pool, "register", secret) }));
         apiRouter.use(createLoginRouter({ ...dependencies, limiter: createRateLimiter(database.pool, "login", secret) }));
+        apiRouter.use(createPasswordResetRouter({
+            database: database.pool,
+            appOrigin: config.appOrigin,
+            limiter: createRateLimiter(database.pool, "reset", secret),
+            rateLimitSecret: secret,
+            mailer: config.mail ? createMailer(config.mail) : null,
+        }));
         apiRouter.use(createCatalogRouter(catalog, database.pool, config.credentialsEncryptionKey));
         apiRouter.use(createCredentialRouter(database.pool, { encryptionKey: config.credentialsEncryptionKey }));
         apiRouter.use(createWorkspaceRouter(database.pool));
-        apiRouter.use(createMediaRouter(database.pool, minio, config.rateLimitSecret));
-        apiRouter.use(createGenerationRouter(database.pool, { catalog, encryptionKey: config.credentialsEncryptionKey, media: minio, appOrigin: config.appOrigin, mediaLinkSecret: config.rateLimitSecret }));
+        apiRouter.use(createMediaRouter(database.pool, minio));
+        apiRouter.use(createGenerationRouter(database.pool, { catalog, encryptionKey: config.credentialsEncryptionKey, media: minio }));
         const server = createApp({ appOrigin: config.appOrigin, apiRouter }).listen(config.port, config.host);
         let closing = false;
         const close = () => {

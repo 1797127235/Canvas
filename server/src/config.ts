@@ -11,6 +11,11 @@ const configSchema = z.object({
     }),
     RATE_LIMIT_SECRET: z.string().refine((value) => Boolean(value.trim())),
     CREDENTIALS_ENCRYPTION_KEY: z.string().regex(/^[A-Za-z0-9+/]{43}=$/).optional(),
+    SMTP_HOST: z.string().trim().optional(),
+    SMTP_PORT: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().min(1).max(65535)).optional(),
+    SMTP_USER: z.string().trim().optional(),
+    SMTP_PASSWORD: z.string().optional(),
+    MAIL_FROM: z.string().trim().optional(),
     CATALOG_CONFIG_PATH: z.string().trim().optional(),
     MINIO_ENDPOINT: z.string().trim().optional(),
     MINIO_PORT: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().min(1).max(65535)).optional(),
@@ -38,6 +43,10 @@ export function readConfig(environment: Record<string, string | undefined>) {
     }
     const config = result.data;
     if (config.CREDENTIALS_ENCRYPTION_KEY && Buffer.from(config.CREDENTIALS_ENCRYPTION_KEY, "base64").length !== 32) throw new Error("Invalid server configuration: CREDENTIALS_ENCRYPTION_KEY");
+    // 五项齐备才启用密码重置邮件；缺任一项视为未配置，接口明确返回 503 而不是静默失败。
+    const mail = config.SMTP_HOST && config.SMTP_PORT && config.SMTP_USER && config.SMTP_PASSWORD && config.MAIL_FROM
+        ? { host: config.SMTP_HOST, port: config.SMTP_PORT, user: config.SMTP_USER, password: config.SMTP_PASSWORD, from: config.MAIL_FROM }
+        : null;
     const origin = parseUrl(config.APP_ORIGIN);
     if (!origin) throw new Error("Invalid server configuration: APP_ORIGIN");
     return {
@@ -48,6 +57,7 @@ export function readConfig(environment: Record<string, string | undefined>) {
         databaseUrl: config.DATABASE_URL,
         rateLimitSecret: config.RATE_LIMIT_SECRET,
         credentialsEncryptionKey: config.CREDENTIALS_ENCRYPTION_KEY,
+        mail,
         catalogConfigPath: config.CATALOG_CONFIG_PATH,
         minioEndpoint: config.MINIO_ENDPOINT,
         minioPort: config.MINIO_PORT,

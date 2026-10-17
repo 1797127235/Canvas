@@ -7,12 +7,14 @@ import AssetsPage from "@/pages/assets";
 import CanvasPage from "@/pages/canvas";
 import CanvasProjectPage from "@/pages/canvas/project";
 import ConfigPage from "@/pages/config";
+import ForgotPasswordPage from "@/pages/forgot-password";
 import HomePage from "@/pages/home";
 import ImagePage from "@/pages/image";
 import LoginPage from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import PromptsPage from "@/pages/prompts";
 import RegisterPage from "@/pages/register";
+import ResetPasswordPage from "@/pages/reset-password";
 import VideoPage from "@/pages/video";
 
 function Protected({ children }: { children: ReactNode }) {
@@ -30,6 +32,8 @@ export const router = createBrowserRouter([
             { path: "/", element: <HomePage /> },
             { path: "/login", element: <LoginPage /> },
             { path: "/register", element: <RegisterPage /> },
+            { path: "/forgot-password", element: <ForgotPasswordPage /> },
+            { path: "/reset-password", element: <ResetPasswordPage /> },
             { path: "/prompts", element: <PromptsPage /> },
             { path: "/image", element: <Protected><ImagePage /></Protected> },
             { path: "/video", element: <Protected><VideoPage /></Protected> },

@@ -56,6 +56,11 @@ export default function LoginPage() {
                     ]}>
                         <Input.Password size="large" autoComplete="current-password" placeholder="请输入密码" />
                     </Form.Item>
+                    <div className="-mt-2 mb-5 text-right">
+                        <Link to="/forgot-password" className="text-sm text-stone-500 underline underline-offset-4 transition hover:text-stone-950 dark:text-stone-400 dark:hover:text-stone-100">
+                            忘记密码？
+                        </Link>
+                    </div>
                     <Button type="primary" htmlType="submit" size="large" block loading={submitting}>
                         登录
                     </Button>
