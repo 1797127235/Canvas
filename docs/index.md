@@ -32,7 +32,6 @@
 - [本地开发](content/docs/development/local-development.mdx)
 - [线上部署](content/docs/development/deployment.mdx)：生产地址、部署机、发布流程与注意事项。
 - [画布数据结构](content/docs/development/canvas-data-structure.mdx)
-- [服务端架构图](diagrams/server-architecture.html)
 
 ## 支持与安全
 
