@@ -1,4 +1,4 @@
-# 质量门禁 + 构建镜像推送到 GHCR。服务器只拉取镜像运行，不再本地构建。
+# 质量门禁 → GHCR 镜像 → main 自动部署到生产 WSL；PR 和版本 tag 不部署。
 # 触发：推送到 main、打版本 tag（v*）、PR 到 main（只跑门禁）、或手动触发。
 name: Publish images
 
@@ -52,6 +52,11 @@ jobs:
       # runner 默认没有，不装则 account-media 测试报 spawn ffmpeg ENOENT。
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Deployment regression tests
+        run: |
+          bash -n scripts/deploy.sh
+          python3 scripts/deploy.test.py
 
       - name: Web type check
         working-directory: web
@@ -125,6 +130,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=sha,format=short
+            type=sha,format=long
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
@@ -137,3 +143,67 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  deploy:
+    needs: publish
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: http://openai2api.com:3015
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Configure deployment SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_SSH_KEY" && test -n "$DEPLOY_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<'CONFIG'
+          Host canvas-production
+            HostName openai2api.com
+            Port 2222
+            User miaoda
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ConnectTimeout 15
+            ServerAliveInterval 15
+            ServerAliveCountMax 4
+          CONFIG
+          chmod 600 ~/.ssh/config
+
+      - name: Deploy immutable images and verify production
+        run: |
+          set -euo pipefail
+          manifest=$(mktemp -d)
+          trap 'rm -rf -- "$manifest"' EXIT
+          printf '%s\n' "$GITHUB_SHA" > "$manifest/revision"
+          printf '%s\n' "$GITHUB_REPOSITORY" > "$manifest/repository"
+          tar -czf - scripts/deploy.sh docker-compose.yml server/sql/001-identity.sql server/sql/002-identity-rate-limits.sql -C "$manifest" revision repository | ssh canvas-production '
+            set -eu
+            release=$(mktemp -d /tmp/canvas-deploy.XXXXXX)
+            trap '"'"'rm -rf -- "$release"'"'"' EXIT
+            tar -xzf - -C "$release"
+            read -r revision < "$release/revision"
+            read -r repository < "$release/repository"
+            bash "$release/scripts/deploy.sh" "$revision" /mnt/d/infinite-canvas-v2 "$repository" "$release"
+          '
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-all-errors --max-time 20 http://openai2api.com:3015/api/health | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'
+
+      - name: Remove deployment key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
