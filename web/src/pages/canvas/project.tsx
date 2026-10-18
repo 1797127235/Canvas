@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { saveAs } from "file-saver";
+import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { pollServerImageTask, requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
@@ -49,6 +50,7 @@ import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { buildNodeMentionReferences, getGroupResourceNodes, isCanvasReferenceNode, type CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 import { applyNodeConfigPatch, audioMetadata, buildAudioGenerationMetadata, buildImageGenerationMetadata, createCanvasNode, imageMetadata, videoMetadata } from "@/lib/canvas/canvas-node-factory";
+import { buildAgentGraph, type AgentGraphResult, type ApplyGraphInput } from "@/lib/canvas/canvas-agent-graph";
 import { applyGroupSelection, applyUngroupSelection, canGroupSelectedNodes, canUngroupSelectedNodes, collectGroupMemberNodes, findContainingGroupId, findGroupDropTarget, getConnectionTargetAnchor, getGroupWrapRect, nodeRenderBounds, normalizeConnection, snapNodesIntoGroup } from "@/lib/canvas/canvas-node-geometry";
 import {
     audioExtension,
@@ -64,7 +66,6 @@ import {
     hasResumableVideoTask,
     hasVideoTaskId,
     hasResumableImageTask,
-    hydrateAssistantImages,
     hydrateCanvasImages,
     imageExtension,
     isAudioFile,
@@ -80,7 +81,6 @@ import { ConnectionCreateMenu, NodeCreateMenu, type PendingConnectionCreate } fr
 import {
     CanvasNodeType,
     type CanvasAssistantImage,
-    type CanvasAssistantSession,
     type CanvasConnection,
     type CanvasNodeData,
     type CanvasNodeImage,
@@ -97,6 +97,10 @@ import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 // Register built-in nodes in the shared registry once when the module loads.
 registerBuiltinNodes();
 
+// 画布助手整块懒加载：CopilotKit 的 Provider 会牵进 markdown 渲染、代码高亮等一堆东西，
+// 没用过助手的用户不该在打开画布时就下载它们。
+const CanvasAgentLauncher = lazy(() => import("@/components/canvas/canvas-agent-launcher"));
+
 type CanvasClipboard = {
     nodes: CanvasNodeData[];
     connections: CanvasConnection[];
@@ -108,8 +112,6 @@ type ConnectionDropTarget = {
 };
 
 type CanvasHistoryEntry = Pick<CanvasClipboard, "nodes" | "connections"> & {
-    chatSessions: CanvasAssistantSession[];
-    activeChatId: string | null;
     backgroundMode: CanvasBackgroundMode;
     showImageInfo: boolean;
 };
@@ -212,8 +214,7 @@ function InfiniteCanvasPage() {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const [nodes, setNodes] = useState<CanvasNodeData[]>([]);
     const [connections, setConnections] = useState<CanvasConnection[]>([]);
-    const [chatSessions, setChatSessions] = useState<CanvasAssistantSession[]>([]);
-    const [activeChatId, setActiveChatId] = useState<string | null>(null);
+    const [agentOpen, setAgentOpen] = useState(false);
     const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, k: 1 });
     const [canvasTool, setCanvasTool] = useState<"select" | "pan">("pan");
     const [size, setSize] = useState({ width: 1200, height: 720 });
@@ -271,12 +272,10 @@ function InfiniteCanvasPage() {
         (): CanvasHistoryEntry => ({
             nodes: nodesRef.current,
             connections: connectionsRef.current,
-            chatSessions,
-            activeChatId,
             backgroundMode,
             showImageInfo,
         }),
-        [activeChatId, backgroundMode, chatSessions, showImageInfo],
+        [backgroundMode, showImageInfo],
     );
 
     const cleanupCanvasFiles = useCallback(
@@ -445,11 +444,8 @@ function InfiniteCanvasPage() {
 
         const restore = async () => {
             const restoredNodes = await hydrateCanvasImages(resetInterruptedGeneration(project.nodes, project.connections));
-            const restoredSessions = await hydrateAssistantImages(project.chatSessions || []);
             setNodes(restoredNodes);
             setConnections(project.connections);
-            setChatSessions(restoredSessions);
-            setActiveChatId(project.activeChatId || null);
             setBackgroundMode(project.backgroundMode);
             setShowImageInfo(project.showImageInfo || false);
             setViewport(project.viewport);
@@ -461,8 +457,6 @@ function InfiniteCanvasPage() {
             lastHistoryRef.current = {
                 nodes: restoredNodes,
                 connections: project.connections,
-                chatSessions: restoredSessions,
-                activeChatId: project.activeChatId || null,
                 backgroundMode: project.backgroundMode,
                 showImageInfo: project.showImageInfo || false,
             };
@@ -552,8 +546,6 @@ function InfiniteCanvasPage() {
         if (
             previous?.nodes === next.nodes &&
             previous.connections === next.connections &&
-            previous.chatSessions === next.chatSessions &&
-            previous.activeChatId === next.activeChatId &&
             previous.backgroundMode === next.backgroundMode &&
             previous.showImageInfo === next.showImageInfo
         )
@@ -577,12 +569,12 @@ function InfiniteCanvasPage() {
                 historyCommitTimerRef.current = null;
             }
         };
-    }, [activeChatId, backgroundMode, chatSessions, connections, createHistoryEntry, nodes, projectLoaded, showImageInfo]);
+    }, [backgroundMode, connections, createHistoryEntry, nodes, projectLoaded, showImageInfo]);
 
     useEffect(() => {
         if (!projectLoaded || historyPausedRef.current) return;
-        updateProject(projectId, { nodes, connections, chatSessions, activeChatId, backgroundMode, showImageInfo });
-    }, [activeChatId, backgroundMode, chatSessions, connections, nodes, projectId, projectLoaded, showImageInfo, updateProject]);
+        updateProject(projectId, { nodes, connections, backgroundMode, showImageInfo });
+    }, [backgroundMode, connections, nodes, projectId, projectLoaded, showImageInfo, updateProject]);
 
     useEffect(() => {
         if (!dialogNodeId) setNodeImageSettingsOpen(false);
@@ -910,9 +902,9 @@ function InfiniteCanvasPage() {
             setReferencePickerNodeId((current) => (current && allIds.has(current) ? null : current));
             setExpandedBatchNodeIds((current) => new Set([...current].filter((nodeId) => !allIds.has(nodeId))));
             setContextMenu((current) => (current?.type === "node" && allIds.has(current.nodeId) ? null : current));
-            cleanupCanvasFiles({ projectId, nodes: nodesRef.current.filter((node) => !allIds.has(node.id)), chatSessions });
+            cleanupCanvasFiles({ projectId, nodes: nodesRef.current.filter((node) => !allIds.has(node.id)) });
         },
-        [chatSessions, cleanupCanvasFiles, projectId],
+        [cleanupCanvasFiles, projectId],
     );
 
     const groupSelection = useCallback(() => {
@@ -1009,7 +1001,7 @@ function InfiniteCanvasPage() {
         setRunningNodeId(null);
         deselectCanvas();
         setClearConfirmOpen(false);
-        cleanupCanvasFiles({ projectId, nodes: [], chatSessions: [] });
+        cleanupCanvasFiles({ projectId, nodes: [] });
     }, [cleanupCanvasFiles, deselectCanvas, projectId]);
 
     const duplicateNode = useCallback((nodeId: string) => {
@@ -1168,8 +1160,6 @@ function InfiniteCanvasPage() {
         applyingHistoryRef.current = true;
         setNodes(entry.nodes);
         setConnections(entry.connections);
-        setChatSessions(entry.chatSessions);
-        setActiveChatId(entry.activeChatId);
         setBackgroundMode(entry.backgroundMode);
         setShowImageInfo(entry.showImageInfo);
         setSelectedNodeIds(new Set());
@@ -3031,6 +3021,18 @@ function InfiniteCanvasPage() {
         [insertAssistantImage, insertAssistantText, screenToCanvas, size.height, size.width],
     );
 
+    // 助手写画布的唯一入口：与手工操作走同一套 setNodes/setConnections 与撤销历史。
+    // 后续加 update/delete/generate 工具时，在这里加方法而不是新开写入通道。
+    const handleApplyAgentGraph = useCallback((input: ApplyGraphInput): AgentGraphResult => {
+        const result = buildAgentGraph(input, nodesRef.current, getCanvasCenter());
+        if (result.nodes.length) {
+            setNodes((prev) => [...prev, ...result.nodes]);
+            setConnections((prev) => [...prev, ...result.connections]);
+            setSelectedNodeIds(new Set(result.created.map((item) => item.nodeId)));
+        }
+        return result;
+    }, [getCanvasCenter]);
+
     // Memoize every callback and render function passed to CanvasNode.
     // CanvasNode uses React.memo, but new prop references would invalidate it on every render and rerender every node
     // during click, hover, or viewport changes, which is especially expensive for Markdown. These useCallback values
@@ -3405,6 +3407,26 @@ function InfiniteCanvasPage() {
                 </Modal>
 
                 <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={() => setAssetPickerOpen(false)} />
+
+                {/* 右下角：助手面板悬在按钮上方，不遮挡缩放控件（左下）。 */}
+                {agentOpen ? (
+                    <div className="absolute bottom-20 right-5 z-50" data-canvas-no-zoom>
+                        <Suspense fallback={null}>
+                            <CanvasAgentLauncher projectId={projectId} nodes={nodes} connections={connections} selectedNodeIds={selectedNodeIds} onClose={() => setAgentOpen(false)} onApplyGraph={handleApplyAgentGraph} />
+                        </Suspense>
+                    </div>
+                ) : null}
+                <button
+                    type="button"
+                    onClick={() => setAgentOpen((value) => !value)}
+                    className="absolute bottom-5 right-5 z-50 flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium shadow-lg transition hover:brightness-105"
+                    style={{ background: theme.toolbar.panel, color: theme.node.text, border: `1px solid ${theme.toolbar.border}` }}
+                    aria-label={t("canvas.agent.open")}
+                    title={t("canvas.agent.open")}
+                >
+                    <Sparkles className="size-4" />
+                    {t("canvas.agent.title")}
+                </button>
             </section>
         </main>
     );

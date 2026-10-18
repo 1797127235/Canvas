@@ -17,6 +17,7 @@ import { createCredentialRouter } from "./credentials.js";
 import { createWorkspaceRouter } from "./workspace.js";
 import { createMediaRouter, clearUnusedMedia } from "./media.js";
 import { createGenerationRouter } from "./generation.js";
+import { createAgentRouter } from "./agent/routes.js";
 import { logError } from "./log.js";
 
 async function start() {
@@ -24,7 +25,7 @@ async function start() {
     const database = createDatabase(config);
     try {
         // 启动时验证数据库/schema 并清理过期记录；认证拒绝过期凭证不依赖清理。
-        for (const file of ["003-workspace-credentials-media.sql", "004-generation-tasks.sql", "005-generation-history.sql", "006-generation-sdk-operations.sql", "007-image-generation-tasks.sql", "008-media-references.sql", "009-credential-base-url.sql", "010-password-resets.sql"]) {
+        for (const file of ["003-workspace-credentials-media.sql", "004-generation-tasks.sql", "005-generation-history.sql", "006-generation-sdk-operations.sql", "007-image-generation-tasks.sql", "008-media-references.sql", "009-credential-base-url.sql", "010-password-resets.sql", "011-agent-threads.sql"]) {
             await database.pool.query(await readFile(new URL(`../sql/${file}`, import.meta.url), "utf8"));
         }
         await clearExpiredIdentityData(database.pool);
@@ -55,6 +56,7 @@ async function start() {
         apiRouter.use(createWorkspaceRouter(database.pool));
         apiRouter.use(createMediaRouter(database.pool, minio));
         apiRouter.use(createGenerationRouter(database.pool, { catalog, encryptionKey: config.credentialsEncryptionKey, media: minio }));
+        apiRouter.use(createAgentRouter({ database: database.pool, catalog, encryptionKey: config.credentialsEncryptionKey, limiter: createRateLimiter(database.pool, "agent", secret), rateLimitSecret: secret }));
         const server = createApp({ appOrigin: config.appOrigin, apiRouter }).listen(config.port, config.host);
         let closing = false;
         const close = () => {

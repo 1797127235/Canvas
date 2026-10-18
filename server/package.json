@@ -14,6 +14,7 @@
         "start": "node dist/src/index.js"
     },
     "dependencies": {
+        "@ag-ui/core": "1.0.2",
         "@ai-sdk/openai": "4.0.91",
         "@ai-sdk/provider": "4.0.26",
         "@ai-sdk/provider-utils": "5.0.58",

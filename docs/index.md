@@ -27,6 +27,7 @@
 - [生成请求内联素材（初步调研）](specs/generation-media-payload-investigation.md)：上述问题的代码考古、现状梳理、可复用能力、方案对比和待确认项；未改动代码。
 - [服务端与网页端数据流向审计](specs/media-data-flow-audit.md)：根因是项目没有资源抽象，由此产生字节多份、引用多份、搬运重复实现、无回收等后果；含代码定位与处理顺序。
 - [资源身份单点化](specs/resource-identity.md)：上述问题的实现方案与落地结果；生成上行/下行改传 `remote:<uuid>`、视频流式落盘、引用表与回收、请求体分档上限。
+- [画布 Agent 接入](specs/agent-copilotkit.md)：CopilotKit/AG-UI 的目标架构与文件组织；只装前端 SDK、服务端按契约自实现两个路由以保持 `ai` 单份依赖；工具在浏览器执行的边界。
 
 ## 开发与数据
 

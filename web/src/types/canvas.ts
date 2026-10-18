@@ -107,38 +107,13 @@ export type CanvasConnection = {
     toNodeId: string;
 };
 
-export type CanvasAssistantReference = {
-    id: string;
-    type: CanvasNodeTypeId;
-    title: string;
-    dataUrl?: string;
-    storageKey?: string;
-    text?: string;
-};
-
+// 助手建图时引用已有资产的入参；会话消息本身改由 AG-UI 协议与
+// user_agent_threads 存储，不再有本地会话类型。
 export type CanvasAssistantImage = {
     id: string;
     dataUrl: string;
     storageKey?: string;
     prompt: string;
-};
-
-export type CanvasAssistantMessage = {
-    id: string;
-    role: "user" | "assistant" | "system" | "tool" | "error";
-    title?: string;
-    text: string;
-    meta?: string;
-    detail?: unknown;
-    references?: CanvasAssistantReference[];
-};
-
-export type CanvasAssistantSession = {
-    id: string;
-    title: string;
-    messages: CanvasAssistantMessage[];
-    createdAt: string;
-    updatedAt: string;
 };
 
 export type ConnectionHandle = {

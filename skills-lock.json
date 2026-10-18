@@ -1,6 +1,54 @@
 {
   "version": 1,
   "skills": {
+    "channels-setup": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/channels-setup/SKILL.md",
+      "computedHash": "1e1a512ed9fd9462773c36fb71a06941e151b49f4661468d34028f611bbb72d4"
+    },
+    "copilotkit": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/copilotkit/SKILL.md",
+      "computedHash": "797dab664dc25520e5b38baf91fa50be23aa5888b168b9a05a9417ddf3a05b6a"
+    },
+    "copilotkit-channels": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/copilotkit-channels/SKILL.md",
+      "computedHash": "57371ea932171000fdee1e6168034d3146caaa3d88aeb6c47250afe98535b288"
+    },
+    "copilotkit-cli": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/copilotkit-cli/SKILL.md",
+      "computedHash": "222ab18ca9e1e61c923b60f489a31149de76f7259f8965ed5fc2d696d34376d6"
+    },
+    "inspector-docs": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/inspector-docs/SKILL.md",
+      "computedHash": "b4d587632b649c505ede8bce2970284ab5d4e5f8c0109418917e98ef1f380889"
+    },
+    "inspector-workbench": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/inspector-workbench/SKILL.md",
+      "computedHash": "1f48902d483c19eae1df6d1c80546f057138b46264c184f67ee036ba25fd5034"
+    },
+    "intelligence-docs": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/intelligence-docs/SKILL.md",
+      "computedHash": "a1d3de96edeaf4ffb279f67595e543da371c063d45d62eff178b1e26897c479a"
+    },
+    "intelligence-vocabulary": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/intelligence-vocabulary/SKILL.md",
+      "computedHash": "85d96a43bb8454901a63c25016f641802feda2590d9e40a737655d313ce4817f"
+    },
     "next-best-practices": {
       "source": "vercel-labs/openreview",
       "sourceType": "github",
@@ -12,6 +60,12 @@
       "sourceType": "github",
       "skillPath": ".agents/skills/open-code-review/SKILL.md",
       "computedHash": "d3a3a06ec51a1b1d8c4ff4cb5fbc963269446b1627178c1106c606868f5a4d29"
+    },
+    "setup-slack-channel": {
+      "source": "CopilotKit/CopilotKit",
+      "sourceType": "github",
+      "skillPath": "skills/setup-slack-channel/SKILL.md",
+      "computedHash": "dbac12de444fc1cd8d34d74d48d817dcb43dd6d6f41347d57462e931ee1ca1ca"
     }
   }
 }

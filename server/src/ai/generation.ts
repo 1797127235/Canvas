@@ -47,6 +47,11 @@ function providers(model: CatalogModel, apiKey: string) {
     return { openai: createOpenAI(options), xai: createXai(options) };
 }
 
+// 画布助手与文本生成走同一个 chat 模型入口：同一条上游、同一把账号 Key、同样的网关 fetch。
+export function chatModel(model: CatalogModel, apiKey: string) {
+    return providers(model, apiKey).openai.chat(model.upstreamModel);
+}
+
 export async function createImages(model: CatalogModel, apiKey: string, input: ImageInput, signal: AbortSignal, media: MediaReader) {
     const images = input.images?.length ? await Promise.all(input.images.map(media.image)) : [];
     // 方舟图片走原生同步协议（参考图在 JSON body 的 image 字段）；[OI] / xAI 仍走 SDK。

@@ -1,0 +1,134 @@
+import { Router, type Request, type Response } from "express";
+import type { Pool } from "pg";
+import { RunAgentInputSchema } from "@ag-ui/core/schemas";
+import type { RateLimiterPostgres } from "rate-limiter-flexible";
+import { z } from "zod";
+
+import type { Catalog } from "../catalog/catalog.js";
+import { accountModels } from "../catalog/catalog.js";
+import { readUserCredential } from "../credentials.js";
+import { requireUser } from "../identity/auth-middleware.js";
+import { consumeUserRateLimit } from "../identity/rate-limit.js";
+import { logError } from "../log.js";
+import { streamAgentRun } from "./run.js";
+import { AgentThreadError, createThreadStore, validateMessages } from "./threads.js";
+
+const AGENT_ID = "default";
+const AGENT_INFO = { name: "画布助手", description: "理解当前画布并协助搭建生成流程" };
+const PROJECT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+const saveSchema = z.strictObject({ messages: z.array(z.unknown()) });
+
+export type AgentOptions = {
+    database: Pool;
+    catalog: Catalog;
+    encryptionKey?: string;
+    limiter?: RateLimiterPostgres;
+    rateLimitSecret?: string;
+};
+
+export function createAgentRouter(options: AgentOptions) {
+    const router = Router();
+    const threads = createThreadStore(options.database);
+    router.use(requireUser(options.database));
+
+    // 前端 CopilotKitCore 启动时读它来发现 agent，未登录时前端据此提示登录。
+    router.get("/copilotkit/info", (_request, response) => {
+        response.json({ version: "0.1.0", mode: "sse", agents: { [AGENT_ID]: AGENT_INFO } });
+    });
+
+    router.post("/copilotkit/agent/:agentId/run", async (request, response) => {
+        if (request.params.agentId !== AGENT_ID) return response.status(404).json({ error: { code: "AGENT_NOT_FOUND", message: "助手不存在" } });
+        const userId = response.locals.user.id as string;
+        const parsed = RunAgentInputSchema.safeParse(request.body);
+        if (!parsed.success) return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "对话请求格式无效" } });
+        const input = parsed.data;
+        // 客户端在 properties 里声明自己在哪个画布项目；没有它就无法校验会话归属，直接拒绝。
+        const projectId = typeof input.forwardedProps?.projectId === "string" ? input.forwardedProps.projectId : "";
+        if (!PROJECT_ID.test(projectId)) return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "缺少画布标识" } });
+        if (!(await threads.owns(userId, projectId, input.threadId))) return response.status(409).json({ error: { code: "AGENT_THREAD_MISMATCH", message: "对话不属于当前画布，请重新打开助手" } });
+
+        try {
+            if (options.limiter && options.rateLimitSecret) await consumeUserRateLimit(options.limiter, options.rateLimitSecret, "agent", userId);
+        } catch {
+            return response.status(429).json({ error: { code: "RATE_LIMITED", message: "对话太频繁，请稍后再试" } });
+        }
+
+        const credential = await readUserCredential(options.database, userId, options.encryptionKey);
+        if (!credential) return response.status(409).json({ error: { code: "API_KEY_REQUIRED", message: "请先在配置页保存账号 API Key" } });
+        let candidates: Awaited<ReturnType<typeof accountModels>>;
+        try {
+            candidates = await accountModels(options.catalog, credential.apiKey, credential.baseUrl);
+        } catch {
+            return response.status(502).json({ error: { code: "UPSTREAM_ERROR", message: "上游模型获取失败，请检查账号 API Key 和上游服务" } });
+        }
+        const textModels = candidates.filter((model) => model.capability === "text");
+        const preferred = typeof input.forwardedProps?.modelId === "string" ? textModels.find((model) => model.id === input.forwardedProps.modelId) : undefined;
+        const model = preferred || textModels[0];
+        if (!model) return response.status(424).json({ error: { code: "AGENT_MODEL_UNAVAILABLE", message: "当前账号没有可用的文本模型，助手暂时不可用" } });
+
+        const controller = new AbortController();
+        response.once("close", () => controller.abort());
+        try {
+            await streamAgentRun({ model, apiKey: credential.apiKey, input, signal: controller.signal, response });
+        } catch (error) {
+            logError("agent", error, { userId });
+            if (!response.headersSent) return response.status(500).json({ error: { code: "INTERNAL_ERROR", message: "助手响应失败，请重试" } });
+        }
+    });
+
+    router.get("/agent/threads/:projectId", async (request, response) => {
+        const projectId = readProjectId(request, response);
+        if (!projectId) return;
+        try {
+            return response.json(await threads.ensure(response.locals.user.id as string, projectId));
+        } catch (error) {
+            return threadFailure(response, error);
+        }
+    });
+
+    router.put("/agent/threads/:projectId", async (request, response) => {
+        const projectId = readProjectId(request, response);
+        if (!projectId) return;
+        const version = Number(request.header("if-match-version"));
+        const parsed = saveSchema.safeParse(request.body);
+        if (!request.header("if-match-version") || !Number.isSafeInteger(version) || version < 0 || !parsed.success) return response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "会话数据或版本无效" } });
+        try {
+            const messages = validateMessages(parsed.data.messages);
+            return response.json(await threads.save(response.locals.user.id as string, projectId, version, messages));
+        } catch (error) {
+            return threadFailure(response, error);
+        }
+    });
+
+    router.delete("/agent/threads/:projectId", async (request, response) => {
+        const projectId = readProjectId(request, response);
+        if (!projectId) return;
+        try {
+            return response.json(await threads.reset(response.locals.user.id as string, projectId));
+        } catch (error) {
+            return threadFailure(response, error);
+        }
+    });
+
+    return router;
+}
+
+function readProjectId(request: Request, response: Response) {
+    const projectId = String(request.params.projectId ?? "");
+    if (!PROJECT_ID.test(projectId)) {
+        response.status(422).json({ error: { code: "VALIDATION_ERROR", message: "画布标识无效" } });
+        return null;
+    }
+    return projectId;
+}
+
+function threadFailure(response: Response, error: unknown) {
+    if (error instanceof AgentThreadError) {
+        const status = error.failure === "not-found" ? 404 : error.failure === "conflict" ? 409 : 413;
+        const code = error.failure === "not-found" ? "AGENT_THREAD_NOT_FOUND" : error.failure === "conflict" ? "AGENT_THREAD_CONFLICT" : "AGENT_THREAD_TOO_LARGE";
+        return response.status(status).json({ error: { code, message: error.message } });
+    }
+    logError("agent-threads", error);
+    return response.status(500).json({ error: { code: "INTERNAL_ERROR", message: "会话读写失败" } });
+}

@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import { z } from "zod";
 
 import { requireUser } from "./identity/auth-middleware.js";
+import { createThreadStore } from "./agent/threads.js";
 import { withTransaction } from "./db.js";
 import { logError } from "./log.js";
 
@@ -42,7 +43,18 @@ async function putWorkspace(request: Request, response: Response, database: Pool
     // 引用表在工作区写入的同一个 pass 里整体重建：删掉本次文档不再引用的，补齐新增的。
     // 回收任务据此判断哪些媒体已无人引用；重建失败不影响保存成功。
     await syncMediaReferences(database, response.locals.user.id, parsed.data);
+    // 画布项目删掉后它的助手会话没有外键可用（项目 id 在工作区 JSON 里），按当前项目列表回收。
+    await pruneAgentThreads(database, response.locals.user.id, parsed.data.projects);
     return response.json({ version: result.rows[0].version });
+}
+
+async function pruneAgentThreads(database: Pool, userId: string, projects: unknown[]) {
+    const ids = projects.flatMap((project) => (project && typeof project === "object" && typeof (project as { id?: unknown }).id === "string" ? [(project as { id: string }).id] : []));
+    try {
+        await createThreadStore(database).pruneOrphans(userId, ids);
+    } catch (error) {
+        logError("agent-threads", error, { userId });
+    }
 }
 
 async function syncMediaReferences(database: Pool, userId: string, data: unknown) {

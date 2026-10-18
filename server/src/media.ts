@@ -127,11 +127,12 @@ export async function storeAccountMedia(database: Pool, options: MediaOptions, u
     return { id, mimeType, bytes: bytes.length };
 }
 
-// 回收无人引用的账号媒体。三重保险，宁可少删不能误删：
+// 回收无人引用的账号媒体。四重保险，宁可少删不能误删：
 // ① 只动创建超过宽限期的媒体，刚生成、刚上传的永不入选；
 // ② 以 user_media_references 为索引（保存工作区时重建）；
 // ③ 再核对工作区与生成历史的原文——引用表是后来才加的，
-//    旧数据首次上线时表是空的，只看表会把还在用的媒体删光。
+//    旧数据首次上线时表是空的，只看表会把还在用的媒体删光；
+// ④ 助手对话（user_agent_threads）同样按原文核对，它不在引用表里。
 export const MEDIA_GRACE_DAYS = 7;
 
 export async function clearUnusedMedia(database: Pool, options: MediaOptions) {
@@ -143,6 +144,9 @@ export async function clearUnusedMedia(database: Pool, options: MediaOptions) {
            AND NOT EXISTS (SELECT 1 FROM user_media_references r WHERE r.user_id = m.user_id AND r.media_id = m.id)
            AND NOT EXISTS (SELECT 1 FROM user_workspaces w WHERE w.user_id = m.user_id AND w.data::text LIKE '%remote:' || m.id::text || '%')
            AND NOT EXISTS (SELECT 1 FROM user_generation_history h WHERE h.user_id = m.user_id AND h.data::text LIKE '%remote:' || m.id::text || '%')
+           -- 画布助手的对话也会引用素材（建节点时带 storageKey、生成结果回填），
+           -- 不查这一处会在宽限期后把对话里还在用的图删掉。
+           AND NOT EXISTS (SELECT 1 FROM user_agent_threads t WHERE t.user_id = m.user_id AND t.messages::text LIKE '%remote:' || m.id::text || '%')
          RETURNING m.id, m.object_key`,
         [MEDIA_GRACE_DAYS],
     );

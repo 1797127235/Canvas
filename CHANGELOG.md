@@ -2,6 +2,16 @@
 
 ## Unreleased
 
++ [修复] 画布助手的回复按 Markdown 渲染：粗体、列表和代码不再显示成原文标记。用户消息仍保持原文。
+
++ [修复] 画布助手的多轮回复不再叠进同一条气泡：上游文本片段 id 经常重复为 `0`，事件层改为每次新开一段文本都签发独立消息 id。
+
++ [修复] 画布助手不再把系统提示放进模型消息：AI SDK 7 默认拒绝 `messages` 里的 system，助手会直接报 Invalid prompt。系统提示改走 `instructions`，客户端自带的 system / developer 消息会被丢弃。
+
++ [新增] 画布助手：画布右下角新增入口，打开后是与账号绑定的对话面板。助手能读到当前画布的节点、连线与资产摘要（不含提示词全文和图片字节），能通过 `apply_graph` 一次创建一组节点与连线（可撤销、不重叠、自动避让已有内容），对话按画布项目持久保存，刷新和换设备后仍在，别人看不到。服务端按 AG-UI 契约自实现 `/api/copilotkit`（`info` + `agent/:id/run`，SSE 流式）与 `/api/agent/threads`，不引入 `@copilotkit/runtime`，服务端仍只有一份 `ai`；工具在浏览器执行，模型只负责决定「加什么、怎么连」。新增会话表 `user_agent_threads` 与 `011-agent-threads.sql`，媒体回收补上会话引用检查（否则对话里引用的图会在宽限期后被删）。
+
++ [调整] 删除旧 Agent 遗留的死字段 `CanvasProject.chatSessions` / `activeChatId` 及相关类型与读写逻辑：会话改由 `user_agent_threads` 存储，不再挂在工作区文档上（对话每来一条消息就 bump 一次工作区版本号，会让对话与画布编辑互相 409）。
+
 + [优化] CI/CD 增加 main 自动部署：质量门禁和双镜像发布通过后，由 runner 经 SSH 导入固定 SHA 镜像、更新应用并检查健康状态，失败按真实镜像 ID 回滚；保留数据库备份并限制传输超时。
 
 + [调整] 完整移除旧本地 Agent 面板、消息与审批逻辑、状态 Store、画布桥接和工作台命令总线，清理专属依赖与入口，为后续 CopilotKit/AG-UI 接入腾出独立边界。
