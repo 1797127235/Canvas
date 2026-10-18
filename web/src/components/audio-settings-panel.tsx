@@ -1,7 +1,7 @@
-import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
+import { OptionPill, SettingGroup } from "@/components/settings-controls";
 import { audioFormatOptions, audioSpeedLabel, audioVoiceOptions, normalizeAudioFormatValue, normalizeAudioSpeedValue, normalizeAudioVoiceValue } from "@/lib/audio-generation";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import type { AiConfig } from "@/stores/use-config-store";
@@ -82,21 +82,3 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
     );
 }
 
-function OptionPill({ selected, theme, onClick, children }: { selected: boolean; theme: CanvasTheme; onClick: () => void; children: ReactNode }) {
-    return (
-        <button type="button" className="h-9 cursor-pointer rounded-full border px-2 text-sm transition hover:opacity-80" style={{ background: "transparent", borderColor: selected ? theme.node.text : theme.node.stroke, color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()} onClick={onClick}>
-            {children}
-        </button>
-    );
-}
-
-function SettingGroup({ title, color, children }: { title: string; color: string; children: ReactNode }) {
-    return (
-        <div className="space-y-2.5">
-            <div className="text-xs font-medium" style={{ color }}>
-                {title}
-            </div>
-            {children}
-        </div>
-    );
-}

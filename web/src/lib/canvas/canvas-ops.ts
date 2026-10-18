@@ -1,6 +1,5 @@
 import { nanoid } from "nanoid";
 
-import i18n from "@/i18n";
 import { getNodeSpec, isRegisteredNodeType } from "@/lib/canvas/node-registry";
 import { CanvasNodeType, type CanvasConnection, type CanvasNodeData, type CanvasNodeMetadata, type CanvasNodeTypeId, type ViewportTransform } from "@/types/canvas";
 
@@ -22,17 +21,6 @@ export type CanvasOpsSnapshot = {
     selectedNodeIds: string[];
     viewport: ViewportTransform;
 };
-
-export function summarizeCanvasOps(ops?: CanvasOp[]) {
-    const counts = (Array.isArray(ops) ? ops : []).reduce<Record<string, number>>((acc, op) => {
-        if (!op?.type) return acc;
-        acc[op.type] = (acc[op.type] || 0) + 1;
-        return acc;
-    }, {});
-    return Object.entries(counts)
-        .map(([type, count]) => `${opLabel(type)} ${count}`)
-        .join("，");
-}
 
 export function applyCanvasOps(snapshot: CanvasOpsSnapshot, ops?: CanvasOp[]) {
     let nodes = snapshot.nodes;
@@ -82,8 +70,4 @@ export function applyCanvasOps(snapshot: CanvasOpsSnapshot, ops?: CanvasOp[]) {
     });
 
     return { ...snapshot, nodes, connections, selectedNodeIds, viewport };
-}
-
-function opLabel(type: string) {
-    return i18n.t(`canvas.ops.${type}`, { defaultValue: type });
 }

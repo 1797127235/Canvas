@@ -1,9 +1,9 @@
-import { type ReactNode } from "react";
 import { Slider } from "antd";
 import { useTranslation } from "react-i18next";
 
 import i18n from "@/i18n";
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
+import { OptionPill, SettingGroup } from "@/components/settings-controls";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import { clampVideoSeconds, computeVideoSize, inferVideoRatio, parseVideoResolution, readVideoDimensions, VIDEO_SECONDS_MAX, VIDEO_SECONDS_MIN, videoRatioOptions } from "@/lib/media-size";
 import { type AiConfig } from "@/stores/use-config-store";
@@ -141,25 +141,6 @@ export function normalizeVideoResolutionValue(value: string) {
 function updateDimension(key: "width" | "height", value: number | null, dimensions: { width: number; height: number }, onConfigChange: VideoSettingsPanelProps["onConfigChange"]) {
     const next = Math.max(1, Math.floor(value || dimensions[key] || 720));
     onConfigChange("size", `${key === "width" ? next : dimensions.width}x${key === "height" ? next : dimensions.height}`);
-}
-
-function OptionPill({ selected, disabled = false, theme, onClick, children }: { selected: boolean; disabled?: boolean; theme: CanvasTheme; onClick: () => void; children: ReactNode }) {
-    return (
-        <button type="button" disabled={disabled} className="h-9 cursor-pointer rounded-full border px-2 text-sm transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-35" style={{ background: "transparent", borderColor: selected ? theme.node.text : theme.node.stroke, color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()} onClick={onClick}>
-            {children}
-        </button>
-    );
-}
-
-function SettingGroup({ title, color, children }: { title: string; color: string; children: ReactNode }) {
-    return (
-        <div className="space-y-2.5">
-            <div className="text-xs font-medium" style={{ color }}>
-                {title}
-            </div>
-            {children}
-        </div>
-    );
 }
 
 function ResolutionInput({ value, theme, onChange }: { value: string; theme: CanvasTheme; onChange: (value: string) => void }) {

@@ -3,6 +3,7 @@ import { ConfigProvider, Switch } from "antd";
 import { useTranslation } from "react-i18next";
 
 import i18n from "@/i18n";
+import { OptionPill } from "@/components/settings-controls";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import { computeMediaSize, inferMediaRatio, inferMediaScale, mediaRatioOptions, mediaScaleOptions, readMediaDimensions } from "@/lib/media-size";
 import type { AiConfig } from "@/stores/use-config-store";
@@ -170,20 +171,6 @@ export function imageSizeLabel(size: string) {
     if (ratio === "auto" || size === "auto") return i18n.t("settingsPanels.common.auto");
     if (scale === "auto") return ratio;
     return `${scale} · ${ratio}`;
-}
-
-function OptionPill({ selected, theme, onClick, children }: { selected: boolean; theme: CanvasTheme; onClick: () => void; children: ReactNode }) {
-    return (
-        <button
-            type="button"
-            className="h-9 cursor-pointer rounded-full border px-2 text-sm transition hover:opacity-80"
-            style={{ background: "transparent", borderColor: selected ? theme.node.text : theme.node.stroke, color: theme.node.text }}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={onClick}
-        >
-            {children}
-        </button>
-    );
 }
 
 function DimensionInput({ prefix, value, disabled, theme, alignToStep, onChange }: { prefix: string; value: number; disabled: boolean; theme: CanvasTheme; alignToStep: boolean; onChange: (value: number | null) => void }) {

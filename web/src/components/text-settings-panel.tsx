@@ -1,8 +1,8 @@
-import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import i18n from "@/i18n";
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
+import { OptionPill } from "@/components/settings-controls";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import type { AiConfig, ReasoningEffort } from "@/stores/use-config-store";
 
@@ -40,18 +40,4 @@ export function TextSettingsPanel({ config, onConfigChange, theme, className = "
 
 export function reasoningEffortLabel(value: ReasoningEffort) {
     return reasoningEffortOptions.includes(value) ? i18n.t(`settingsPanels.common.${value}`) : value;
-}
-
-function OptionPill({ selected, theme, onClick, children }: { selected: boolean; theme: CanvasTheme; onClick: () => void; children: ReactNode }) {
-    return (
-        <button
-            type="button"
-            className="h-9 cursor-pointer rounded-full border px-2 text-sm transition hover:opacity-80"
-            style={{ background: "transparent", borderColor: selected ? theme.node.text : theme.node.stroke, color: theme.node.text }}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={onClick}
-        >
-            {children}
-        </button>
-    );
 }
