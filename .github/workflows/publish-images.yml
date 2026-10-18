@@ -186,6 +186,14 @@ jobs:
           CONFIG
           chmod 600 ~/.ssh/config
 
+      - name: Transfer immutable images over SSH
+        run: |
+          set -euo pipefail
+          owner=${GITHUB_REPOSITORY_OWNER,,}
+          images=("ghcr.io/$owner/infinite-canvas-api:sha-$GITHUB_SHA" "ghcr.io/$owner/infinite-canvas-web:sha-$GITHUB_SHA")
+          for image in "${images[@]}"; do timeout 180s docker pull "$image"; done
+          timeout 420s bash -o pipefail -c 'docker save "$@" | gzip -1 | ssh canvas-production "timeout 390s docker load"' _ "${images[@]}"
+
       - name: Deploy immutable images and verify production
         run: |
           set -euo pipefail

@@ -30,16 +30,15 @@ api_id=$(compose ps -q api)
 web_id=$(compose ps -q web)
 db_id=$(compose ps -q db)
 [[ -n $api_id && -n $web_id && -n $db_id ]] || { echo 'Existing production stack is required' >&2; exit 1; }
-previous_api=$(docker inspect -f '{{.Config.Image}}' "$api_id")
-previous_web=$(docker inspect -f '{{.Config.Image}}' "$web_id")
+previous_api=$(docker inspect -f '{{.Image}}' "$api_id")
+previous_web=$(docker inspect -f '{{.Image}}' "$web_id")
 owner=${repository%%/*}
 owner=${owner,,}
 api_image="ghcr.io/$owner/infinite-canvas-api:sha-$revision"
 web_image="ghcr.io/$owner/infinite-canvas-web:sha-$revision"
 
-# 两个镜像全部下载并核对提交身份后，才触碰现有部署。
+# CI 已经由 SSH 导入镜像；生产不访问 GHCR。全部核对身份后才触碰现有部署。
 for image in "$api_image" "$web_image"; do
-    docker pull "$image"
     actual=$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")
     [[ $actual == "$revision" ]] || { echo 'Image revision does not match commit' >&2; exit 1; }
 done

@@ -25,9 +25,10 @@ import json, os, pathlib, sys
 a = sys.argv[1:]
 with open(os.environ['CALLS'], 'a') as log:
     log.write(json.dumps(a) + '\n')
-if a[0] == 'pull' and os.environ['FAILURE'] == 'pull': sys.exit(1)
+if a[0] == 'image' and os.environ['FAILURE'] == 'missing': sys.exit(1)
 if a[0] == 'image': print(os.environ['REVISION'])
-elif a[0] == 'inspect': print('sha256:old-' + a[-1])
+elif a[0] == 'inspect':
+    print('sha256:old-' + a[-1] if a[2] == '{{.Image}}' else 'mutable:latest')
 elif 'ps' in a: print(a[-1])
 elif 'pg_dump' in a: print('-- backup')
 elif 'port' in a: print('0.0.0.0:3015')
@@ -63,10 +64,10 @@ printf '{"ok":true}'
         self.assertIn('--force-recreate', up)
         self.assertIn('--wait', up)
         self.assertEqual(up[-2:], ['api', 'web'])
-        self.assertFalse(any('down' in call or 'prune' in call for call in calls))
+        self.assertFalse(any('down' in call or 'prune' in call or call[0] == 'pull' for call in calls))
 
-    def test_pull_failure_leaves_existing_release_untouched(self):
-        result, calls, override, compose, backups = self.deploy('pull')
+    def test_missing_image_leaves_existing_release_untouched(self):
+        result, calls, override, compose, backups = self.deploy('missing')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(compose, 'old compose')
         self.assertEqual(override, '')

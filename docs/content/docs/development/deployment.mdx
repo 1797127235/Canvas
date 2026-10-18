@@ -17,7 +17,7 @@ description: 生产服务器地址、发布流程与注意事项
 
 1. 推送到 `main` 后，`.github/workflows/publish-images.yml` 先执行两端类型检查、测试、PostgreSQL 集成测试和部署脚本回归测试，再构建 Web/API 镜像并发布到 GHCR。
 2. 两个镜像都成功后，`deploy` job 使用 `production` 环境密钥，经 `miaoda@openai2api.com:2222` 登录 WSL，运行 `scripts/deploy.sh`。PR 只验证；版本 tag 只发布镜像，不自动部署。手动运行工作流并选择 `main` 也会部署。
-3. 拉取并校验本次提交的 `sha-<完整 40 位 SHA>` 镜像。短 SHA、分支名和 `latest` 标签仍发布，但生产不依赖可变标签。
+3. GitHub runner 拉取本次 `sha-<完整 40 位 SHA>` 镜像，经 `docker save | gzip | SSH docker load` 导入生产机；生产机不直接访问 GHCR。Runner 单镜像拉取超时 180 秒，传输超时 420 秒；生产脚本校验镜像提交标签。短 SHA、分支名和 `latest` 标签仍发布，但生产不依赖可变标签。
 4. 在 `backups/deploy-<时间>-<短 SHA>/` 新建 PostgreSQL 快照、旧 Compose 配置和旧镜像记录，不清理已有备份。数据库备份失败则停止部署。
 5. 同步仓库的 `docker-compose.yml` 和初始化 SQL 001/002；镜像写入独立的 `docker-compose.deploy.yml` 覆盖文件。服务器 `.env`、catalog、媒体和数据库卷保持不变。
 6. 仅重建 `api` / `web`，使用 `--no-deps --pull never --force-recreate --wait`，不重启数据库或 db-init。检查健康接口、首页和模板索引，最后从 GitHub runner 检查公网健康接口。
@@ -27,7 +27,7 @@ description: 生产服务器地址、发布流程与注意事项
 git push origin main
 ```
 
-当前脚本用于已有生产栈升级，不负责首次安装、密钥生成或数据库首次初始化。两包目前公开，使用临时空 Docker 凭据配置匿名拉取，避免 Windows wincred 影响 SSH；改为私有包时需另行配置只读 GHCR 凭据。
+当前脚本用于已有生产栈升级，不负责首次安装、密钥生成或数据库首次初始化。两包目前公开，由 GitHub runner 拉取后传入生产机，绕过生产 Docker 的 GHCR 代理下载阻塞；生产仍使用临时空凭据配置，不调用 wincred。改为私有包时需给 runner 配置只读 GHCR 凭据。
 
 ## 首次凭据配置
 
@@ -40,7 +40,7 @@ GitHub 仓库设置 → Environments → `production`，仅允许 `main` 分支�
 
 ## 失败恢复与手工回滚
 
-自动恢复只切换应用镜像，不自动恢复数据库。数据库迁移需与旧版本兼容；破坏性迁移必须另行备份、演练和人工决策，不能依赖镜像回滚保证数据安全。
+自动恢复使用部署前容器实际镜像 ID（`{{.Image}}`），即使原标签被重建覆盖也不会切错版本；不自动恢复数据库。数据库迁移需与旧版本兼容；破坏性迁移必须另行备份、演练和人工决策，不能依赖镜像回滚保证数据安全。
 
 生产版本以覆盖文件和容器 revision label 为准，不再依赖 `.env` 中的 `IMAGE_TAG`。手工维护必须同时指定两个 Compose 文件，避免切回 `.env` 的旧标签：
 
