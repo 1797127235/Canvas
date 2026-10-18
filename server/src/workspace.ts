@@ -3,7 +3,7 @@ import type { Pool } from "pg";
 import { z } from "zod";
 
 import { requireUser } from "./identity/auth-middleware.js";
-import { createThreadStore } from "./agent/threads.js";
+import { createSessionStore } from "./agent/sessions/store.js";
 import { withTransaction } from "./db.js";
 import { logError } from "./log.js";
 
@@ -51,7 +51,7 @@ async function putWorkspace(request: Request, response: Response, database: Pool
 async function pruneAgentThreads(database: Pool, userId: string, projects: unknown[]) {
     const ids = projects.flatMap((project) => (project && typeof project === "object" && typeof (project as { id?: unknown }).id === "string" ? [(project as { id: string }).id] : []));
     try {
-        await createThreadStore(database).pruneOrphans(userId, ids);
+        await createSessionStore(database).pruneOrphans(userId, ids);
     } catch (error) {
         logError("agent-threads", error, { userId });
     }

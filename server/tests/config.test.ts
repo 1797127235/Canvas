@@ -45,6 +45,13 @@ test("rejects invalid ports and non-PostgreSQL database URLs", () => {
     assert.throws(() => readConfig({ ...environment, DATABASE_URL: "https://example.com" }));
 });
 
+test("requires explicit valid compaction budgets and never guesses a model window", () => {
+    assert.deepEqual(readConfig(environment).agentCompactionBudgets, {});
+    const budget = { contextWindow: 32000, maxOutputTokens: 2000, keepRecentTokens: 6000, summaryTokens: 1200, safetyTokens: 1000 };
+    assert.deepEqual(readConfig({ ...environment, AGENT_COMPACTION_BUDGETS: JSON.stringify({ exact: budget }) }).agentCompactionBudgets.exact, budget);
+    assert.throws(() => readConfig({ ...environment, AGENT_COMPACTION_BUDGETS: "invalid" }), /预算配置无效/);
+});
+
 test("never exposes database credentials in configuration errors", () => {
     assert.throws(
         () => readConfig({ ...environment, DATABASE_URL: "not-a-url-containing-private-password" }),

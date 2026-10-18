@@ -7,6 +7,9 @@ import { chatModel } from "../ai/generation.js";
 import type { CatalogModel } from "../catalog/catalog.js";
 import { createEventMapper, runFailed, runFinished, runStarted, sseFrame } from "./events.js";
 import { buildSystemPrompt, toModelMessages, toToolSet } from "./messages.js";
+import { prepareAgentContext } from "./compaction/prepare.js";
+import type { CompactionBudget } from "./compaction/context.js";
+import type { SessionStore } from "./sessions/store.js";
 
 // 系统提示词固定在这里：它决定助手扮演什么角色，属于产品行为，不交给客户端覆盖。
 // 画布摘要由客户端通过 AG-UI 的 context 传进来，拼在后面的同名段落里。
@@ -28,12 +31,17 @@ export type AgentRunOptions = {
     input: RunAgentInput;
     signal: AbortSignal;
     response: Response;
+    sessions: SessionStore;
+    userId: string;
+    projectId: string;
+    budget?: CompactionBudget;
 };
 
 // 一次 run：把 AG-UI 输入换成 AI SDK 调用，把 fullStream 逐块写成 SSE。
 // 工具在浏览器执行，所以这里传给 streamText 的 ToolSet 全部没有 execute：
 // AI SDK 遇到这种工具调用就结束本轮，前端跑完把结果作为下一轮消息带回来。
-export async function streamAgentRun({ model, apiKey, input, signal, response }: AgentRunOptions) {
+export async function streamAgentRun(options: AgentRunOptions) {
+    const { model, apiKey, input, signal, response } = options;
     const context = { threadId: input.threadId, runId: input.runId };
     const mapper = createEventMapper(context, randomUUID);
     const write = (event: unknown) => {
@@ -48,16 +56,18 @@ export async function streamAgentRun({ model, apiKey, input, signal, response }:
 
     write(runStarted(context));
 
-    const instructions = buildSystemPrompt(INSTRUCTIONS, input.context);
-    const messages: ModelMessage[] = toModelMessages(input.messages);
-    const tools = toToolSet(input.tools);
-
     try {
+        const prepared = await prepareAgentContext({ ...options, instructions: buildSystemPrompt(INSTRUCTIONS, input.context) });
+        write({ type: "CUSTOM", name: "session_version", value: { threadId: input.threadId, runId: input.runId, version: prepared.version } });
+        const instructions = prepared.instructions;
+        const messages: ModelMessage[] = toModelMessages(prepared.messages);
+        const tools = toToolSet(input.tools);
         const result = streamText({
             model: chatModel(model, apiKey),
             instructions,
             messages,
             ...(tools ? { tools, stopWhen: stepCountIs(MAX_STEPS) } : {}),
+            ...(options.budget ? { maxOutputTokens: options.budget.maxOutputTokens } : {}),
             maxRetries: 0,
             abortSignal: signal,
         });

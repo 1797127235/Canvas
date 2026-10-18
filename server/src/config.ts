@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { readCompactionBudgets } from "./agent/compaction/context.js";
+
 const configSchema = z.object({
     NODE_ENV: z.enum(["development", "test", "production"]),
     HOST: z.string().trim().min(1),
@@ -17,6 +19,7 @@ const configSchema = z.object({
     SMTP_PASSWORD: z.string().optional(),
     MAIL_FROM: z.string().trim().optional(),
     CATALOG_CONFIG_PATH: z.string().trim().optional(),
+    AGENT_COMPACTION_BUDGETS: z.string().optional(),
     MINIO_ENDPOINT: z.string().trim().optional(),
     MINIO_PORT: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().min(1).max(65535)).optional(),
     MINIO_ACCESS_KEY: z.string().trim().optional(),
@@ -59,6 +62,7 @@ export function readConfig(environment: Record<string, string | undefined>) {
         credentialsEncryptionKey: config.CREDENTIALS_ENCRYPTION_KEY,
         mail,
         catalogConfigPath: config.CATALOG_CONFIG_PATH,
+        agentCompactionBudgets: readCompactionBudgets(config.AGENT_COMPACTION_BUDGETS),
         minioEndpoint: config.MINIO_ENDPOINT,
         minioPort: config.MINIO_PORT,
         minioAccessKey: config.MINIO_ACCESS_KEY,

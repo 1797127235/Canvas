@@ -61,6 +61,7 @@ function logRequests(): RequestHandler {
     return (request, response, next) => {
         if (!request.path.startsWith("/api/") || request.path === "/api/health") return next();
         const media = request.path.startsWith("/api/media");
+        const agent = request.path.startsWith("/api/copilotkit/") || request.path.startsWith("/api/agent/threads/");
         const start = Date.now();
         let resBody: unknown;
         if (!media) {
@@ -72,7 +73,8 @@ function logRequests(): RequestHandler {
         }
         response.on("finish", () => {
             // 中间件先于 body 解析挂载，请求体留到响应结束时读取。
-            const reqBody = !media && request.body !== undefined ? loggedJson(request.body, REQ_BODY_LIMIT) : undefined;
+            const body = request.body;
+            const reqBody = agent && body ? { threadId: body.threadId, runId: body.runId, messageCount: Array.isArray(body.messages) ? body.messages.length : undefined, toolCount: Array.isArray(body.tools) ? body.tools.length : undefined, sessionVersion: body.forwardedProps?.sessionVersion } : !media && body !== undefined ? loggedJson(body, REQ_BODY_LIMIT) : undefined;
             logRequest({
                 method: request.method,
                 path: request.originalUrl,
@@ -81,7 +83,7 @@ function logRequests(): RequestHandler {
                 userId: response.locals.user?.id as string | undefined,
                 media: media || undefined,
                 reqBody,
-                resBody: media ? undefined : loggedJson(resBody, RES_BODY_LIMIT),
+                resBody: media || agent ? undefined : loggedJson(resBody, RES_BODY_LIMIT),
             });
         });
         return next();

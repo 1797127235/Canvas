@@ -31,6 +31,7 @@ function stubRouter(): Router {
     router.post("/echo", (request, response) => response.json({ ok: true, echo: request.body }));
     router.get("/models", (_request, response) => response.json({ models: [{ id: "m-1" }] }));
     router.post("/media/echo", (_request, response) => response.json({ ok: true }));
+    router.post("/copilotkit/agent/default/run", (_req, res) => res.json({ messages: [{ content: "private-reply" }] }));
     router.post("/images", (_request, response) => response.json({ data: [{ b64_json: Buffer.alloc(1200).toString("base64"), mime_type: "image/png" }] }));
     return router;
 }
@@ -110,6 +111,15 @@ test("内联素材只记类型和体积，素材身份原样保留", async () =>
     const resBody = imageLine?.resBody as { data: Array<{ b64_json: string; mime_type: string }> };
     assert.equal(resBody.data[0].b64_json, "<base64 省略 1200 字节>");
     assert.equal(resBody.data[0].mime_type, "image/png");
+});
+
+test("助手请求日志不落完整历史、摘要和画布正文", async () => {
+    const lines = await withServer(async (baseUrl) => {
+        await fetch(`${baseUrl}/api/copilotkit/agent/default/run`, { method: "POST", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ threadId: "thread-1", runId: "run-1", messages: [{ content: "private-history" }], context: [{ value: "private-canvas" }], tools: [], forwardedProps: { sessionVersion: 2 } }) });
+    });
+    const line = lines[0];
+    assert.doesNotMatch(JSON.stringify(line), /private-history|private-canvas|private-reply/);
+    assert.deepEqual(line.reqBody, { threadId: "thread-1", runId: "run-1", messageCount: 1, toolCount: 0, sessionVersion: 2 });
 });
 
 test("健康检查不记日志，媒体请求只记元信息，伪造来源的 403 也会记录", async () => {

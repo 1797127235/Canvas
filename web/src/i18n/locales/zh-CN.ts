@@ -449,6 +449,8 @@ export default {
             placeholder: "说说你想在画布上做什么",
             send: "发送",
             newThread: "新对话",
+            deleteThread: "删除当前会话",
+            deleteFailed: "会话删除失败",
             empty: "让助手帮你搭一张能直接生成的图，比如「在右边加一个文本节点写夕阳」",
             threadFailed: "对话读取失败",
             saveFailed: "对话保存失败",

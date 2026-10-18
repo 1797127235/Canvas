@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Message } from "@ag-ui/client";
-import { CopilotKitProvider, UseAgentUpdate, useAgent, useAgentContext, useCopilotKit, useFrontendTool } from "@copilotkit/react-core/v2";
-import { ArrowUp, Loader2, MessageSquarePlus, X } from "lucide-react";
+import { CopilotKitProvider, UseAgentUpdate, useAgent, useAgentContext, useCopilotKit } from "@copilotkit/react-core/v2";
+import { ArrowUp, Loader2, MessageSquarePlus, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { buildAssetsContext, buildCanvasContext } from "@/lib/canvas/canvas-agent-context";
+import { createSessionSaveQueue } from "@/lib/agent/session-save-queue";
+import { bindSessionPersistence } from "@/lib/agent/session-run";
 import { applyGraphInput, type AgentGraphResult, type ApplyGraphInput } from "@/lib/canvas/canvas-agent-graph";
+import { useApplyGraphTool } from "@/components/canvas/tools/use-apply-graph-tool";
 import { cn } from "@/lib/utils";
-import { fetchAgentThread, resetAgentThread, saveAgentThread } from "@/services/api/agent";
+import { createAgentThread, deleteAgentThread, fetchAgentThread, fetchAgentThreads, saveAgentThread, AgentThreadApiError, type AgentThread } from "@/services/api/agent";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -33,7 +36,7 @@ export default function CanvasAgentPanel(props: CanvasAgentProps) {
     const headers = useMemo(() => (userId ? { "X-Account-Id": userId } : {}), [userId]);
     return (
         // 换账号时整个 Provider 重挂载：否则上一个账号的会话、工具和运行态会串到下一个账号。
-        <CopilotKitProvider key={userId} runtimeUrl={`${window.location.origin}/api/copilotkit`} credentials="same-origin" headers={headers} properties={{ projectId: props.projectId }}>
+        <CopilotKitProvider key={`${userId}:${props.projectId}`} runtimeUrl={`${window.location.origin}/api/copilotkit`} credentials="same-origin" headers={headers} properties={{ projectId: props.projectId }}>
             <AgentChat {...props} />
         </CopilotKitProvider>
     );
@@ -48,9 +51,32 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
     const [draft, setDraft] = useState("");
     const [error, setError] = useState("");
     const [threadReady, setThreadReady] = useState(false);
-    const versionRef = useRef(0);
-    const savedCountRef = useRef(-1);
+    const [threads, setThreads] = useState<AgentThread[]>([]);
+    const [activeThreadId, setActiveThreadId] = useState("");
+    const switchingRef = useRef(false);
+    const sendingRef = useRef(false);
+    const overflowMessagesRef = useRef(new Map<string, Message[]>());
+    const syncingRef = useRef(false);
+    const [sending, setSending] = useState(false);
+    const [syncing, setSyncing] = useState(false);
+    const busy = sending || syncing || agent.isRunning;
+    const saveQueueRef = useRef<ReturnType<typeof createSessionSaveQueue> | null>(null);
+    if (!saveQueueRef.current) {
+        saveQueueRef.current = createSessionSaveQueue(
+            (threadId, version, messages) => saveAgentThread(projectId, threadId, version, messages),
+            (threadId, result) => setThreads((current) => current.map((thread) => thread.threadId === threadId ? { ...thread, ...(result.title ? { title: result.title } : {}), version: result.version } : thread)),
+            async (threadId) => { const thread = await fetchAgentThread(projectId, threadId); return thread; },
+        );
+    }
+    const saveQueue = saveQueueRef.current;
     const listRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => bindSessionPersistence(agent, {
+        queue: saveQueue,
+        load: (threadId) => fetchAgentThread(projectId, threadId),
+        onBusy: (value) => { syncingRef.current = value; setSyncing(value); },
+        isActive: () => !switchingRef.current,
+    }), [agent, projectId, saveQueue]);
 
     const canvasContext = useMemo(() => buildCanvasContext(nodes, connections, selectedNodeIds), [connections, nodes, selectedNodeIds]);
     const assetsContext = useMemo(() => buildAssetsContext(assets), [assets]);
@@ -58,16 +84,7 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
     useAgentContext(assetsContext);
 
     // 工具在浏览器执行：模型只决定「加什么节点、什么关系」，坐标与 id 由 buildAgentGraph 算。
-    const applyGraph = useCallback((args: unknown) => onApplyGraph(applyGraphInput.parse(args)), [onApplyGraph]);
-    useFrontendTool(
-        {
-            name: "apply_graph",
-            description: "在当前画布上一次性创建一组节点和它们之间的连线。一次提交会作为一个整体进入撤销历史。不要用来修改已有节点。",
-            parameters: applyGraphInput,
-            handler: async (args) => applyGraph(args),
-        },
-        [applyGraph],
-    );
+    useApplyGraphTool(onApplyGraph);
 
     // 会话由服务端签发：先取到 threadId 才能 run，服务端据此校验「这个对话属于这个画布」。
     useEffect(() => {
@@ -75,37 +92,44 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
         setThreadReady(false);
         void (async () => {
             try {
-                const thread = await fetchAgentThread(projectId, controller.signal);
+                const listed = await fetchAgentThreads(projectId, controller.signal);
                 if (controller.signal.aborted) return;
-                versionRef.current = thread.version;
+                const thread = listed[0];
+                setThreads(listed);
+                setActiveThreadId(thread.threadId);
+                saveQueue.markSaved(thread.threadId, thread.version, thread.messages);
                 agent.threadId = thread.threadId;
                 agent.setMessages(thread.messages);
-                savedCountRef.current = thread.messages.length;
                 setThreadReady(true);
             } catch (cause) {
                 if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : t("canvas.agent.threadFailed"));
             }
         })();
         return () => controller.abort();
-    }, [agent, projectId, t]);
+    }, [agent, projectId, saveQueue, t]);
 
-    // 每轮结束后落库。按消息条数去重，避免流式渲染过程中反复写库。
+    // 保存完整内容快照；旧 effect 取消后不能再创建重试定时器。
     useEffect(() => {
-        if (!threadReady || agent.isRunning || agent.messages.length === savedCountRef.current) return;
-        const messages = agent.messages;
-        const timer = setTimeout(() => {
-            void (async () => {
-                try {
-                    const result = await saveAgentThread(projectId, versionRef.current, messages);
-                    versionRef.current = result.version;
-                    savedCountRef.current = messages.length;
-                } catch (cause) {
-                    setError(cause instanceof Error ? cause.message : t("canvas.agent.saveFailed"));
-                }
-            })();
-        }, 400);
-        return () => clearTimeout(timer);
-    }, [agent.isRunning, agent.messages, projectId, threadReady, t]);
+        if (!threadReady || busy || !activeThreadId || !saveQueue.isDirty(activeThreadId, agent.messages)) return;
+        let cancelled = false;
+        let retryDelay = 800;
+        let timer: ReturnType<typeof setTimeout>;
+        const snapshot = structuredClone(agent.messages);
+        const persist = async () => {
+            if (cancelled || sendingRef.current || syncingRef.current || switchingRef.current) return;
+            try {
+                await saveQueue.flush(activeThreadId, snapshot);
+            } catch (cause) {
+                if (cancelled) return;
+                setError(cause instanceof Error ? cause.message : t("canvas.agent.saveFailed"));
+                if (!(cause instanceof TypeError) && !(cause instanceof AgentThreadApiError && cause.retryable)) return;
+                timer = setTimeout(() => { void persist(); }, retryDelay);
+                retryDelay = Math.min(retryDelay * 2, 8000);
+            }
+        };
+        timer = setTimeout(() => { void persist(); }, 400);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [activeThreadId, agent.messages, busy, saveQueue, threadReady, t]);
 
     useEffect(() => {
         listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
@@ -113,29 +137,117 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
 
     const send = useCallback(async () => {
         const text = draft.trim();
-        if (!text || agent.isRunning || !threadReady) return;
+        if (!text || agent.isRunning || !threadReady || sendingRef.current || syncingRef.current || switchingRef.current) return;
+        sendingRef.current = true;
+        setSending(true);
         setDraft("");
         setError("");
-        agent.addMessage({ id: `user-${Date.now()}`, role: "user", content: text } as Message);
+        const userMessage = { id: crypto.randomUUID(), role: "user", content: text } as Message;
+        agent.addMessage(userMessage);
         try {
             await copilotkit.runAgent({ agent });
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : t("canvas.agent.runFailed"));
+        } finally {
+            sendingRef.current = false;
+            setSending(false);
         }
     }, [agent, copilotkit, draft, t, threadReady]);
 
-    const startNewThread = useCallback(async () => {
+    const switchThread = useCallback(async (threadId: string) => {
+        if (!threadId || threadId === activeThreadId || agent.isRunning || sendingRef.current || syncingRef.current || switchingRef.current) return;
+        switchingRef.current = true;
+        setThreadReady(false);
         try {
-            const thread = await resetAgentThread(projectId);
-            versionRef.current = thread.version;
-            savedCountRef.current = 0;
+            if (activeThreadId && saveQueue.isDirty(activeThreadId, agent.messages)) {
+                try {
+                    await saveQueue.flush(activeThreadId, agent.messages);
+                } catch (cause) {
+                    if (!(cause instanceof AgentThreadApiError) || cause.status !== 413) throw cause;
+                    overflowMessagesRef.current.set(activeThreadId, structuredClone(agent.messages));
+                }
+            }
+            const thread = await fetchAgentThread(projectId, threadId);
+            saveQueue.markSaved(thread.threadId, thread.version, thread.messages);
+            setActiveThreadId(thread.threadId);
             agent.threadId = thread.threadId;
-            agent.setMessages([]);
+            agent.setMessages(overflowMessagesRef.current.get(threadId) ?? thread.messages);
             setError("");
         } catch (cause) {
-            setError(cause instanceof Error ? cause.message : t("canvas.agent.newThreadFailed"));
+            setError(cause instanceof Error ? cause.message : t("canvas.agent.threadFailed"));
+        } finally {
+            switchingRef.current = false;
+            setThreadReady(true);
         }
-    }, [agent, projectId, t]);
+    }, [activeThreadId, agent, projectId, saveQueue, t]);
+
+    const startNewThread = useCallback(async () => {
+        if (agent.isRunning || sendingRef.current || syncingRef.current || switchingRef.current) return;
+        switchingRef.current = true;
+        setThreadReady(false);
+        let retainedOverflow = false;
+        try {
+            if (activeThreadId) {
+                try {
+                    await saveQueue.flush(activeThreadId, agent.messages);
+                } catch (cause) {
+                    if (!(cause instanceof AgentThreadApiError) || cause.status !== 413) throw cause;
+                    overflowMessagesRef.current.set(activeThreadId, structuredClone(agent.messages));
+                    retainedOverflow = true;
+                }
+            }
+            const thread = await createAgentThread(projectId);
+            setThreads((current) => [thread, ...current]);
+            setActiveThreadId(thread.threadId);
+            saveQueue.markSaved(thread.threadId, thread.version, []);
+            agent.threadId = thread.threadId;
+            agent.setMessages([]);
+            setError(retainedOverflow ? "已新建会话；上一会话的未保存消息暂存于本页面，刷新前请先复制保留。" : "");
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : t("canvas.agent.newThreadFailed"));
+        } finally {
+            switchingRef.current = false;
+            setThreadReady(true);
+        }
+    }, [activeThreadId, agent, projectId, saveQueue, t]);
+
+    const removeThread = useCallback(async () => {
+        if (!activeThreadId || agent.isRunning || threads.length < 1 || sendingRef.current || syncingRef.current || switchingRef.current) return;
+        switchingRef.current = true;
+        setThreadReady(false);
+        try {
+            await saveQueue.flush(activeThreadId, agent.messages);
+            const remaining = threads.filter((thread) => thread.threadId !== activeThreadId);
+            const next = remaining.length ? await fetchAgentThread(projectId, remaining[0].threadId) : await createAgentThread(projectId);
+            await deleteAgentThread(projectId, activeThreadId);
+            setThreads(remaining.length ? remaining : [next]);
+            setActiveThreadId(next.threadId);
+            saveQueue.markSaved(next.threadId, next.version, next.messages);
+            agent.threadId = next.threadId;
+            agent.setMessages(next.messages);
+            setError("");
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : t("canvas.agent.deleteFailed"));
+        } finally {
+            switchingRef.current = false;
+            setThreadReady(true);
+        }
+    }, [activeThreadId, agent, projectId, saveQueue, t, threads]);
+
+    const close = useCallback(async () => {
+        if (agent.isRunning || sendingRef.current || syncingRef.current || switchingRef.current) return;
+        switchingRef.current = true;
+        setThreadReady(false);
+        try {
+            if (activeThreadId) await saveQueue.flush(activeThreadId, agent.messages);
+            onClose();
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : t("canvas.agent.saveFailed"));
+        } finally {
+            switchingRef.current = false;
+            setThreadReady(true);
+        }
+    }, [activeThreadId, agent, onClose, saveQueue, t]);
 
     const messages = agent.messages.filter((message) => message.role === "user" || message.role === "assistant");
 
@@ -144,10 +256,16 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
             <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ borderColor: theme.toolbar.border }}>
                 <span className="text-sm font-semibold">{t("canvas.agent.title")}</span>
                 <span className="text-[11px] opacity-45">{isReady && threadReady ? t("canvas.agent.ready") : t("canvas.agent.connecting")}</span>
-                <button type="button" onClick={() => void startNewThread()} className="ml-auto grid size-7 place-items-center rounded-md opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" title={t("canvas.agent.newThread")} aria-label={t("canvas.agent.newThread")}>
+                <select value={activeThreadId} onChange={(event) => void switchThread(event.target.value)} disabled={!threadReady || busy} className="ml-auto min-w-0 max-w-28 truncate bg-transparent text-xs outline-none">
+                    {threads.map((thread) => <option key={thread.threadId} value={thread.threadId}>{thread.title}</option>)}
+                </select>
+                <button type="button" onClick={() => void startNewThread()} disabled={!threadReady || busy} className="grid size-7 shrink-0 place-items-center rounded-md opacity-55 transition hover:bg-black/5 hover:opacity-100 disabled:opacity-25 dark:hover:bg-white/10" title={t("canvas.agent.newThread")} aria-label={t("canvas.agent.newThread")}>
                     <MessageSquarePlus className="size-4" />
                 </button>
-                <button type="button" onClick={onClose} className="grid size-7 place-items-center rounded-md opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" aria-label={t("common.close")}>
+                <button type="button" onClick={() => void removeThread()} disabled={!threadReady || busy} className="grid size-7 shrink-0 place-items-center rounded-md opacity-55 transition hover:bg-black/5 hover:text-red-500 hover:opacity-100 disabled:opacity-25 dark:hover:bg-white/10" title={t("canvas.agent.deleteThread")} aria-label={t("canvas.agent.deleteThread")}>
+                    <Trash2 className="size-4" />
+                </button>
+                <button type="button" onClick={() => void close()} disabled={!threadReady || busy} className="grid size-7 place-items-center rounded-md opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" aria-label={t("common.close")}>
                     <X className="size-4" />
                 </button>
             </div>
@@ -187,7 +305,7 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
                     <button
                         type="button"
                         onClick={() => void send()}
-                        disabled={!draft.trim() || agent.isRunning || !threadReady}
+                        disabled={!draft.trim() || busy || !threadReady}
                         className="mb-0.5 grid size-8 shrink-0 place-items-center rounded-lg transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-white/10"
                         aria-label={t("canvas.agent.send")}
                     >
