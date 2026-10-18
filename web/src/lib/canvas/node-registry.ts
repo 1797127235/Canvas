@@ -17,13 +17,9 @@ export function listNodeDefinitions() {
     return Array.from(definitions.values());
 }
 
-export function isRegisteredNodeType(type: string) {
-    return definitions.has(type);
-}
-
 const FALLBACK_SPEC = { width: 340, height: 240, title: i18n.t("canvas.node.node"), metadata: {} as CanvasNodeDefinition["defaultMetadata"] };
 
-// Provide default size, title, and metadata shared by createCanvasNode and agent operations.
+// 创建画布节点时统一提供默认尺寸、标题和元数据。
 export function getNodeSpec(type: string) {
     const def = definitions.get(type);
     if (!def) return FALLBACK_SPEC;

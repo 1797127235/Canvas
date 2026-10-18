@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 
-import { AgentPanel } from "@/components/agent/agent-panel";
 import { WorkspaceSync } from "@/components/auth/workspace-sync";
 import { AppTopNav } from "@/components/layout/app-top-nav";
 import { bypassLocalAuth } from "@/lib/auth-access";
@@ -49,7 +48,6 @@ export default function UserLayout({ children }: { children: ReactNode }) {
                 {workspaceError ? <div role="alert" className="px-4 py-2 text-sm text-destructive">{workspaceError}</div> : null}
                 <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
             </div>
-            <AgentPanel />
         </div>
     );
 }

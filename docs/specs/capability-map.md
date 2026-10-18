@@ -8,14 +8,14 @@
 2. 每个用户只保存一个 API Key。模型目录只提供上游地址和模型，不保存 Key；生成请求统一使用这把账号 Key。
 3. 服务端固定唯一上游地址，模型列表使用当前账号 Key 请求上游 `/models`；配置只提供能力与名称映射，没有管理后台。
 4. 账号工作区和生成历史使用 PostgreSQL，媒体本地开发默认保存服务端磁盘，也可配置 MinIO。
-5. 不迁移现有 IndexedDB 数据。公开模板库和本地 Canvas Agent 不纳入本期。
+5. 不迁移现有 IndexedDB 数据。Agent 交互由后续 CopilotKit/AG-UI 接入负责。
 6. 画布自动保存间隔为 400 毫秒，保存时携带版本号。
 7. 开发阶段不设单文件、账号总量或画布数量限额。
 8. 已确认登录锁定规则：同一账号连续输错密码 5 次后锁定 15 分钟，成功登录清零失败次数；锁定期间即使密码正确也不能登录，重复尝试不延长锁定时间，到期自动解除，已有登录会话不受影响。
 9. 注册成功后立即建立 7 天会话；从游客模板或示例发起注册时，登录后返回原入口，不自动执行生成、上传等操作。
 10. 同一账号允许多设备同时登录，每次登录建立独立的 7 天会话；退出登录只撤销当前会话，同一浏览器共用该会话的标签页也退出，不影响其他设备。本期不做设备管理或一键退出所有设备。
 11. 注册和登录时去除邮箱首尾空格并统一转为小写，大小写不同的同一邮箱视为同一账号，不允许重复注册；不合并邮箱中的点号或 `+标签` 别名。
-12. 多用户业务后端使用 Node.js、TypeScript、Express 和 PostgreSQL，源码放在独立的 `server/` 目录，不依赖或改造本地 Canvas Agent。
+12. 多用户业务后端使用 Node.js、TypeScript、Express 和 PostgreSQL，源码放在独立的 `server/` 目录；Agent 通过后续 CopilotKit/AG-UI Runtime 接入，不再依赖本地 Agent。
 13. 浏览器通过同源入口访问前端页面和 `/api/` 接口；开发环境由 Vite 将 `/api` 代理到后端。前后端进程可独立部署，本期不支持跨站点前端接入。
 
 ## 模块规格索引
@@ -45,7 +45,7 @@ Build order: identity、catalog → credentials、media → workspace → genera
 - credentials 只管理当前用户的一个 API Key，不保存 Base URL 或模型名称。generation 读取这把 Key，目录里的 Key 不再有效。
 - media 管理账号对象和读取权限，不设业务容量额度。workspace 和生成历史保存媒体引用。
 - generation 校验模型并代发请求，结果写入 media 和 workspace。画布编辑与自动保存属于 workspace。
-- 公开模板库和本地 Canvas Agent 不属于以上任何模块。
+- Agent 交互层通过后续 CopilotKit/AG-UI Runtime 接入，画布与生成业务仍由 workspace、media、generation 模块负责。
 
 ## 本期不做
 

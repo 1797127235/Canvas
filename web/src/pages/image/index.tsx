@@ -24,7 +24,6 @@ import { formatBytes, formatDuration } from "@/lib/image-utils";
 import { requestEdit, requestGeneration } from "@/services/api/image";
 import { deleteStoredImages, ensureImagePreview, getImagePreviewRevision, previewUrlFor, resolveGeneratedImage, resolveImageUrl, subscribeImagePreviews, uploadImage } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
-import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
 import type { ReferenceImage } from "@/types/image";
 import i18n from "@/i18n";
 
@@ -106,12 +105,6 @@ export default function ImagePage() {
     const [previewLog, setPreviewLog] = useState<GenerationLog | null>(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [isReferenceDragActive, setIsReferenceDragActive] = useState(false);
-    const [autoRunToken, setAutoRunToken] = useState(0);
-    const imageCommand = useWorkbenchAgentStore((state) => state.imageCommand);
-    const clearImageCommand = useWorkbenchAgentStore((state) => state.clearImageCommand);
-    const updateAgentTask = useWorkbenchAgentStore((state) => state.updateTask);
-    const processedCommandRef = useRef(0);
-    const agentTaskIdRef = useRef<string | undefined>(undefined);
 
     const model = effectiveConfig.imageModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
@@ -160,30 +153,22 @@ export default function ImagePage() {
     };
 
     const generate = async () => {
-        const agentTaskId = agentTaskIdRef.current;
-        agentTaskIdRef.current = undefined;
         const text = prompt.trim();
         if (!text) {
             message.error(t("imageWorkbench.promptRequired"));
-            if (agentTaskId) updateAgentTask(agentTaskId, { status: "failed", error: t("imageWorkbench.promptRequired") });
             return;
         }
         if (bypassLocalAuth && !isAiConfigReady(effectiveConfig, model)) {
             message.warning(t("workbench.configFirst"));
             openConfigDialog(true);
-            if (agentTaskId) updateAgentTask(agentTaskId, { status: "failed", error: t("imageWorkbench.configIncomplete") });
             return;
         }
 
         const snapshot = buildRequestSnapshot();
-        if (!snapshot) {
-            if (agentTaskId) updateAgentTask(agentTaskId, { status: "failed", error: t("imageWorkbench.invalidParams") });
-            return;
-        }
+        if (!snapshot) return;
 
         setElapsedMs(0);
         setRunning(true);
-        if (agentTaskId) updateAgentTask(agentTaskId, { status: "running", error: undefined });
         setPreviewLog(null);
         setResults(Array.from({ length: generationCount }, () => ({ id: nanoid(), status: "pending" })));
         const batchStartedAt = performance.now();
@@ -195,8 +180,6 @@ export default function ImagePage() {
         const successCount = successImages.length;
         const failCount = generationCount - successCount;
         const failed = result.find((item): item is PromiseRejectedResult => item.status === "rejected");
-        const error = failed?.reason instanceof Error ? failed.reason.message : failCount ? t("workbench.generationFailed") : undefined;
-        if (agentTaskId) updateAgentTask(agentTaskId, { status: successCount ? "succeeded" : "failed", successCount, failCount, error: successCount ? undefined : error });
 
         try {
             saveLog(
@@ -218,28 +201,6 @@ export default function ImagePage() {
             setRunning(false);
         }
     };
-
-    // Handle image-generation commands from the Agent panel by setting the prompt and optionally starting generation.
-    useEffect(() => {
-        if (!imageCommand || imageCommand.nonce === processedCommandRef.current) return;
-        processedCommandRef.current = imageCommand.nonce;
-        clearImageCommand();
-        if (typeof imageCommand.prompt === "string") setPrompt(imageCommand.prompt);
-        if (imageCommand.run && running) {
-            if (imageCommand.taskId) updateAgentTask(imageCommand.taskId, { status: "failed", error: t("imageWorkbench.busy") });
-            return;
-        }
-        if (imageCommand.run) {
-            agentTaskIdRef.current = imageCommand.taskId;
-            setAutoRunToken((value) => value + 1);
-        }
-    }, [imageCommand, clearImageCommand, running, updateAgentTask]);
-
-    useEffect(() => {
-        if (!autoRunToken) return;
-        void generate();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [autoRunToken]);
 
     const downloadImage = (image: GeneratedImage, index: number) => {
         saveAs(image.dataUrl, `image-${index + 1}.png`);

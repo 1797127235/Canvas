@@ -54,7 +54,7 @@ bun run dev
 
 ## 旧本地工作区
 
-只有显式在 `web/.env.local` 写入 `VITE_AUTH_BYPASS=true` 并重启 Vite，才使用旧浏览器工作区、渠道和外部 Agent。它不伪造服务端账号，不能放开后端鉴权；生产构建不启用此豁免。
+只有显式在 `web/.env.local` 写入 `VITE_AUTH_BYPASS=true` 并重启 Vite，才使用旧浏览器工作区和渠道；旧本地 Agent 已移除。它不伪造服务端账号，不能放开后端鉴权；生产构建不启用此豁免。
 
 ## 验证
 
