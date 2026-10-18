@@ -73,8 +73,8 @@ export function createAgentRouter(options: AgentOptions) {
                 return response.status(502).json({ error: { code: "UPSTREAM_ERROR", message: "上游模型获取失败，请检查账号 API Key 和上游服务" } });
             }
             const textModels = candidates.filter((model) => model.capability === "text");
-            const preferred = typeof input.forwardedProps?.modelId === "string" ? textModels.find((model) => model.id === input.forwardedProps.modelId) : undefined;
-            const model = preferred || textModels[0];
+            const requestedModelId = typeof input.forwardedProps?.modelId === "string" ? input.forwardedProps.modelId : undefined;
+            const model = requestedModelId ? textModels.find((candidate) => candidate.id === requestedModelId) : textModels[0];
             if (!model) return response.status(424).json({ error: { code: "AGENT_MODEL_UNAVAILABLE", message: "当前账号没有可用的文本模型，助手暂时不可用" } });
 
             const controller = new AbortController();

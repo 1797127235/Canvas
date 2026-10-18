@@ -17,9 +17,9 @@ test("HTTP compaction retains full history, sends summary plus recent messages, 
     const database = createTestDatabase(process.env);
     const upstream = express();
     upstream.use(express.json());
-    const requests: Array<{ stream?: boolean; messages: Array<{ role: string; content: unknown }> }> = [];
+    const requests: Array<{ stream?: boolean; model: string; messages: Array<{ role: string; content: unknown }> }> = [];
     let summaryReason = "stop";
-    upstream.get("/v1/models", (_req, res) => res.json({ data: [{ id: "test-model", capability: "text" }] }));
+    upstream.get("/v1/models", (_req, res) => res.json({ data: [{ id: "test-model", capability: "text" }, { id: "alternate-model", capability: "text" }] }));
     upstream.post("/v1/chat/completions", (req, res) => {
         requests.push(req.body);
         if (!req.body.stream) return res.json({ id: "summary", object: "chat.completion", created: 1, model: "test-model", choices: [{ index: 0, message: { role: "assistant", content: "用户需要海边咖啡馆画布，旧目标已讨论。" }, finish_reason: summaryReason }], usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 } });
@@ -46,7 +46,7 @@ test("HTTP compaction retains full history, sends summary plus recent messages, 
         const messages: Message[] = [{ id: "u1", role: "user", content: "旧目标".repeat(240) }, { id: "a1", role: "assistant", content: "旧回答".repeat(240) }, { id: "u2", role: "user", content: "继续" }];
         const saved = await store.save(user.id, "project", thread.threadId, thread.version, messages);
         const run = async (version: number) => {
-            const res = await fetch(`${api.baseUrl}/api/copilotkit/agent/default/run`, { method: "POST", headers, body: JSON.stringify({ threadId: thread.threadId, runId: randomUUID(), state: {}, messages, tools: [], context: [{ description: "当前画布", value: "画布状态".repeat(120) }], forwardedProps: { projectId: "project", sessionVersion: version } }) });
+            const res = await fetch(`${api.baseUrl}/api/copilotkit/agent/default/run`, { method: "POST", headers, body: JSON.stringify({ threadId: thread.threadId, runId: randomUUID(), state: {}, messages, tools: [], context: [{ description: "当前画布", value: "画布状态".repeat(120) }], forwardedProps: { projectId: "project", sessionVersion: version, modelId: "test-model" } }) });
             assert.equal(res.status, 200);
             return res.text();
         };
@@ -60,6 +60,7 @@ test("HTTP compaction retains full history, sends summary plus recent messages, 
         assert.equal(compacted.version, saved.version + 1);
         const generation = requests.find((r) => r.stream)!;
         assert.ok(generation);
+        assert.ok(requests.every((request) => request.model === "test-model"));
         assert.equal(generation.messages.filter((m) => m.role === "user").length, 2);
         assert.doesNotMatch(JSON.stringify(generation.messages.filter((m) => m.role === "system")), /海边咖啡馆/);
         assert.match(JSON.stringify(generation), /海边咖啡馆/);
@@ -71,8 +72,14 @@ test("HTTP compaction retains full history, sends summary plus recent messages, 
 
         const failedThread = await store.create(user.id, "failed");
         const failedSaved = await store.save(user.id, "failed", failedThread.threadId, 0, messages);
+        const alternate = await fetch(`${api.baseUrl}/api/copilotkit/agent/default/run`, { method: "POST", headers, body: JSON.stringify({ threadId: failedThread.threadId, runId: randomUUID(), state: {}, messages, tools: [], context: [{ description: "画布", value: "画布状态".repeat(120) }], forwardedProps: { projectId: "failed", sessionVersion: failedSaved.version, modelId: "alternate-model" } }) });
+        assert.equal(alternate.status, 200);
+        await alternate.text();
+        assert.equal(requests.at(-1)?.model, "alternate-model");
+        const unavailable = await fetch(`${api.baseUrl}/api/copilotkit/agent/default/run`, { method: "POST", headers, body: JSON.stringify({ threadId: failedThread.threadId, runId: randomUUID(), state: {}, messages, tools: [], context: [], forwardedProps: { projectId: "failed", sessionVersion: failedSaved.version, modelId: "removed-model" } }) });
+        assert.equal(unavailable.status, 424);
         summaryReason = "length";
-        const failed = await fetch(`${api.baseUrl}/api/copilotkit/agent/default/run`, { method: "POST", headers, body: JSON.stringify({ threadId: failedThread.threadId, runId: randomUUID(), state: {}, messages, tools: [], context: [{ description: "画布", value: "画布状态".repeat(120) }], forwardedProps: { projectId: "failed", sessionVersion: failedSaved.version } }) });
+        const failed = await fetch(`${api.baseUrl}/api/copilotkit/agent/default/run`, { method: "POST", headers, body: JSON.stringify({ threadId: failedThread.threadId, runId: randomUUID(), state: {}, messages, tools: [], context: [{ description: "画布", value: "画布状态".repeat(120) }], forwardedProps: { projectId: "failed", sessionVersion: failedSaved.version, modelId: "test-model" } }) });
         assert.match(await failed.text(), /RUN_ERROR/);
         const unchanged = await store.getForCompaction(user.id, "failed", failedThread.threadId);
         assert.equal(unchanged.version, failedSaved.version);

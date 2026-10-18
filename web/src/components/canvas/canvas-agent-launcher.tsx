@@ -14,6 +14,7 @@ import { applyGraphInput, type AgentGraphResult, type ApplyGraphInput } from "@/
 import { useApplyGraphTool } from "@/components/canvas/tools/use-apply-graph-tool";
 import { cn } from "@/lib/utils";
 import { createAgentThread, deleteAgentThread, fetchAgentThread, fetchAgentThreads, saveAgentThread, AgentThreadApiError, type AgentThread } from "@/services/api/agent";
+import { fetchServerModels, type PublicModel } from "@/services/api/catalog";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -53,6 +54,10 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
     const [threadReady, setThreadReady] = useState(false);
     const [threads, setThreads] = useState<AgentThread[]>([]);
     const [activeThreadId, setActiveThreadId] = useState("");
+    const [textModels, setTextModels] = useState<PublicModel[]>([]);
+    const [selectedModelId, setSelectedModelId] = useState("");
+    const [modelError, setModelError] = useState("");
+    const [modelsReady, setModelsReady] = useState(false);
     const switchingRef = useRef(false);
     const sendingRef = useRef(false);
     const overflowMessagesRef = useRef(new Map<string, Message[]>());
@@ -70,6 +75,18 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
     }
     const saveQueue = saveQueueRef.current;
     const listRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        let active = true;
+        void fetchServerModels().then((models) => {
+            if (!active) return;
+            const available = models.filter((model) => model.capability === "text");
+            setTextModels(available);
+            setSelectedModelId((current) => available.some((model) => model.id === current) ? current : available[0]?.id ?? "");
+            setModelsReady(true);
+        }).catch((cause) => { if (active) setModelError(cause instanceof Error ? cause.message : "文本模型读取失败"); });
+        return () => { active = false; };
+    }, []);
 
     useEffect(() => bindSessionPersistence(agent, {
         queue: saveQueue,
@@ -137,7 +154,7 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
 
     const send = useCallback(async () => {
         const text = draft.trim();
-        if (!text || agent.isRunning || !threadReady || sendingRef.current || syncingRef.current || switchingRef.current) return;
+        if (!text || !modelsReady || !selectedModelId || agent.isRunning || !threadReady || sendingRef.current || syncingRef.current || switchingRef.current) return;
         sendingRef.current = true;
         setSending(true);
         setDraft("");
@@ -145,14 +162,14 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
         const userMessage = { id: crypto.randomUUID(), role: "user", content: text } as Message;
         agent.addMessage(userMessage);
         try {
-            await copilotkit.runAgent({ agent });
+            await copilotkit.runAgent({ agent, forwardedProps: { modelId: selectedModelId } });
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : t("canvas.agent.runFailed"));
         } finally {
             sendingRef.current = false;
             setSending(false);
         }
-    }, [agent, copilotkit, draft, t, threadReady]);
+    }, [agent, copilotkit, draft, modelsReady, selectedModelId, t, threadReady]);
 
     const switchThread = useCallback(async (threadId: string) => {
         if (!threadId || threadId === activeThreadId || agent.isRunning || sendingRef.current || syncingRef.current || switchingRef.current) return;
@@ -269,6 +286,13 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
                     <X className="size-4" />
                 </button>
             </div>
+            <div className="flex items-center gap-2 border-b px-3 py-1.5" style={{ borderColor: theme.toolbar.border }}>
+                <span className="text-[11px] opacity-50">模型</span>
+                <select value={selectedModelId} onChange={(event) => setSelectedModelId(event.target.value)} disabled={busy || !textModels.length} aria-label="选择助手模型" className="min-w-0 flex-1 truncate bg-transparent text-xs outline-none disabled:opacity-50">
+                    {textModels.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
+                </select>
+                {modelError ? <span className="max-w-36 truncate text-[10px] text-red-500" title={modelError}>{modelError}</span> : null}
+            </div>
 
             <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
                 {messages.length ? (
@@ -305,7 +329,7 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
                     <button
                         type="button"
                         onClick={() => void send()}
-                        disabled={!draft.trim() || busy || !threadReady}
+                        disabled={!draft.trim() || busy || !threadReady || !modelsReady || !selectedModelId}
                         className="mb-0.5 grid size-8 shrink-0 place-items-center rounded-lg transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-white/10"
                         aria-label={t("canvas.agent.send")}
                     >
