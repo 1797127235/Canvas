@@ -9,6 +9,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_production:
+        description: Deploy this ref to production after verification and image publishing
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: publish-images-${{ github.ref }}
@@ -146,7 +152,7 @@ jobs:
 
   deploy:
     needs: publish
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || inputs.deploy_production == true)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
