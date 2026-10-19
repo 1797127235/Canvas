@@ -6,6 +6,7 @@ import type { Message } from "@ag-ui/core";
 
 import { createApp } from "../src/app.js";
 import { createAgentRouter } from "../src/agent/routes.js";
+import "../src/gateway/providers.js";
 import { createSessionStore } from "../src/agent/sessions/store.js";
 import { createAccount } from "../src/identity/account-repository.js";
 import { createSession, serializeSessionCookie } from "../src/identity/session.js";
