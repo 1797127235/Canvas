@@ -21,7 +21,6 @@ export function createVideoModel(binding: ModelBinding, apiKey: string): Experim
         maxVideosPerCall: 1,
         async doStart(options) {
             if (options.n !== 1) throw new Error("Grok 视频接口一次只支持生成一个视频");
-            if (options.generateAudio) throw new Error("当前 Grok 视频接口适配不支持 generate_audio");
             if (options.inputReferences?.some(file => !file.mediaType?.startsWith("image/"))) throw new Error("当前 Grok 视频接口适配只支持图片参考");
             if (options.frameImages?.some(frame => frame.frameType !== "first_frame")) throw new Error("当前 Grok 视频接口适配只支持首帧图片");
             const imageFiles = [
@@ -96,9 +95,9 @@ export const c2aVideoCapability = {
         ...(resolution ? { resolution: resolution === "1920x1080" ? "1080p" : resolution === "1280x720" ? "720p" : resolution } : {}),
         ...(imageUrls ? { imageUrls } : {}),
     } }),
-    validateInput: ({ videos, audios, generateAudio, frameCount, unsupportedReferences }) => {
-        if (videos?.length || audios?.length || generateAudio || (frameCount || 0) > 1 || unsupportedReferences?.length) {
-            throw new Error("当前 Grok 视频接口适配仅支持文生视频和图片参考生成");
+    validateInput: ({ videos, audios, frameCount, unsupportedReferences }) => {
+        if (videos?.length || audios?.length || (frameCount || 0) > 1 || unsupportedReferences?.length) {
+            throw new Error("当前 Grok 视频接口适配仅支持文生视频和图片参考生成，不支持参考视频/音频或首尾帧");
         }
     },
 } satisfies VideoCapability;

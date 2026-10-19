@@ -60,7 +60,7 @@ test("Codex2API video model creates, polls and returns the content URL", async t
     });
     const model = createVideoModel(binding, "account-key");
     assert.ok(model.doStart && model.doStatus);
-    const start = await model.doStart({ prompt: "A moving landscape", n: 1, aspectRatio: "16:9", resolution: "1280x720", duration: 5, fps: undefined, seed: undefined, image: undefined, frameImages: undefined, inputReferences: undefined, generateAudio: undefined, providerOptions: { C2A: { resolution: "720p" } }, abortSignal: undefined });
+    const start = await model.doStart({ prompt: "A moving landscape", n: 1, aspectRatio: "16:9", resolution: "1280x720", duration: 5, fps: undefined, seed: undefined, image: undefined, frameImages: undefined, inputReferences: undefined, generateAudio: true, providerOptions: { C2A: { resolution: "720p" } }, abortSignal: undefined });
     assert.deepEqual(start.operation, { requestId: "request-123" });
     assert.equal(calls[0].url, "https://gateway.example/v1/videos/generations");
     assert.deepEqual(calls[0].body, { model: "grok-imagine-video-1.5", prompt: "A moving landscape", duration: 5, aspect_ratio: "16:9", resolution: "720p" });
@@ -76,8 +76,30 @@ test("Codex2API video download refuses URLs outside the configured gateway", asy
     await assert.rejects(downloadVideo("not-a-url", binding, "account-key", new AbortController().signal), /地址无效/);
 });
 
-test("only documented Grok video models are accepted and unsupported options fail explicitly", async () => {
+test("only documented Grok video models are accepted and unsupported references fail explicitly", async () => {
     assert.throws(() => createVideoModel({ ...binding, upstreamModel: "other-video-model" }, "account-key"), /暂未适配模型/);
     const model = createVideoModel(binding, "account-key");
-    await assert.rejects(Promise.resolve(model.doStart!({ prompt: "test", n: 1, aspectRatio: undefined, resolution: undefined, duration: undefined, fps: undefined, seed: undefined, image: undefined, frameImages: undefined, inputReferences: undefined, generateAudio: true, providerOptions: {}, abortSignal: undefined })), /generate_audio/);
+    await assert.rejects(Promise.resolve(model.doStart!({ prompt: "test", n: 1, aspectRatio: undefined, resolution: undefined, duration: undefined, fps: undefined, seed: undefined, image: undefined, frameImages: undefined, inputReferences: [{ type: "file", data: "AAAA", mediaType: "video/mp4" }], generateAudio: undefined, providerOptions: {}, abortSignal: undefined })), /只支持图片参考/);
+});
+
+test("C2A image-to-video accepts the app audio default and preserves signed image references", async t => {
+    const bodies: Record<string, unknown>[] = [];
+    t.mock.method(globalThis, "fetch", async (_input: unknown, init?: RequestInit) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return Response.json({ request_id: "image-video" });
+    });
+    const capability = c2aProvider.capabilities.video;
+    const model = createVideoModel(binding, "account-key");
+    const image = { type: "file" as const, data: "aGVsbG8=", mediaType: "image/png" };
+    for (const generateAudio of [true, false]) {
+        capability.validateInput!({ generateAudio, frameCount: 1 });
+        await model.doStart!({ prompt: "animate", n: 1, aspectRatio: "9:16", resolution: undefined, duration: 6, fps: undefined, seed: undefined, image: undefined, frameImages: [{ image, frameType: "first_frame" }], inputReferences: undefined, generateAudio, providerOptions: { C2A: { imageUrls: ["https://canvas.example/api/media/image?expires=123&token=signed"] } }, abortSignal: undefined });
+        assert.deepEqual(bodies.at(-1), { model: binding.upstreamModel, prompt: "animate", duration: 6, aspect_ratio: "9:16", image: { url: "https://canvas.example/api/media/image?expires=123&token=signed" } });
+    }
+    await model.doStart!({ prompt: "references", n: 1, aspectRatio: undefined, resolution: undefined, duration: undefined, fps: undefined, seed: undefined, image: undefined, frameImages: undefined, inputReferences: [image, image], generateAudio: undefined, providerOptions: { C2A: { imageUrls: ["https://canvas.example/first", "https://canvas.example/second"] } }, abortSignal: undefined });
+    assert.deepEqual(bodies.at(-1)?.reference_images, [{ url: "https://canvas.example/first" }, { url: "https://canvas.example/second" }]);
+    assert.doesNotThrow(() => capability.validateInput!({ generateAudio: true, frameCount: 1 }));
+    assert.throws(() => capability.validateInput!({ frameCount: 2 }), /视频接口适配/);
+    assert.throws(() => capability.validateInput!({ videos: ["video"] }), /视频.*参考/);
+    await assert.rejects(Promise.resolve(model.doStart!({ prompt: "missing URL", n: 1, aspectRatio: undefined, resolution: undefined, duration: undefined, fps: undefined, seed: undefined, image: undefined, frameImages: [{ image, frameType: "first_frame" }], inputReferences: undefined, generateAudio: undefined, providerOptions: {}, abortSignal: undefined })), /签名 URL/);
 });

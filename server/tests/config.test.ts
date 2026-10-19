@@ -17,6 +17,8 @@ test("reads explicit development configuration without connecting to the databas
     assert.equal(config.port, 4100);
     assert.equal(config.host, "127.0.0.1");
     assert.equal(config.appOrigin, "http://localhost:3000");
+    assert.equal(config.mediaLinkSecret, readConfig(environment).mediaLinkSecret);
+    assert.ok(config.mediaLinkSecret);
 });
 
 test("requires every startup setting without disclosing its value", () => {

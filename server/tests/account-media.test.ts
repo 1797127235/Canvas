@@ -49,11 +49,14 @@ test("account media streams raw uploads and isolates Range, HEAD and stale-accou
             return { rows: [] };
         }
         const file = files.get(values[0] as string);
+        if (sql.startsWith("SELECT") && sql.includes("FROM user_media WHERE id = $1")) {
+            return { rows: file && (!sql.includes("AND user_id = $2") || file.user === values[1]) ? [file] : [] };
+        }
         if (file?.user !== values[1]) return { rows: [] };
         if (sql.startsWith("DELETE")) files.delete(values[0] as string);
         return { rows: [file] };
     } } as unknown as Pool;
-    const api = await startTestServer(createApp({ appOrigin: origin, apiRouter: createMediaRouter(database, { directory }) }));
+    const api = await startTestServer(createApp({ appOrigin: origin, apiRouter: createMediaRouter(database, { directory }, "test-media-link-secret") }));
     try {
         const bytes = new Uint8Array([0, 255, 17, 128, 64]);
         const upload = await fetch(`${api.baseUrl}/api/media`, { method: "POST", headers: { ...headers(sidA), origin, "content-type": "video/mp4" }, body: bytes });
@@ -78,6 +81,13 @@ test("account media streams raw uploads and isolates Range, HEAD and stale-accou
         const imageUpload = await fetch(`${api.baseUrl}/api/media`, { method: "POST", headers: { ...headers(sidA), origin, "content-type": "image/png" }, body: imageBytes });
         assert.equal(imageUpload.status, 201);
         const { id: imageId } = await imageUpload.json() as { id: string };
+        const { signedMediaUrl } = await import("../src/media.js");
+        const signedUrl = new URL(signedMediaUrl(api.baseUrl, "test-media-link-secret", imageId));
+        const signedImage = await fetch(signedUrl);
+        assert.equal(signedImage.status, 200);
+        assert.deepEqual(Buffer.from(await signedImage.arrayBuffer()), imageBytes);
+        const rejectedSignedImage = await fetch(new URL(signedMediaUrl(api.baseUrl, "wrong-secret", imageId)));
+        assert.equal(rejectedSignedImage.status, 401);
         const preview = await fetch(`${api.baseUrl}/api/media/${imageId}/preview`, { headers: headers(sidA) });
         assert.equal(preview.status, 200);
         assert.equal(preview.headers.get("content-type")?.split(";", 1)[0], "image/webp");

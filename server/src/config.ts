@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { z } from "zod";
 
 import { readCompactionBudgets } from "./agent/compaction/context.js";
@@ -60,6 +61,7 @@ export function readConfig(environment: Record<string, string | undefined>) {
         databaseUrl: config.DATABASE_URL,
         rateLimitSecret: config.RATE_LIMIT_SECRET,
         credentialsEncryptionKey: config.CREDENTIALS_ENCRYPTION_KEY,
+        mediaLinkSecret: createHmac("sha256", config.RATE_LIMIT_SECRET).update("account-media-links").digest("hex"),
         mail,
         catalogConfigPath: config.CATALOG_CONFIG_PATH,
         agentCompactionBudgets: readCompactionBudgets(config.AGENT_COMPACTION_BUDGETS),
