@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+
++ [修复] 账号模型发现对未声明能力元数据的 OpenAI 兼容上游，按模型名关键词兜底分类（与本地模式 guessCapability 规则一致），文本、音频等模型不再因目录未预配置而被过滤；显式元数据与目录覆盖仍优先。
+
++ [调整] 线上部署改为部署机本地构建：新增 `scripts/deploy-local.sh`，同步源码后在部署机并行构建镜像再只切换 `api`/`web`，不再经 GHCR 传输镜像；CI deploy job 走同一条路径，`publish` 仅归档镜像且不再阻塞部署，`scripts/deploy.sh` 改为接收本地镜像引用并默认跳过数据库快照。
+
 + [新增] C2A 视频 provider 按本机 Grok API 文档适配 `grok-imagine-video` 与 `grok-imagine-video-1.5` 的异步生成、任务查询和内容下载；不将该协议泛化到其他中转视频模型，暂不支持编辑/扩展与图片参考。
 
 + [调整] 服务端改为无内置提供商的 gateway 扩展底座，provider 包仅在单一组合入口注册，任务表不迁移或兼容旧任务格式；删除具体厂商适配，后续注册 provider 包后才启用生成。

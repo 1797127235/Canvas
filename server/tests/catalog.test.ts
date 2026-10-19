@@ -121,7 +121,7 @@ test("uses the account upstream address when one is configured", async t => {
     assert.deepEqual(urls, ["https://api.example.com/v1/models", "https://upstream.example.com/v1/models"]);
 });
 
-test("does not infer capability from unknown provider fields or model names", async t => {
+test("ignores unknown provider fields and falls back to model name keywords", async t => {
     const catalog = await loadCatalog(await write("opaque-provider.json", { models: [model()] }));
     t.mock.method(globalThis, "fetch", async () => Response.json({ data: [
         { id: "opaque-image-name", domain: "ImageGeneration", status: "Retiring" },
@@ -131,12 +131,12 @@ test("does not infer capability from unknown provider fields or model names", as
         { id: "known-video", capability: "video" },
     ] }));
     const discovered = await accountModels(catalog, "key");
-    assert.deepEqual(discovered.map(item => item.capability), ["image", "video"]);
-    assert.deepEqual(discovered.map(item => item.id), ["known-image", "known-video"]);
+    assert.deepEqual(discovered.map(item => item.capability), ["image", "video", "text", "image", "video"]);
+    assert.deepEqual(discovered.map(item => item.id), ["opaque-image-name", "opaque-video-name", "opaque-chat-name", "known-image", "known-video"]);
     assert.ok(discovered.every(item => item.providerId === "test-provider"));
 });
 
-test("uses valid capability metadata before the frontend keyword rules", async t => {
+test("uses valid capability metadata before model name keyword rules", async t => {
     const catalog = await loadCatalog(await write("capabilities.json", { models: [model()] }));
     const data = [
         { id: "video-with-text-metadata", capability: "text" },
@@ -150,7 +150,7 @@ test("uses valid capability metadata before the frontend keyword rules", async t
     ];
     t.mock.method(globalThis, "fetch", async () => Response.json({ data }));
     const discovered = await accountModels(catalog, "key");
-    assert.deepEqual(discovered.map(item => item.capability), ["text", "audio", "video", "video", "video", "video", "video", "audio", "audio", "image", "image", "video"]);
+    assert.deepEqual(discovered.map(item => item.capability), ["text", "audio", "video", "video", "video", "video", "video", "audio", "audio", "image", "image", "image", "text", "video", "text"]);
     assert.ok(discovered.every(item => item.providerId === "test-provider"));
 });
 

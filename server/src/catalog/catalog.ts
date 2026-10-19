@@ -31,6 +31,16 @@ export async function loadCatalog(path?: string, _production = false): Promise<C
 }
 
 const capabilitySchema = z.enum(capabilities);
+// OpenAI 兼容上游通常不在 /models 里声明能力，按模型名关键词兜底，与前端本地模式 guessCapability 规则一致。
+const capabilityKeywords: readonly [Capability, readonly string[]][] = [
+    ["video", ["video", "sora", "veo", "kling", "wan", "hailuo", "seedance", "minimax-h"]],
+    ["audio", ["audio", "tts", "speech", "voice", "music", "sound"]],
+    ["image", ["seedream", "gpt-image", "image", "dall-e", "dalle", "imagen", "flux", "sdxl", "stable-diffusion", "midjourney"]],
+];
+function inferCapability(id: string): Capability {
+    const value = id.toLowerCase();
+    return capabilityKeywords.find(([, keywords]) => keywords.some(keyword => value.includes(keyword)))?.[0] ?? "text";
+}
 export async function accountModels(catalog: Catalog, apiKey: string, accountBaseUrl?: string | null): Promise<CatalogModel[]> {
     try {
         const baseUrl = accountBaseUrl || catalog.models[0]?.baseUrl;
@@ -39,8 +49,7 @@ export async function accountModels(catalog: Catalog, apiKey: string, accountBas
         const upstream = await gateway.discoverModels(baseUrl, apiKey, discoveryProviderId);
         return upstream.flatMap(model => {
             const override = catalog.models.find(configured => configured.upstreamModel === model.id || configured.id === model.id);
-            const capability = override?.capability || capabilitySchema.safeParse(model.capability).data || z.array(capabilitySchema).nonempty().safeParse(model.capabilities).data?.[0];
-            if (!capability) return [];
+            const capability = override?.capability || capabilitySchema.safeParse(model.capability).data || z.array(capabilitySchema).nonempty().safeParse(model.capabilities).data?.[0] || inferCapability(model.id);
             return [{
                 id: override?.id || model.id, name: override?.name || model.id, upstreamModel: model.id,
                 providerId: override?.providerId || discoveryProviderId, capability,
