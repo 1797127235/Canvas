@@ -66,8 +66,5 @@ async function fetchModelsDev(fetcher: ModelsDevFetcher): Promise<ModelsDevSpecs
 }
 
 export function findModelSpec(specs: ModelsDevSpecs, modelId: string, providerId?: string) {
-    const direct = specs.get(modelId) ?? (providerId ? specs.get(`${providerId}/${modelId}`) : undefined);
-    if (direct) return direct;
-    const matches = [...specs.values()].filter((spec) => spec.canonicalId.endsWith(`/${modelId}`));
-    return matches.length === 1 ? matches[0] : undefined;
+    return specs.get(modelId) ?? (providerId ? specs.get(`${providerId}/${modelId}`) : undefined);
 }

@@ -20,7 +20,7 @@
 - [身份规格](specs/identity.md)：已批准的需求、契约和本地验收证据。
 - [身份技术计划](specs/identity-plan.md)：已批准的技术方案、阶段性开放策略和遗留生产决策。
 - [身份任务清单](specs/identity-todo.md)：此前的身份验收结论和多用户实现追踪；新改动需重新验收，不继承早先测试结果。
-- [上游目录规格](specs/catalog.md)：账号上游模型发现、四类生成协议、账号历史和本地开发契约。
+- [上游目录规格](specs/catalog.md)：账号上游模型发现、四类生成协议、账号历史和本地开发契约。\n- [网关与提供商边界](specs/gateway-provider-boundaries.md)：账号连接、provider 模块、最小执行绑定、规格源和分阶段迁移边界。
 - [模板库规格](specs/template-library.md)：提示词库改名为模板库入口那一版的阶段性规格；完整工作流模板库在其后落地。
 - [生成请求内联素材（问题）](specs/generation-media-payload.md)：账号模式把参考素材以 base64 内联进生成请求，实测单次请求体约 29.5MB；含实测数据、影响和根因。
 - [视频网关协议不一致（问题）](specs/video-gateway-protocol.md)：网关兼容层按旧中转字段发往 `/v1/videos`，与 Codex2API 的 OpenAI Videos 字段不一致；H3 被拒，Seedance 参考图被丢弃。

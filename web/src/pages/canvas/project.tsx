@@ -3408,14 +3408,7 @@ function InfiniteCanvasPage() {
 
                 <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={() => setAssetPickerOpen(false)} />
 
-                {/* 右下角：助手面板悬在按钮上方，不遮挡缩放控件（左下）。 */}
-                {agentOpen ? (
-                    <div className="absolute bottom-20 right-5 z-50" data-canvas-no-zoom>
-                        <Suspense fallback={null}>
-                            <CanvasAgentLauncher projectId={projectId} nodes={nodes} connections={connections} selectedNodeIds={selectedNodeIds} onClose={() => setAgentOpen(false)} onApplyGraph={handleApplyAgentGraph} />
-                        </Suspense>
-                    </div>
-                ) : null}
+                {/* 右下角按钮 */}
                 <button
                     type="button"
                     onClick={() => setAgentOpen((value) => !value)}
@@ -3428,6 +3421,15 @@ function InfiniteCanvasPage() {
                     {t("canvas.agent.title")}
                 </button>
             </section>
+
+            {/* 右侧助手侧边栏：与画布并列占位，不遮挡画布内容 */}
+            {agentOpen ? (
+                <aside className="flex h-full w-[420px] max-w-[92vw] shrink-0 border-l" style={{ borderColor: theme.toolbar.border }}>
+                    <Suspense fallback={null}>
+                        <CanvasAgentLauncher projectId={projectId} nodes={nodes} connections={connections} selectedNodeIds={selectedNodeIds} onClose={() => setAgentOpen(false)} onApplyGraph={handleApplyAgentGraph} />
+                    </Suspense>
+                </aside>
+            ) : null}
         </main>
     );
 }

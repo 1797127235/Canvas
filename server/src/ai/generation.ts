@@ -1,5 +1,3 @@
-import { createOpenAI } from "@ai-sdk/openai";
-import { createXai } from "@ai-sdk/xai";
 import {
     generateImage, generateSpeech, generateText, streamText,
     experimental_startVideo as startVideo, experimental_getVideoStatus as getVideoStatus,
@@ -7,19 +5,12 @@ import {
 } from "ai";
 import type { JSONValue } from "@ai-sdk/provider";
 import sharp from "sharp";
-import { z } from "zod";
-import type { CatalogModel } from "../catalog/catalog.js";
-import { videoProtocols, type VideoProtocol } from "../catalog/catalog.js";
+import { type ModelBinding } from "../gateway/contracts.js";
+import { chatModel, imageCapability as imageCapabilityFor, imageModel, videoCapability as videoCapabilityFor, speechModel, videoModel as gatewayVideoModelForBinding, parseVideoOperation, textProviderOptions } from "../gateway/index.js";
 import type { ImageInput, SpeechInput, TextInput, VideoInput } from "./input.js";
 import { mediaRefId } from "./input.js";
-import { gatewayFetch, gatewayVideoModel, videoProtocolFor } from "./gateway-video.js";
-import { arkImages } from "./gateway-image.js";
 
-const operationSchema = z.strictObject({
-    version: z.literal(1), adapter: z.enum(["xai-videos", "gateway-videos"]),
-    modelId: z.string().min(1), operation: z.json(),
-});
-export type VideoOperation = Omit<z.infer<typeof operationSchema>, "operation"> & { operation: JSONValue };
+export type VideoOperation = { version: 2; binding: ModelBinding; operation: JSONValue };
 
 // 素材按能力做类型校验：身份字符串本身不带类型，用实际 mime 把关（等价于原先 data URL 正则的约束）。
 const MEDIA_TYPES: Record<"image" | "video" | "audio", RegExp> = {
@@ -42,36 +33,17 @@ export function mediaReader(read: (mediaId: string) => Promise<{ bytes: Buffer; 
     return { image: resolve("image"), video: resolve("video"), audio: resolve("audio") };
 }
 
-function providers(model: CatalogModel, apiKey: string) {
-    const options = { apiKey, baseURL: model.baseUrl, fetch: gatewayFetch };
-    return { openai: createOpenAI(options), xai: createXai(options) };
-}
-
-// 画布助手与文本生成走同一个 chat 模型入口：同一条上游、同一把账号 Key、同样的网关 fetch。
-export function chatModel(model: CatalogModel, apiKey: string) {
-    return providers(model, apiKey).openai.chat(model.upstreamModel);
-}
-
-export async function createImages(model: CatalogModel, apiKey: string, input: ImageInput, signal: AbortSignal, media: MediaReader) {
+export async function createImages(model: ModelBinding, apiKey: string, input: ImageInput, signal: AbortSignal, media: MediaReader) {
     const images = input.images?.length ? await Promise.all(input.images.map(media.image)) : [];
-    // 方舟图片走原生同步协议（参考图在 JSON body 的 image 字段）；[OI] / xAI 仍走 SDK。
-    // 方舟一次请求只出一张图，面板的「生成 N 张」按 N 次独立调用展开，上限与面板一致（15）。
-    if (model.adapter === "ark-images") {
-        return arkImages({
-            baseUrl: model.baseUrl, apiKey, modelId: model.upstreamModel, prompt: input.prompt, images,
-            size: input.size, outputFormat: input.output_format, count: Math.min(15, Math.max(1, input.n || 1)), signal,
-        });
-    }
-    const { openai, xai } = providers(model, apiKey);
-    const isXai = model.adapter === "xai-images";
+    const imageCapability = imageCapabilityFor(model.providerId);
     const { quality, background, output_format } = input;
     try {
         const result = await generateImage({
-            model: isXai ? xai.image(model.upstreamModel) : openai.image(model.upstreamModel),
+            model: imageModel(model, apiKey),
             prompt: images.length ? { text: input.prompt, images } : input.prompt,
             n: input.n, maxImagesPerCall: input.n || 1,
-            ...(isXai ? { aspectRatio: mediaAspectRatio(input.size, ["1:1", "2:3", "3:2", "4:3", "3:4", "16:9", "9:16", "21:9", "9:21"]) } : { size: input.size as `${number}x${number}` | undefined }),
-            providerOptions: isXai ? { xai: { quality, output_format } } : { openai: { quality, background, outputFormat: output_format } },
+            ...(imageCapability?.aspectRatios ? { aspectRatio: mediaAspectRatio(input.size, imageCapability.aspectRatios) } : { size: input.size as `${number}x${number}` | undefined }),
+            providerOptions: imageCapability.options?.({ size: input.size, quality, background, outputFormat: output_format }) as never,
             maxRetries: 0, abortSignal: signal,
         });
         return { data: result.images.map(image => ({ b64_json: image.base64, mime_type: image.mediaType })), warnings: result.warnings };
@@ -110,10 +82,9 @@ async function bridgeImageUrls(error: unknown, signal: AbortSignal) {
     return { data: images, warnings: [] };
 }
 
-export async function createSpeech(model: CatalogModel, apiKey: string, input: SpeechInput, signal: AbortSignal) {
-    const { openai } = providers(model, apiKey);
+export async function createSpeech(model: ModelBinding, apiKey: string, input: SpeechInput, signal: AbortSignal) {
     const result = await generateSpeech({
-        model: openai.speech(model.upstreamModel), text: input.input, voice: input.voice,
+        model: speechModel(model, apiKey), text: input.input, voice: input.voice,
         outputFormat: input.response_format, speed: input.speed, instructions: input.instructions,
         maxRetries: 0, abortSignal: signal,
     });
@@ -135,26 +106,22 @@ async function messages(input: TextInput, media: MediaReader): Promise<ModelMess
     }));
 }
 
-async function textOptions(model: CatalogModel, apiKey: string, input: TextInput, signal: AbortSignal, media: MediaReader) {
+async function textOptions(model: ModelBinding, apiKey: string, input: TextInput, signal: AbortSignal, media: MediaReader) {
     return {
-        model: providers(model, apiKey).openai.chat(model.upstreamModel), messages: await messages(input, media),
-        providerOptions: { openai: { reasoningEffort: input.reasoning_effort } }, maxRetries: 0, abortSignal: signal,
+        model: chatModel(model, apiKey), messages: await messages(input, media),
+        providerOptions: textProviderOptions(model.providerId, { reasoningEffort: input.reasoning_effort }) as never, maxRetries: 0, abortSignal: signal,
     };
 }
-export async function createTextStream(model: CatalogModel, apiKey: string, input: TextInput, signal: AbortSignal, media: MediaReader) {
+export async function createTextStream(model: ModelBinding, apiKey: string, input: TextInput, signal: AbortSignal, media: MediaReader) {
     return streamText(await textOptions(model, apiKey, input, signal, media));
 }
-export async function createText(model: CatalogModel, apiKey: string, input: TextInput, signal: AbortSignal, media: MediaReader) {
+export async function createText(model: ModelBinding, apiKey: string, input: TextInput, signal: AbortSignal, media: MediaReader) {
     const result = await generateText(await textOptions(model, apiKey, input, signal, media));
     return { choices: [{ message: { role: "assistant", content: result.text } }] };
 }
 
-function videoModel(adapter: VideoOperation["adapter"], modelId: string, baseUrl: string, apiKey: string, protocol?: VideoProtocol) {
-    return adapter === "xai-videos" ? createXai({ apiKey, baseURL: baseUrl, fetch: gatewayFetch }).video(modelId) : gatewayVideoModel(modelId, baseUrl, apiKey, protocol);
-}
-
-export async function createVideo(model: CatalogModel, apiKey: string, input: VideoInput, signal: AbortSignal, media: MediaReader, referenceUrls?: Record<string, string>) {
-    const adapter = model.adapter === "xai-videos" ? "xai-videos" : "gateway-videos";
+export async function createVideo(model: ModelBinding, apiKey: string, input: VideoInput, signal: AbortSignal, media: MediaReader, referenceUrls?: Record<string, string>) {
+    const videoCapability = videoCapabilityFor(model.providerId);
     const imageUrls = (input.images || []).map(ref => referenceUrls?.[ref]).filter((url): url is string => Boolean(url));
     const [images, videos, audios] = await Promise.all([
         normalizeVideoImages(await Promise.all((input.images || []).map(media.image))),
@@ -168,26 +135,25 @@ export async function createVideo(model: CatalogModel, apiKey: string, input: Vi
         ...audios.map(data => ({ data, mediaType: data.slice(5, data.indexOf(";")) })),
     ];
     const frameImages = frames && images.length ? images.map((image, index) => ({ image, frameType: index === 0 ? "first_frame" as const : "last_frame" as const })) : undefined;
-    // xAI 当前 provider 支持图片 R2V，但不支持把视频作为 R2V 参考；H3 兼容端点负责 videos 参考输入。
-    if (adapter === "xai-videos" && videos.length) throw new Error("Grok 当前不支持参考视频生成，请改用 MiniMax-H3；Grok 可使用图片参考或视频编辑接口");
+    videoCapability.validateInput?.({
+        videos, audios, generateAudio: input.generate_audio,
+        frameCount: frameImages?.length || 0,
+        unsupportedReferences: inputReferences?.filter(file => !file.mediaType.startsWith("image/")).map(file => file.mediaType),
+    });
     const result = await startVideo({
-        model: videoModel(adapter, model.upstreamModel, model.baseUrl, apiKey, model.videoProtocol), prompt: input.prompt,
+        model: gatewayVideoModelForBinding(model, apiKey), prompt: input.prompt,
         duration: input.seconds ? Number(input.seconds) : undefined,
-        aspectRatio: mediaAspectRatio(input.size), frameImages, inputReferences,
+        aspectRatio: mediaAspectRatio(input.size, videoCapability?.aspectRatios), frameImages, inputReferences,
         generateAudio: input.generate_audio,
-        providerOptions: adapter === "xai-videos"
-            ? { xai: { resolution: input.resolution_name, watermark: input.watermark } }
-            : { gateway: { resolution: input.resolution_name, watermark: input.watermark, size: input.size, imageUrls } },
+        providerOptions: videoCapability.options?.({ resolution: input.resolution_name, watermark: input.watermark, size: input.size, imageUrls }) as never,
         maxRetries: 0, abortSignal: signal,
     });
-    return { operation: { version: 1, adapter, modelId: model.upstreamModel, operation: result.operation } satisfies VideoOperation, warnings: result.warnings };
+    return { operation: { version: 2, binding: { providerId: model.providerId, capability: "video", upstreamModel: model.upstreamModel, baseUrl: model.baseUrl }, operation: result.operation } satisfies VideoOperation, warnings: result.warnings };
 }
 
-export async function readVideo(operation: unknown, baseUrl: string, apiKey: string, signal: AbortSignal) {
-    const saved = operationSchema.parse(operation);
-    // 协议随任务一起保存：上游登记或模型名变化后，历史任务仍走创建时的查询路径。
-    const protocol = z.object({ protocol: z.enum(videoProtocols) }).safeParse(saved.operation).data?.protocol;
-    return getVideoStatus(videoModel(saved.adapter, saved.modelId, baseUrl, apiKey, protocol), { operation: saved.operation as JSONValue, maxRetries: 0, abortSignal: signal });
+export async function readVideo(operation: unknown, apiKey: string, signal: AbortSignal) {
+    const envelope = parseVideoOperation(operation);
+    return getVideoStatus(gatewayVideoModelForBinding(envelope.binding, apiKey), { operation: envelope.operation as JSONValue, maxRetries: 0, abortSignal: signal });
 }
 
 export function mediaAspectRatio(size?: string, ratios: readonly `${number}:${number}`[] = ["1:1", "3:4", "4:3", "16:9", "9:16", "21:9"]): `${number}:${number}` | undefined {

@@ -9,8 +9,6 @@ const MAX_TOOLS = 32;
 const MAX_DESCRIPTION = 1024;
 const TOOL_NAME = /^[A-Za-z0-9_-]{1,64}$/;
 const FALLBACK_INPUT_SCHEMA = { type: "object", properties: {}, additionalProperties: false } as const;
-// ai@7 要求「没有 execute 的工具」必须声明 outputSchema。它的形状对我们没有意义
-// （工具在浏览器执行，结果由下一轮消息带回来），所以给一个宽松对象即可。
 const CLIENT_TOOL_OUTPUT_SCHEMA = { type: "object", additionalProperties: true } as const;
 
 export function buildSystemPrompt(instructions: string, context: Context[]) {
@@ -35,8 +33,7 @@ export function toToolSet(tools: Tool[]): ToolSet | undefined {
     );
 }
 
-// 系统提示走 streamText 的 instructions，不放进 messages。
-// AI SDK 7 默认拒绝 prompt/messages 里的 system，否则上游直接报 Invalid prompt。
+
 export function toModelMessages(messages: Message[]): ModelMessage[] {
     const result: ModelMessage[] = [];
     // tool 消息只带 toolCallId，工具名要从更早的 assistant 消息里反查。
@@ -99,7 +96,6 @@ function textContent(content: string | Array<{ type: string; text?: string }>) {
         .join("\n");
 }
 
-// 用户消息里的文本与图片转成 AI SDK 的用户内容；audio/video/document 本轮不支持，忽略。
 function userContent(content: string | ContentPart[]): UserContent {
     if (typeof content === "string") return content;
     const parts: Exclude<UserContent, string> = [];

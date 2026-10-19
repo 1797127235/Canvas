@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Message } from "@ag-ui/client";
 import { CopilotKitProvider, UseAgentUpdate, useAgent, useAgentContext, useCopilotKit } from "@copilotkit/react-core/v2";
-import { ArrowUp, Loader2, MessageSquarePlus, Trash2, X } from "lucide-react";
+import { Dropdown, type MenuProps } from "antd";
+import { ArrowUp, Check, ChevronDown, Loader2, MessageSquarePlus, Plus, RotateCw, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -11,6 +12,7 @@ import { buildAssetsContext, buildCanvasContext } from "@/lib/canvas/canvas-agen
 import { createSessionSaveQueue } from "@/lib/agent/session-save-queue";
 import { bindSessionPersistence } from "@/lib/agent/session-run";
 import { applyGraphInput, type AgentGraphResult, type ApplyGraphInput } from "@/lib/canvas/canvas-agent-graph";
+import { CanvasPromptLibrary } from "@/components/canvas/canvas-prompt-library";
 import { useApplyGraphTool } from "@/components/canvas/tools/use-apply-graph-tool";
 import { cn } from "@/lib/utils";
 import { createAgentThread, deleteAgentThread, fetchAgentThread, fetchAgentThreads, saveAgentThread, AgentThreadApiError, type AgentThread } from "@/services/api/agent";
@@ -23,6 +25,12 @@ import type { CanvasConnection, CanvasNodeData } from "@/types/canvas";
 // 画布助手的浮动面板。整个模块由 project.tsx 懒加载：
 // CopilotKit 的 Provider 会牵进 markdown 渲染、代码高亮等一大堆东西，
 // 不该让没用过助手的用户在打开画布时就下载它们。
+// 空态灵感胶囊分两批轮换，「换一批」只在本地切换，不额外请求模板库。
+const IDEA_SETS = [
+    ["巨物奇幻电影", "东方巨物幻想", "复古胶片 POV 漫游", "咖啡馆胶片人像"],
+    ["赛博夜景街拍", "水墨山水长卷", "产品棚拍封面", "复古油画肖像"],
+];
+
 export type CanvasAgentProps = {
     projectId: string;
     nodes: CanvasNodeData[];
@@ -47,9 +55,11 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
     const { t } = useTranslation();
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const assets = useAssetStore((state) => state.assets);
-    const { agent, isReady } = useAgent({ agentId: "default", updates: [UseAgentUpdate.OnMessagesChanged, UseAgentUpdate.OnRunStatusChanged], throttleMs: 60 });
+    const { agent } = useAgent({ agentId: "default", updates: [UseAgentUpdate.OnMessagesChanged, UseAgentUpdate.OnRunStatusChanged], throttleMs: 60 });
     const { copilotkit } = useCopilotKit();
+    const userName = useUserStore((state) => state.user?.email.split("@")[0]) || "创作者";
     const [draft, setDraft] = useState("");
+    const [ideaPage, setIdeaPage] = useState(0);
     const [error, setError] = useState("");
     const [threadReady, setThreadReady] = useState(false);
     const [threads, setThreads] = useState<AgentThread[]>([]);
@@ -266,52 +276,79 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
         }
     }, [activeThreadId, agent, onClose, saveQueue, t]);
 
+    const suggestions = IDEA_SETS[ideaPage % IDEA_SETS.length];
     const messages = agent.messages.filter((message) => message.role === "user" || message.role === "assistant");
+    const activeTitle = threads.find((thread) => thread.threadId === activeThreadId)?.title || t("canvas.agent.newChat");
+    const activeModelName = textModels.find((model) => model.id === selectedModelId)?.name;
+    const threadMenuItems: MenuProps["items"] = [
+        ...threads.map((thread) => ({
+            key: thread.threadId,
+            icon: thread.threadId === activeThreadId ? <Check className="size-4" /> : <span className="size-4" />,
+            label: <span className="block max-w-56 truncate">{thread.title}</span>,
+        })),
+        { type: "divider" },
+        { key: "new", icon: <MessageSquarePlus className="size-4" />, label: t("canvas.agent.newThread"), disabled: !threadReady || busy },
+        { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: t("canvas.agent.deleteThread"), disabled: !threadReady || busy },
+    ];
+    const onThreadMenuClick: MenuProps["onClick"] = ({ key }) => {
+        if (key === "new") void startNewThread();
+        else if (key === "delete") void removeThread();
+        else void switchThread(key);
+    };
+    const modelMenuItems: MenuProps["items"] = textModels.map((model) => ({ key: model.id, label: model.name, disabled: busy }));
+    const selectModel: MenuProps["onClick"] = ({ key }) => {
+        if (textModels.some((model) => model.id === key)) setSelectedModelId(key);
+    };
 
     return (
-        <div className="pointer-events-auto flex h-[min(560px,72vh)] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border shadow-xl" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}>
-            <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ borderColor: theme.toolbar.border }}>
-                <span className="text-sm font-semibold">{t("canvas.agent.title")}</span>
-                <span className="text-[11px] opacity-45">{isReady && threadReady ? t("canvas.agent.ready") : t("canvas.agent.connecting")}</span>
-                <select value={activeThreadId} onChange={(event) => void switchThread(event.target.value)} disabled={!threadReady || busy} className="ml-auto min-w-0 max-w-28 truncate bg-transparent text-xs outline-none">
-                    {threads.map((thread) => <option key={thread.threadId} value={thread.threadId}>{thread.title}</option>)}
-                </select>
-                <button type="button" onClick={() => void startNewThread()} disabled={!threadReady || busy} className="grid size-7 shrink-0 place-items-center rounded-md opacity-55 transition hover:bg-black/5 hover:opacity-100 disabled:opacity-25 dark:hover:bg-white/10" title={t("canvas.agent.newThread")} aria-label={t("canvas.agent.newThread")}>
-                    <MessageSquarePlus className="size-4" />
+        <div className="pointer-events-auto flex h-full w-full flex-col overflow-hidden" style={{ background: theme.toolbar.panel, color: theme.node.text }}>
+            <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
+                <Dropdown trigger={["click"]} placement="bottomLeft" menu={{ items: threadMenuItems, onClick: onThreadMenuClick }}>
+                    <button type="button" className="flex min-w-0 items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium transition hover:bg-black/5 dark:hover:bg-white/10" aria-label={t("canvas.agent.threads")} title={t("canvas.agent.threads")}>
+                        <span className="truncate">{activeTitle}</span>
+                        <ChevronDown className="size-4 shrink-0 opacity-55" />
+                    </button>
+                </Dropdown>
+                <button type="button" onClick={() => void close()} disabled={!threadReady || busy} className="grid size-8 shrink-0 place-items-center rounded-lg transition hover:bg-black/5 disabled:opacity-30 dark:hover:bg-white/10" aria-label={t("common.close")}>
+                    <X className="size-[18px]" />
                 </button>
-                <button type="button" onClick={() => void removeThread()} disabled={!threadReady || busy} className="grid size-7 shrink-0 place-items-center rounded-md opacity-55 transition hover:bg-black/5 hover:text-red-500 hover:opacity-100 disabled:opacity-25 dark:hover:bg-white/10" title={t("canvas.agent.deleteThread")} aria-label={t("canvas.agent.deleteThread")}>
-                    <Trash2 className="size-4" />
-                </button>
-                <button type="button" onClick={() => void close()} disabled={!threadReady || busy} className="grid size-7 place-items-center rounded-md opacity-55 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10" aria-label={t("common.close")}>
-                    <X className="size-4" />
-                </button>
-            </div>
-            <div className="flex items-center gap-2 border-b px-3 py-1.5" style={{ borderColor: theme.toolbar.border }}>
-                <span className="text-[11px] opacity-50">模型</span>
-                <select value={selectedModelId} onChange={(event) => setSelectedModelId(event.target.value)} disabled={busy || !textModels.length} aria-label="选择助手模型" className="min-w-0 flex-1 truncate bg-transparent text-xs outline-none disabled:opacity-50">
-                    {textModels.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
-                </select>
-                {modelError ? <span className="max-w-36 truncate text-[10px] text-red-500" title={modelError}>{modelError}</span> : null}
             </div>
 
-            <div ref={listRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
+            {/* 消息列表：空态居中展示问候、标题与灵感胶囊 */}
+            <div ref={listRef} className="thin-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
                 {messages.length ? (
                     messages.map((message) => <MessageRow key={message.id} message={message} theme={theme} />)
                 ) : (
-                    <div className="pt-10 text-center text-xs leading-relaxed opacity-40">{t("canvas.agent.empty")}</div>
+                    <div className="flex h-full flex-col items-center justify-center gap-5 pb-16">
+                        <div className="space-y-2 text-center">
+                            <div className="text-sm opacity-55">{t("canvas.agent.greeting", { name: userName })}</div>
+                            <h2 className="text-[26px] font-medium leading-tight">{t("canvas.agent.greetingTitle")}</h2>
+                        </div>
+                        <div className="flex max-w-[330px] flex-wrap items-center justify-center gap-2">
+                            {suggestions.map((suggestion) => (
+                                <button key={suggestion} type="button" onClick={() => setDraft(suggestion)} className="rounded-full border px-3.5 py-2 text-xs transition hover:bg-black/5 dark:hover:bg-white/10" style={{ borderColor: theme.toolbar.border }}>
+                                    {suggestion}
+                                </button>
+                            ))}
+                        </div>
+                        <button type="button" onClick={() => setIdeaPage((page) => page + 1)} className="flex items-center gap-1.5 text-xs opacity-55 transition hover:opacity-100">
+                            <RotateCw className="size-3.5" />
+                            {t("canvas.agent.ideas")}
+                        </button>
+                    </div>
                 )}
                 {agent.isRunning ? (
-                    <div className="flex items-center gap-1.5 text-xs opacity-50">
-                        <Loader2 className="size-3 animate-spin" />
+                    <div className="flex items-center gap-1.5 text-sm opacity-50">
+                        <Loader2 className="size-3.5 animate-spin" />
                         {t("canvas.agent.thinking")}
                     </div>
                 ) : null}
             </div>
 
-            {error ? <div className="px-3 pb-1 text-[11px] leading-snug text-red-500">{error}</div> : null}
-
-            <div className="border-t px-2.5 py-2" style={{ borderColor: theme.toolbar.border }}>
-                <div className="flex items-end gap-1.5">
+            {/* 底部输入卡片：输入框与工具栏同处一张卡片，替代原来的两块布局 */}
+            <div className="shrink-0 px-3 pb-3">
+                {error ? <div className="mb-1.5 px-1 text-xs leading-snug text-red-500">{error}</div> : null}
+                <div className="rounded-[22px] border p-2" style={{ background: theme.node.panel, borderColor: theme.toolbar.border }}>
                     <textarea
                         value={draft}
                         onChange={(event) => setDraft(event.target.value)}
@@ -324,18 +361,34 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
                         rows={1}
                         disabled={!threadReady}
                         placeholder={t("canvas.agent.placeholder")}
-                        className="max-h-28 min-h-9 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm outline-none placeholder:opacity-35 disabled:opacity-50"
+                        className="block max-h-32 min-h-10 w-full resize-none bg-transparent px-2.5 py-1.5 text-sm leading-6 outline-none placeholder:opacity-45 disabled:opacity-50"
                     />
-                    <button
-                        type="button"
-                        onClick={() => void send()}
-                        disabled={!draft.trim() || busy || !threadReady || !modelsReady || !selectedModelId}
-                        className="mb-0.5 grid size-8 shrink-0 place-items-center rounded-lg transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-white/10"
-                        aria-label={t("canvas.agent.send")}
-                    >
-                        <ArrowUp className="size-4" />
-                    </button>
+                    <div className="flex items-center justify-between gap-1">
+                        <div className="flex min-w-0 items-center gap-0.5">
+                            <button type="button" onClick={() => void startNewThread()} disabled={!threadReady || busy} className="grid size-8 shrink-0 place-items-center rounded-full transition hover:bg-black/10 disabled:opacity-30 dark:hover:bg-white/10" aria-label={t("canvas.agent.newThread")} title={t("canvas.agent.newThread")}>
+                                <Plus className="size-[18px]" />
+                            </button>
+                            <Dropdown trigger={["click"]} placement="bottomLeft" disabled={!textModels.length} menu={{ items: modelMenuItems, selectedKeys: [selectedModelId], onClick: selectModel }}>
+                                <button type="button" disabled={!textModels.length} className="flex min-w-0 items-center gap-1 rounded-full px-2 py-1.5 text-xs font-medium transition hover:bg-black/10 disabled:opacity-40 dark:hover:bg-white/10" aria-label={t("canvas.agent.model")} title={t("canvas.agent.model")}>
+                                    <span className="max-w-32 truncate">{activeModelName ?? t("canvas.agent.model")}</span>
+                                    <ChevronDown className="size-3.5 shrink-0 opacity-55" />
+                                </button>
+                            </Dropdown>
+                            <CanvasPromptLibrary onSelect={(prompt) => setDraft(prompt)} />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => void send()}
+                            disabled={!draft.trim() || busy || !threadReady || !modelsReady || !selectedModelId}
+                            className="grid size-9 shrink-0 place-items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-30"
+                            style={{ background: theme.node.text, color: theme.canvas.background }}
+                            aria-label={t("canvas.agent.send")}
+                        >
+                            <ArrowUp className="size-[18px]" />
+                        </button>
+                    </div>
                 </div>
+                {modelError ? <div className="mt-1.5 px-1 text-[10px] text-red-500">{modelError}</div> : null}
             </div>
         </div>
     );
@@ -345,7 +398,7 @@ function MessageRow({ message, theme }: { message: Message; theme: CanvasTheme }
     if (message.role === "user") {
         return (
             <div className="flex justify-end">
-                <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-sm leading-relaxed" style={{ background: theme.toolbar.activeBg }}>
+                <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-sm leading-relaxed" style={{ background: theme.toolbar.activeBg, color: theme.node.text }}>
                     {textOf(message)}
                 </div>
             </div>

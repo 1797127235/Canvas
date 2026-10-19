@@ -7,20 +7,25 @@ import { after, test } from "node:test";
 import express from "express";
 import type { Pool } from "pg";
 
-import { createCatalogRouter } from "../src/catalog.js";
+import { createCatalogRouter } from "../src/catalog/router.js";
 import { accountModels, loadCatalog, publicModels, resolveModel } from "../src/catalog/catalog.js";
 import { encryptCredential } from "../src/credential-crypto.js";
+import { gateway } from "../src/gateway/index.js";
+import { registerTestProvider } from "./support/test-provider.js";
+
+registerTestProvider(gateway);
 import { hashSid } from "../src/identity/session.js";
 import { startTestServer } from "./support/http.js";
 
 const directory = await mkdtemp(join(tmpdir(), "catalog-test-"));
 const write = async (name: string, content: unknown) => {
     const path = join(directory, name);
+    if (typeof content === "object" && content && "models" in content && Array.isArray(content.models)) Object.assign(content, { discoveryProviderId: "test-provider" });
     await writeFile(path, typeof content === "string" ? content : JSON.stringify(content));
     return path;
 };
 const model = (overrides: Record<string, unknown> = {}) => ({
-    id: "image", name: "Image", upstreamModel: "gpt-image-2.5", adapter: "openai-images",
+    id: "image", name: "Image", upstreamModel: "gpt-image-2.5", providerId: "test-provider",
     capability: "image", enabled: true, baseUrl: "https://api.example.com/v1", ...overrides,
 });
 
@@ -31,23 +36,23 @@ test("returns an empty catalog when no path is configured", async () => {
 });
 
 test("trims surrounding whitespace from base URLs and rejects embedded keys", async () => {
-    const path = await write("trim.json", { models: [model({ baseUrl: "  https://api.example.com/v1  " })] });
+    const path = await write("trim.json", { discoveryProviderId: "test-provider", models: [model({ baseUrl: "  https://api.example.com/v1  " })] });
     const catalog = await loadCatalog(path);
     assert.equal(catalog.models[0].baseUrl, "https://api.example.com/v1");
     await assert.rejects(loadCatalog(await write("keyed.json", { models: [model({ apiKey: "key" })] })), /Invalid catalog configuration/);
 });
 
-test("rejects an adapter that does not serve its declared capability", async () => {
-    const path = await write("mismatch.json", { models: [model({ adapter: "openai-chat" })] });
+test("rejects a providerId that is not registered", async () => {
+    const path = await write("mismatch.json", { discoveryProviderId: "test-provider", models: [model({ providerId: "unknown-provider" })] });
     await assert.rejects(loadCatalog(path), /Invalid catalog configuration/);
 });
 
-test("rejects duplicate ids, unknown fields, unknown adapters and malformed JSON", async () => {
+test("rejects duplicate ids, unknown fields, unregistered providers and malformed JSON", async () => {
     const cases = [
-        { models: [model(), model({ name: "Other" })] },
-        { models: [model({ script: "x" })] },
-        { models: [model({ adapter: "custom" })] },
-        { models: [model({ adapter: "minimax-videos", capability: "video" })] },
+        { discoveryProviderId: "test-provider", models: [model(), model({ name: "Other" })] },
+        { discoveryProviderId: "test-provider", models: [model({ script: "x" })] },
+        { discoveryProviderId: "test-provider", models: [model({ providerId: "custom" })] },
+        { discoveryProviderId: "test-provider", models: [model({ providerId: "unknown-provider", capability: "video" })] },
         { upstream: { baseUrl: "https://api.example.com/v1" }, models: [] },
     ];
     for (const [index, content] of cases.entries()) {
@@ -57,13 +62,13 @@ test("rejects duplicate ids, unknown fields, unknown adapters and malformed JSON
 });
 
 test("allows HTTP and HTTPS upstreams in production", async () => {
-    const path = await write("http.json", { models: [model({ baseUrl: "http://127.0.0.1:8000/v1" })] });
+    const path = await write("http.json", { discoveryProviderId: "test-provider", models: [model({ baseUrl: "http://127.0.0.1:8000/v1" })] });
     assert.equal((await loadCatalog(path, true)).models.length, 1);
-    await assert.rejects(loadCatalog(await write("ftp.json", { models: [model({ baseUrl: "ftp://127.0.0.1:8000/v1" })] }), true), /Invalid catalog configuration/);
+    await assert.rejects(loadCatalog(await write("ftp.json", { discoveryProviderId: "test-provider", models: [model({ baseUrl: "ftp://127.0.0.1:8000/v1" })] }), true), /Invalid catalog configuration/);
 });
 
 test("enforces one normalized upstream across enabled and disabled models", async () => {
-    const path = await write("shared.json", { models: [
+    const path = await write("shared.json", { discoveryProviderId: "test-provider", models: [
         model({ baseUrl: "https://API.EXAMPLE.COM:443/v1/" }),
         model({ id: "other", baseUrl: " https://api.example.com/v1 ", enabled: false }),
     ] });
@@ -74,7 +79,7 @@ test("enforces one normalized upstream across enabled and disabled models", asyn
 });
 
 test("discovers models separately for each account without leaking upstream fields", async t => {
-    const catalog = await loadCatalog(await write("accounts.json", { models: [model()] }));
+    const catalog = await loadCatalog(await write("accounts.json", { discoveryProviderId: "test-provider", models: [model()] }));
     const calls: RequestInit[] = [];
     t.mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
         assert.equal(url, "https://api.example.com/v1/models");
@@ -95,9 +100,9 @@ test("discovers models separately for each account without leaking upstream fiel
     ]);
     assert.deepEqual(publicModels({ models: accountB }), [{ id: "opaque-model", name: "opaque-model", capability: "audio" }]);
     assert.equal(accountA[0].upstreamModel, "gpt-image-2.5");
-    assert.equal(accountA[0].adapter, "openai-images");
-    assert.equal(accountA[1].adapter, "gateway-videos");
-    assert.equal(accountB[0].adapter, "openai-speech");
+    assert.equal(accountA[0].providerId, "test-provider");
+    assert.equal(accountA[1].providerId, "test-provider");
+    assert.equal(accountB[0].providerId, "test-provider");
     assert.ok([...accountA, ...accountB].every(item => item.baseUrl === catalog.models[0].baseUrl));
     assert.ok(!JSON.stringify(publicModels({ models: accountA })).includes("key"));
     await accountModels(catalog, "account-A-key");
@@ -116,30 +121,19 @@ test("uses the account upstream address when one is configured", async t => {
     assert.deepEqual(urls, ["https://api.example.com/v1/models", "https://upstream.example.com/v1/models"]);
 });
 
-test("drops models the upstream marks unavailable and classifies Ark models by domain", async t => {
-    const catalog = await loadCatalog(await write("ark.json", { models: [model()] }));
-    // 方舟把已下线模型也列在 /models 里，且按 created 正序排在前面：不过滤的话前端下拉默认就选中不可用模型。
-    const data = [
-        { id: "doubao-lite-128k-240428", domain: "", status: "Shutdown" },
-        { id: "doubao-seedream-3-0-t2i-250415", domain: "ImageGeneration", status: "Shutdown" },
-        { id: "doubao-seedream-4-0-250828", domain: "ImageGeneration", status: "Retiring" },
-        { id: "doubao-seedream-5-0-pro-260628", domain: "ImageGeneration" },
-        { id: "doubao-seedream-5-0-flash-260915", domain: "ImageGeneration" },
-        { id: "doubao-seedance-2-5-260628", domain: "VideoGeneration" },
-        { id: "doubao-seed-2-1-pro-260915", domain: "LLM" },
-        { id: "doubao-embedding-vision-251215", domain: "Embedding" },
-        { id: "doubao-seed3d-2-0-260328", domain: "3DGeneration" },
-        { id: "doubao-smart-router-250928", domain: "Router" },
-    ];
-    t.mock.method(globalThis, "fetch", async () => Response.json({ data }));
+test("does not infer capability from unknown provider fields or model names", async t => {
+    const catalog = await loadCatalog(await write("opaque-provider.json", { models: [model()] }));
+    t.mock.method(globalThis, "fetch", async () => Response.json({ data: [
+        { id: "opaque-image-name", domain: "ImageGeneration", status: "Retiring" },
+        { id: "opaque-video-name", domain: "VideoGeneration" },
+        { id: "opaque-chat-name", domain: "LLM" },
+        { id: "known-image", capability: "image" },
+        { id: "known-video", capability: "video" },
+    ] }));
     const discovered = await accountModels(catalog, "key");
-    // Embedding / 3DGeneration / Router 不映射到任何生成能力，直接丢弃。
-    assert.deepEqual(discovered.map(item => item.id), [
-        "doubao-seedream-5-0-pro-260628", "doubao-seedream-5-0-flash-260915",
-        "doubao-seedance-2-5-260628", "doubao-seed-2-1-pro-260915",
-    ]);
-    assert.deepEqual(discovered.map(item => item.capability), ["image", "image", "video", "text"]);
-    assert.deepEqual(discovered.map(item => item.adapter), ["ark-images", "ark-images", "gateway-videos", "openai-chat"]);
+    assert.deepEqual(discovered.map(item => item.capability), ["image", "video"]);
+    assert.deepEqual(discovered.map(item => item.id), ["known-image", "known-video"]);
+    assert.ok(discovered.every(item => item.providerId === "test-provider"));
 });
 
 test("uses valid capability metadata before the frontend keyword rules", async t => {
@@ -147,40 +141,41 @@ test("uses valid capability metadata before the frontend keyword rules", async t
     const data = [
         { id: "video-with-text-metadata", capability: "text" },
         { id: "opaque-video", capabilities: ["audio"] },
-        { id: "VEO-3", capability: "unknown" },
-        { id: "kling-v2", capabilities: "video" },
-        { id: "wan-2" }, { id: "hailuo-2" }, { id: "sora-2" },
-        { id: "tts-1", capability: null }, { id: "voice-model", capabilities: [] },
-        { id: "gpt-image-other", capabilities: ["invalid"] }, { id: "seedream-4" },
-        { id: "flux-1" }, { id: "plain-model" }, { id: "doubao-seedance-2-0-mini" }, { id: "minimax-h3" }, { id: "MiniMax-M2.7" },
+        { id: "VEO-3", capability: "video" },
+        { id: "kling-v2", capabilities: ["video"] },
+        { id: "wan-2", capability: "video" }, { id: "hailuo-2", capability: "video" }, { id: "sora-2", capability: "video" },
+        { id: "tts-1", capability: "audio" }, { id: "voice-model", capability: "audio" },
+        { id: "gpt-image-other", capability: "image" }, { id: "seedream-4" },
+        { id: "flux-1", capability: "image" }, { id: "plain-model" }, { id: "minimax-h3", capability: "video" }, { id: "MiniMax-M2.7" },
     ];
     t.mock.method(globalThis, "fetch", async () => Response.json({ data }));
     const discovered = await accountModels(catalog, "key");
-    assert.deepEqual(discovered.map(item => item.capability), ["text", "audio", "video", "video", "video", "video", "video", "audio", "audio", "image", "image", "image", "text", "video", "video", "text"]);
-    assert.deepEqual(discovered.map(item => item.adapter), ["openai-chat", "openai-speech", "gateway-videos", "gateway-videos", "gateway-videos", "gateway-videos", "gateway-videos", "openai-speech", "openai-speech", "openai-images", "openai-images", "openai-images", "openai-chat", "gateway-videos", "gateway-videos", "openai-chat"]);
+    assert.deepEqual(discovered.map(item => item.capability), ["text", "audio", "video", "video", "video", "video", "video", "audio", "audio", "image", "image", "video"]);
+    assert.ok(discovered.every(item => item.providerId === "test-provider"));
 });
 
 test("applies only configured overrides for models present upstream", async t => {
-    const catalog = await loadCatalog(await write("overrides.json", { models: [
-        model({ id: "opaque", upstreamModel: "actual-video", name: "Custom Video", capability: "video", adapter: "gateway-videos" }),
+    const catalog = await loadCatalog(await write("overrides.json", { discoveryProviderId: "test-provider", models: [
+        model({ id: "opaque", upstreamModel: "actual-video", name: "Custom Video", capability: "video", providerId: "test-provider" }),
         model({ id: "absent", upstreamModel: "not-available" }),
         model({ id: "hidden", upstreamModel: "hidden-model", enabled: false }),
     ] }));
-    t.mock.method(globalThis, "fetch", async () => Response.json({ data: [{ id: "actual-video", capability: "text" }, { id: "new-model" }, { id: "hidden-model" }] }));
+    t.mock.method(globalThis, "fetch", async () => Response.json({ data: [{ id: "actual-video", capability: "text" }, { id: "new-model", capability: "video" }, { id: "hidden-model", capability: "video" }] }));
     const discovered = await accountModels(catalog, "key");
     assert.deepEqual(discovered[0], {
-        id: "opaque", name: "Custom Video", upstreamModel: "actual-video", capability: "video", adapter: "gateway-videos",
+        id: "opaque", name: "Custom Video", upstreamModel: "actual-video", capability: "video", providerId: "test-provider",
         enabled: true, baseUrl: "https://api.example.com/v1",
     });
     assert.equal(discovered[1].id, "new-model");
     assert.equal(discovered[1].upstreamModel, "new-model");
+    assert.equal(discovered[1].providerId, "test-provider");
     assert.equal(discovered.length, 3);
     assert.equal(discovered[2].enabled, false);
     assert.equal(publicModels({ models: discovered }).length, 2);
 });
 
 test("never falls back to configured models on failure or an empty upstream list", async t => {
-    const catalog = await loadCatalog(await write("failures.json", { models: [model()] }));
+    const catalog = await loadCatalog(await write("failures.json", { discoveryProviderId: "test-provider", models: [model()] }));
     let reply = () => Response.json({ data: [] });
     t.mock.method(globalThis, "fetch", async () => reply());
     assert.deepEqual(await accountModels(catalog, "secret-key"), []);
@@ -196,7 +191,7 @@ test("never falls back to configured models on failure or an empty upstream list
         reply = failure;
         await assert.rejects(accountModels(catalog, "secret-key"), { message: "Upstream model discovery failed" });
     }
-    await assert.rejects(accountModels({ models: [] }, "secret-key"), { message: "Upstream model discovery failed" });
+    await assert.rejects(accountModels({ models: [], discoveryProviderId: "test-provider" }, "secret-key"), { message: "Upstream model discovery failed" });
 });
 
 test("authenticates only the models route, reads the account key and sanitizes upstream errors", async t => {
@@ -251,7 +246,7 @@ test("authenticates only the models route, reads the account key and sanitizes u
 });
 
 test("publishes only enabled model metadata", async () => {
-    const path = await write("public.json", { models: [model(), model({ id: "hidden", enabled: false })] });
+    const path = await write("public.json", { discoveryProviderId: "test-provider", models: [model(), model({ id: "hidden", enabled: false })] });
     const catalog = await loadCatalog(path);
     assert.deepEqual(publicModels(catalog), [{ id: "image", name: "Image", capability: "image" }]);
     assert.equal(resolveModel(catalog, "hidden", "image"), null);

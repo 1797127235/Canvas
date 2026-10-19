@@ -10,8 +10,10 @@ description: Planned follow-up work
 - `docs/specs/capability-map.md` 的模块边界、依赖和构建顺序已批准；允许游客浏览现有内置模板和只读示例，真实操作及私人数据需要登录。
 - identity 主流程已由用户确认。生产部署栈已完成：compose（PostgreSQL + 后端 + 前端）、数据库自动建表、健康检查、每日备份脚本和部署文档。上线环境允许直接 http 访问，不再要求 HTTPS。剩余部署事项：反向代理/容器网络下的限流 IP 识别（当前取 socket 地址，会按同一出口 IP 集体计数）、过期数据定期清理周期、按用户节奏接入计划任务备份与可选的存活监控。镜像化发布新增 main 自动部署：GitHub Actions 质量门禁、双镜像发布完成后，经公网 SSH 2222 更新应用并检查健康，部署脚本失败恢复旧应用镜像（验收项见 Pending Tests）；仍需在仓库设置里开启分支保护并把该 workflow 设为必需检查。
 - 当前开发环境按实际运行环境交付：多用户核心链路、浏览器双账号隔离、真实文本/图片/视频生成与重启持久化已验证；后端专项 14/14、前端账号生成 5/5、两端类型检查通过。断网/双标签冲突、参考图编辑、多模态参数、ZIP 互导仍待逐项确认，当前 Key 无音频模型，真实音频生成尚未验收。详情见 Pending Tests。
-- 后续需根据真实上游返回的能力元数据完善未知模型分类与参数支持范围；当前无元数据时沿用现有关键词分类。账号模式已接入 AI SDK provider，改造和真实生成验证记录在 Pending Tests；H3 参考视频的实际采纳、Grok 视频编辑上游错误、H3-Max 原生端点仍需中转补齐。账号模式不执行本地渠道脚本，旧 IndexedDB 不迁移。
+- 后续需根据真实上游返回的能力元数据完善未知模型分类与参数支持范围；无有效能力元数据时统一按文本处理，由静态目录对已知模型明确覆盖。账号模式生成通过服务端 provider binding 路由；本地渠道脚本仅用于显式开发豁免模式，旧 IndexedDB 不迁移。
 - Agent 架构迁移：旧本地 Agent 面板、Store、Canvas Bridge、工作台命令总线和自定义消息协议已移除；目标架构与文件组织见 `docs/specs/agent-copilotkit.md`。第一轮已落地：能对话、能看到画布、能操作画布（`apply_graph`）、会话持久化（`user_agent_threads`）。服务端按 AG-UI 契约自实现 `/api/copilotkit` 与 `/api/agent/threads`，不装 `@copilotkit/runtime`（保持 `ai` 单份），工具在浏览器执行；旧 Agent 遗留的 `chatSessions` / `activeChatId` 已删除；媒体回收已补上会话引用检查。实测与待验收项见 Pending Tests。
+- 模型身份规格已从 Models.dev 补充到账号目录，具体变更与验收移入 Pending Tests；后续如接入自动压缩预算，仍须先统一字节/token 估算单位、验证中转实际窗口与输出限制，不能直接把基础模型规格当作中转能力。
+- Gateway 当前是无内置提供商的扩展底座，新增上游仅新增 provider 包并在唯一组合入口注册；具体 provider 由用户后续实现。
 - Agent 上下文压缩首版已实现，方案与验收边界见 `docs/specs/agent-context-compaction.md`；实施顺序见 `docs/specs/agent-context-compaction-plan.md`。仍待：按真实上游模型 ID 配置可信预算、登录浏览器验收会话切换/刷新/工具续跑/多标签冲突，以及使用真实账号 Key 验证摘要生成与用量。完成后再确认是否调整 400 条/2 MiB 的会话存储上限；压缩不解除该上限。
 - Agent 后续（按此顺序）：① 补齐画布工具 `update_node` / `delete_nodes` / `connect_nodes` / `get_node_detail`；② 生成类工具 `generate_node`（异步返回 taskId + `confirm: true` 先确认再花钱，复用现有 `/api/generations`）；③ 能力目录接口（把 `gateway-video.ts` / `input.ts` 里的参数约束提成数据，让规划出的图参数合法）；④ 模板检索（`web/public/templates/templates.json` 作为配方库）；⑤ 意图 → 方案 → 确认 → 建图；⑥ 多模态（`mediaReader` 已能把 `remote:<id>` 转 data URL）。未做：`/agent/:id/connect`、`/agent/:id/stop` 两个路由（当前每次都是新 run，不需要续连）。
 

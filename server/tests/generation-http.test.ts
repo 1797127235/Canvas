@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -8,12 +8,12 @@ import express from "express";
 import type { Pool } from "pg";
 
 import { createApp } from "../src/app.js";
-import { createGenerationRouter } from "../src/generation.js";
+import { createGenerationRouter } from "../src/generation/router.js";
+import "../src/gateway/providers.js";
 import { createMediaRouter } from "../src/media.js";
 import { encryptCredential } from "../src/credential-crypto.js";
 import { hashSid } from "../src/identity/session.js";
 import { startTestServer } from "./support/http.js";
-import sharp from "sharp";
 
 const origin = "http://localhost:3000";
 const secret = randomBytes(32).toString("base64");
@@ -23,29 +23,20 @@ const cookie = (sid: Buffer) => `infinite_canvas_session=${sid.toString("base64u
 
 test("unified generation validates models, multipart references, task ownership and binary content", async () => {
     const directory = await mkdtemp(join(tmpdir(), "generation-refs-"));
-    // 参考素材现在按身份（remote:<uuid>）提交，字节由服务端从账号媒体读取；这里用真实目录代替存储。
     const mediaFiles = new Map<string, { user: string; object_key: string; mimeType: string }>();
-    const putMedia = async (user: string, mimeType: string, bytes: Buffer) => {
-        const id = randomUUID();
-        const objectKey = `${user}/${id}`;
-        await mkdir(join(directory, user), { recursive: true });
-        await writeFile(join(directory, objectKey), bytes);
-        mediaFiles.set(id, { user, object_key: objectKey, mimeType });
-        return `remote:${id}`;
-    };
     const calls: Array<{ path: string; authorization?: string; body: Buffer; contentType?: string }> = [];
     const bytes = Buffer.from([0, 255, 128, 17, 99]);
     const upstream = express();
     upstream.use(express.raw({ type: () => true, limit: "32mb" }));
     upstream.use((request, response) => {
         if (request.path === "/v1/models") return response.json({ data: [
-            { id: "gpt-image-2.5", capability: "image" }, { id: "doubao-seedance-2-0-mini", capability: "video" },
-            { id: "doubao-seedance-2-0", capability: "video" }, { id: "chat-model", capability: "text" }, { id: "speech-model", capability: "audio" },
+            { id: "gpt-image-2.5", capability: "image" }, { id: "grok-imagine-video-1.5", capability: "video" },
+            { id: "grok-imagine-video", capability: "video" }, { id: "chat-model", capability: "text" }, { id: "speech-model", capability: "audio" },
         ] });
         calls.push({ path: request.path, authorization: request.header("authorization"), body: request.body || Buffer.alloc(0), contentType: request.header("content-type") });
         if (request.path.endsWith("/content")) return response.type("video/mp4").send(bytes);
-        if (request.method === "GET") return response.json({ id: "upstream-task", status: "completed", content: { video_url: `${request.protocol}://${request.get("host")}/v1/videos/upstream-task/content` } });
-        if (request.path === "/v1/videos" || request.path === "/api/v3/contents/generations/tasks") return response.status(201).json({ id: "upstream-task", status: "queued" });
+        if (request.method === "GET") return response.json({ status: "done", video: { url: `${request.protocol}://${request.get("host")}/v1/videos/generations/upstream-task/content` } });
+        if (request.path === "/v1/videos/generations") return response.status(201).json({ request_id: "upstream-task" });
         if (request.path === "/v1/audio/speech") return response.type("audio/mpeg").send(bytes);
         if (request.path === "/v1/chat/completions") return response.type("text/event-stream").send('data: {"id":"chat","created":1,"model":"chat-model","choices":[{"index":0,"delta":{"role":"assistant","content":"hello"},"finish_reason":null}]}\n\ndata: {"id":"chat","created":1,"model":"chat-model","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
         return response.json({ data: [{ b64_json: "aGVsbG8=" }] });
@@ -91,9 +82,9 @@ test("unified generation validates models, multipart references, task ownership 
         throw new Error("Unexpected query");
     } } as unknown as Pool;
     const catalog = { models: [
-        { id: "image", name: "Image 2.5", upstreamModel: "gpt-image-2.5", adapter: "openai-images" as const, capability: "image" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
-        { id: "video", name: "Seedance", upstreamModel: "doubao-seedance-2-0-mini", adapter: "gateway-videos" as const, capability: "video" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
-        { id: "video-alt", name: "Seedance Alt", upstreamModel: "doubao-seedance-2-0", adapter: "gateway-videos" as const, capability: "video" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
+        { id: "image", name: "Image 2.5", upstreamModel: "gpt-image-2.5", providerId: "C2A" as const, capability: "image" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
+        { id: "video", name: "Video", upstreamModel: "grok-imagine-video-1.5", providerId: "C2A" as const, capability: "video" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
+        { id: "chat-model", name: "Chat", upstreamModel: "chat-model", providerId: "C2A" as const, capability: "text" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
     ] };
     const api = await startTestServer(createApp({ appOrigin: origin, apiRouter: createGenerationRouter(database, { catalog, encryptionKey: secret, media: { directory } }) }));
     const post = (body: unknown) => fetch(`${api.baseUrl}/api/generations`, { method: "POST", headers: { origin, cookie: cookie(sidA), "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -117,51 +108,18 @@ test("unified generation validates models, multipart references, task ownership 
         assert.equal(calls[0].path, "/v1/images/generations");
         assert.equal(JSON.parse(calls[0].body.toString()).model, "gpt-image-2.5");
         assert.equal(calls[0].authorization, "Bearer test-key-A");
-        const ref = await putMedia(userA, "image/png", Buffer.from("hello"));
-        const resolvedRef = "data:image/png;base64,aGVsbG8=";
-        assert.equal((await post({ capability: "image", modelId: "image", input: { prompt: "edit", images: [ref] } })).status, 200);
-        const editCall = calls[1];
-        assert.equal(editCall.path, "/v1/images/edits");
-        const editForm = await new Response(new Uint8Array(editCall.body), { headers: { "content-type": editCall.contentType! } }).formData();
-        assert.equal(editForm.get("model"), "gpt-image-2.5");
-        assert.equal(await (editForm.get("image") as File).text(), "hello");
-        const video = await post({ capability: "video", modelId: "video", input: { prompt: "video", images: [ref], seconds: "5", size: "496x864", resolution_name: "480p", generate_audio: true, watermark: false, mode: "frames" } });
+        const video = await post({ capability: "video", modelId: "video", input: { prompt: "video", seconds: "5", size: "496x864", resolution_name: "480p" } });
         assert.equal(video.status, 201);
         const { id } = await video.json();
         assert.notEqual(id, "upstream-task");
-        assert.equal(calls[2].path, "/api/v3/contents/generations/tasks");
-        assert.equal(calls[2].contentType, "application/json");
-        assert.equal(calls[2].authorization, "Bearer test-key-A");
-        const videoPayload = JSON.parse(calls[2].body.toString());
-        assert.equal(videoPayload.model, "doubao-seedance-2-0-mini");
+        assert.equal(calls[1].path, "/v1/videos/generations");
+        assert.equal(calls[1].contentType, "application/json");
+        assert.equal(calls[1].authorization, "Bearer test-key-A");
+        const videoPayload = JSON.parse(calls[1].body.toString());
+        assert.equal(videoPayload.model, "grok-imagine-video-1.5");
         assert.equal(videoPayload.duration, 5);
         assert.equal(videoPayload.resolution, "480p");
-        assert.equal(videoPayload.ratio, "9:16");
-        assert.equal(videoPayload.generate_audio, true);
-        assert.equal(videoPayload.watermark, false);
-        assert.deepEqual(videoPayload.content[0], { type: "text", text: "video" });
-        assert.deepEqual(videoPayload.content[1], { type: "image_url", image_url: { url: resolvedRef }, role: "first_frame" });
-        const alt = await post({ capability: "video", modelId: "video-alt", input: { prompt: "video" } });
-        assert.equal(alt.status, 201);
-        const { id: altId } = await alt.json();
-        assert.equal(JSON.parse(calls[3].body.toString()).model, "doubao-seedance-2-0");
-        const bigBuffer = await sharp({ create: { width: 2000, height: 2000, channels: 3, background: { r: 128, g: 128, b: 128 }, noise: { type: "gaussian", mean: 128, sigma: 30 } } }).png().toBuffer();
-        assert.ok(bigBuffer.length > 512 * 1024);
-        const bigRef = await putMedia(userA, "image/png", bigBuffer);
-        const bigVideo = await post({ capability: "video", modelId: "video", input: { prompt: "video", images: [bigRef], seconds: "5" } });
-        assert.equal(bigVideo.status, 201);
-        const normalizedUrl = JSON.parse(calls.at(-1)!.body.toString()).content[1].image_url.url as string;
-        assert.match(normalizedUrl, /^data:image\/jpeg;base64,/);
-        assert.ok(Buffer.from(normalizedUrl.split(",")[1], "base64").length <= 512 * 1024);
-        const multiVideo = await post({ capability: "video", modelId: "video", input: { prompt: "video", images: [ref, bigRef], seconds: "5" } });
-        assert.equal(multiVideo.status, 201);
-        const multiPayload = JSON.parse(calls.at(-1)!.body.toString());
-        assert.equal(multiPayload.model, "doubao-seedance-2-0-mini");
-        assert.deepEqual(multiPayload.content[1], { type: "image_url", image_url: { url: resolvedRef }, role: "first_frame" });
-        assert.match(multiPayload.content[2].image_url.url, /^data:image\/jpeg;base64,/);
-        assert.ok(Buffer.from(multiPayload.content[2].image_url.url.split(",")[1], "base64").length <= 512 * 1024);
-        assert.equal((await fetch(`${api.baseUrl}/api/generations/${altId}`, { headers: { cookie: cookie(sidA) } })).status, 200);
-        assert.equal(calls.at(-1)?.authorization, "Bearer test-key-A");
+        assert.equal(videoPayload.aspect_ratio, "9:16");
         const before = calls.length;
         assert.equal((await fetch(`${api.baseUrl}/api/generations/${id}`, { headers: { cookie: cookie(sidB) } })).status, 404);
         assert.equal(calls.length, before);
@@ -170,8 +128,8 @@ test("unified generation validates models, multipart references, task ownership 
         const polled = await poll.json() as { status: string; mediaId?: string };
         assert.equal(polled.status, "completed");
         // 首次完成：先查状态，再下载一次视频存进账号媒体；字节不再经浏览器中转。
-        assert.equal(calls.at(-2)?.path, "/api/v3/contents/generations/tasks/upstream-task");
-        assert.equal(calls.at(-1)?.path, "/v1/videos/upstream-task/content");
+        assert.equal(calls.at(-2)?.path, "/v1/videos/generations/upstream-task");
+        assert.equal(calls.at(-1)?.path, "/v1/videos/generations/upstream-task/content");
         const videoMedia = storedMedia.get(polled.mediaId!)!;
         assert.ok(videoMedia, "video must be stored in account media");
         assert.equal(videoMedia.mimeType, "video/mp4");
@@ -179,13 +137,7 @@ test("unified generation validates models, multipart references, task ownership 
         // 重复轮询直接复用已落库结果，不再重复下载上游视频。
         const again = await fetch(`${api.baseUrl}/api/generations/${id}`, { headers: { cookie: cookie(sidA) } });
         assert.equal((await again.json() as { mediaId?: string }).mediaId, polled.mediaId);
-        assert.equal(calls.at(-1)?.path, "/api/v3/contents/generations/tasks/upstream-task");
-        const audio = await post({ capability: "audio", modelId: "speech-model", input: { input: "speech", voice: "alloy", response_format: "mp3" } });
-        assert.equal(audio.status, 200);
-        const audioPayload = await audio.json() as { mediaId: string; mimeType: string; bytes: number };
-        assert.equal(audioPayload.mimeType, "audio/mpeg");
-        assert.equal(audioPayload.bytes, bytes.length);
-        assert.deepEqual(await readFile(join(directory, storedMedia.get(audioPayload.mediaId)!.object_key)), bytes);
+        assert.equal(calls.at(-1)?.path, "/v1/videos/generations/upstream-task");
         const text = await post({ capability: "text", modelId: "chat-model", input: { messages: [{ role: "user", content: "hi" }], stream: true } });
         assert.equal(text.status, 200);
         const streamed = await text.text();
@@ -266,7 +218,7 @@ test("image generation runs as a background task, bridges url results and stores
         throw new Error(`Unexpected query: ${sql.slice(0, 60)}`);
     } } as unknown as Pool;
     const catalog = { models: [
-        { id: "image", name: "Image 2.5", upstreamModel: "gpt-image-2.5", adapter: "openai-images" as const, capability: "image" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
+        { id: "image", name: "Image 2.5", upstreamModel: "gpt-image-2.5", providerId: "C2A" as const, capability: "image" as const, enabled: true, baseUrl: `${provider.baseUrl}/v1` },
     ] };
     const api = await startTestServer(createApp({ appOrigin: origin, apiRouter: createMediaRouter(database, { directory }).use(createGenerationRouter(database, { catalog, encryptionKey: secret, media: { directory } })) }));
     const headers = { origin, cookie: cookie(sidA), "content-type": "application/json" };

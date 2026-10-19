@@ -1,6 +1,13 @@
 import { z } from "zod";
 
-const modelsSchema = z.object({ models: z.array(z.object({ id: z.string(), name: z.string(), capability: z.enum(["image", "video", "text", "audio"]) })) });
+const modelSpecSchema = z.object({
+    canonicalId: z.string().min(1), source: z.literal("models.dev"), name: z.string().optional(),
+    limit: z.object({ context: z.number().int().nonnegative(), input: z.number().int().nonnegative().optional(), output: z.number().int().nonnegative() }),
+    toolCall: z.boolean().optional(), reasoning: z.boolean().optional(), structuredOutput: z.boolean().optional(),
+    modalities: z.object({ input: z.array(z.string()), output: z.array(z.string()) }).optional(),
+    lastUpdated: z.string().optional(),
+});
+const modelsSchema = z.object({ models: z.array(z.object({ id: z.string(), name: z.string(), capability: z.enum(["image", "video", "text", "audio"]), spec: modelSpecSchema.optional() })) });
 export type PublicModel = z.infer<typeof modelsSchema>["models"][number];
 
 export async function fetchServerModels() {

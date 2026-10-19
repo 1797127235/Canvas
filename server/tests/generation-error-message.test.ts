@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { APICallError } from "ai";
 
-import { generationErrorMessage } from "../src/generation.js";
+import { generationErrorMessage } from "../src/generation/shared.js";
 
 const upstreamError = (message: string, statusCode: number) => new APICallError({
     message, url: "https://upstream.example/v1/videos", requestBodyValues: undefined,

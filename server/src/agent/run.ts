@@ -3,8 +3,8 @@ import type { Response } from "express";
 import type { RunAgentInput } from "@ag-ui/core";
 import { stepCountIs, streamText, type ModelMessage } from "ai";
 
-import { chatModel } from "../ai/generation.js";
-import type { CatalogModel } from "../catalog/catalog.js";
+import { chatModel } from "../gateway/index.js";
+import type { ModelBinding } from "../gateway/contracts.js";
 import { createEventMapper, runFailed, runFinished, runStarted, sseFrame } from "./events.js";
 import { buildSystemPrompt, toModelMessages, toToolSet } from "./messages.js";
 import { prepareAgentContext } from "./compaction/prepare.js";
@@ -26,7 +26,7 @@ const INSTRUCTIONS = [
 const MAX_STEPS = 10;
 
 export type AgentRunOptions = {
-    model: CatalogModel;
+    model: ModelBinding;
     apiKey: string;
     input: RunAgentInput;
     signal: AbortSignal;

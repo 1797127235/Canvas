@@ -12,13 +12,13 @@
 
 `CATALOG_CONFIG_PATH` 指定 JSON 文件，格式见 `server/config/catalog.example.json`。每个配置项包含 `id`、`name`、`upstreamModel`、`adapter`、`capability`、`enabled`、`baseUrl`，不允许 `apiKey`。所有配置项必须使用同一个规范化后的上游根地址，地址含明确的 `/v1` 前缀，不从请求推导。
 
-配置项用于能力、显示名称和 ID 的明确映射，不能扩大 Key 的上游模型权限。请求上游目录后，只对实际返回的模型应用映射；禁用项仍不可用，未列出的上游模型也会显示。能力优先使用配置和上游 `capability`/`capabilities`；没有能力元数据时沿用现有渠道的名称关键词分类，包含 Seedance 和 MiniMax 视频模型。
+配置项用于能力、显示名称和 ID 的明确映射，不能扩大 Key 的上游模型权限。请求上游目录后，只对实际返回的模型应用映射；禁用项仍不可用，未列出的上游模型也会显示。能力优先使用配置和上游 `capability`/`capabilities`；没有能力元数据时当前实现仍沿用名称关键词分类；该分类逻辑是待迁移到实际连接提供商模块的旧行为。
 
-配置缺失允许身份模块启动，但模型发现报错。指定非法配置时启动失败，错误不输出文件内容或秘密。目录不缓存账号 Key 或账号响应，失败不回退旧浏览器渠道或静态配置列表。
+配置缺失允许身份模块启动，但模型发现报错。指定非法配置时启动失败，错误不输出文件内容或秘密。目录不缓存账号 Key 或账号响应，失败不回退旧浏览器渠道或静态配置列表。Models.dev 静态公共规格单独缓存 1 小时，请求失败后短暂冷却重试；只接受精确 canonical ID，或明确上游 `owned_by` 与模型 ID 组合；缺少明确身份时省略规格，不按唯一后缀猜测。
 
 ## API
 
-- `GET /api/models`：需登录，使用当前账号 Key 请求上游目录，返回 `{ models: [{ id, name, capability }] }`；未保存 Key 返回 409，上游读取失败返回 502，不暴露地址、Key 或内部协议。
+- `GET /api/models`：需登录，使用当前账号 Key 请求上游目录，返回 `{ models: [{ id, name, capability, spec? }] }`；`spec` 从 Models.dev `models.json` 按 canonical ID 精确补充，含上下文/输入/输出限额、工具调用、推理、结构化输出和模态。上游 `/models` 仍是可用模型清单；Models.dev 不匹配或不可用时省略 `spec`，不影响模型发现。该社区规格只描述基础模型，不保证中转实际限制，不能自动作为 Agent 压缩预算。未保存 Key 返回 409，上游读取失败返回 502，不暴露地址、Key 或内部协议。
 - `PUT /api/credentials`、`GET /api/credentials`、`DELETE /api/credentials`：账号 Key 加密保存，只返回是否已配置及掩码。保存或清除后前端重置目录，迟到响应不能恢复旧列表。
 - `POST /api/generations`：需登录，参数为 `{ capability, modelId, input }`；服务端重新查询该 Key 可用模型，校验能力后使用固定路由调用上游。
 - `GET /api/generations/:id`、`GET /api/generations/:id/content`：任务按当前账号查询，任务使用创建时保存的上游地址和当前账号 Key，跨账号返回不存在。
@@ -35,7 +35,7 @@
 
 视频字段为 `seconds`、`size`、`resolution_name`、`generate_audio`、`watermark`、`mode`；首尾帧使用 `first_frame`/`last_frame`，全能参考使用 `image[]`，另有 `video[]`/`audio[]`。保留原生面板的清晰度、比例、时长、声音、水印，不在服务端夹到 768P 或某个模型的时长。上游拒绝不支持的参数时返回错误，不静默改写。
 
-只实现当前 OpenAI 兼容上游。浏览器旧本地免登录模式仍保留原有 Gemini 和脚本能力，账号后端不执行用户脚本。
+只实现当前 OpenAI 兼容上游。Models.dev 规格仅随目录返回；Agent 压缩预算仍需按准确上游模型 ID 显式配置，待核实中转限制后才能启用。服务端目录发现不加载 Models.dev；只有 `/api/models` 展示路径做可选规格补充。AI 执行走独立 gateway 入口，边界及尚未迁移的 provider 逻辑见 [网关与提供商边界](./gateway-provider-boundaries.md)。浏览器旧本地免登录模式仍保留原有 Gemini 和脚本能力，账号后端不执行用户脚本。
 
 ## 账号隔离与存储
 

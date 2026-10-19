@@ -12,11 +12,13 @@ import { createRateLimiter } from "./identity/rate-limit.js";
 import { createRegisterRouter } from "./identity/register.js";
 import { createSessionRouter } from "./identity/session-routes.js";
 import { loadCatalog } from "./catalog/catalog.js";
-import { createCatalogRouter } from "./catalog.js";
+import { createModelsDevLoader } from "./catalog/models-dev.js";
+import { createCatalogRouter } from "./catalog/router.js";
 import { createCredentialRouter } from "./credentials.js";
 import { createWorkspaceRouter } from "./workspace.js";
 import { createMediaRouter, clearUnusedMedia } from "./media.js";
-import { createGenerationRouter } from "./generation.js";
+import { createGenerationRouter } from "./generation/router.js";
+import "./gateway/providers.js";
 import { createAgentRouter } from "./agent/routes.js";
 import { logError } from "./log.js";
 
@@ -25,7 +27,7 @@ async function start() {
     const database = createDatabase(config);
     try {
         // 启动时验证数据库/schema 并清理过期记录；认证拒绝过期凭证不依赖清理。
-        for (const file of ["003-workspace-credentials-media.sql", "004-generation-tasks.sql", "005-generation-history.sql", "006-generation-sdk-operations.sql", "007-image-generation-tasks.sql", "008-media-references.sql", "009-credential-base-url.sql", "010-password-resets.sql", "011-agent-threads.sql", "012-agent-multiple-threads.sql", "013-agent-thread-compaction.sql"]) {
+        for (const file of ["003-workspace-credentials-media.sql", "004-generation-tasks.sql", "005-generation-history.sql", "008-media-references.sql", "009-credential-base-url.sql", "010-password-resets.sql", "011-agent-threads.sql", "012-agent-multiple-threads.sql", "013-agent-thread-compaction.sql"]) {
             await database.pool.query(await readFile(new URL(`../sql/${file}`, import.meta.url), "utf8"));
         }
         await clearExpiredIdentityData(database.pool);
@@ -33,6 +35,7 @@ async function start() {
         // 会话 Cookie 的 Secure 标志跟随实际访问协议：HTTP 部署下浏览器不回传 Secure Cookie。
         const dependencies = { database: database.pool, rateLimitSecret: secret, secureCookie: config.appOrigin.startsWith("https:") };
         const catalog = await loadCatalog(config.catalogConfigPath, config.nodeEnv === "production");
+        const loadSpecs = createModelsDevLoader();
         const minio = config.minioEndpoint && config.minioPort && config.minioAccessKey && config.minioSecretKey && config.minioBucket
             ? { client: new Client({ endPoint: config.minioEndpoint, port: config.minioPort, useSSL: config.nodeEnv === "production", accessKey: config.minioAccessKey, secretKey: config.minioSecretKey }), bucket: config.minioBucket }
             : { directory: new URL("../data/media", import.meta.url).pathname };
@@ -51,7 +54,7 @@ async function start() {
             rateLimitSecret: secret,
             mailer: config.mail ? createMailer(config.mail) : null,
         }));
-        apiRouter.use(createCatalogRouter(catalog, database.pool, config.credentialsEncryptionKey));
+        apiRouter.use(createCatalogRouter(catalog, database.pool, config.credentialsEncryptionKey, loadSpecs));
         apiRouter.use(createCredentialRouter(database.pool, { encryptionKey: config.credentialsEncryptionKey }));
         apiRouter.use(createWorkspaceRouter(database.pool));
         apiRouter.use(createMediaRouter(database.pool, minio));

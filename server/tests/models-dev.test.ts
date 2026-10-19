@@ -6,12 +6,14 @@ import { createModelsDevLoader, findModelSpec } from "../src/catalog/models-dev.
 const entry = { name: "Example Chat", family: "example", limit: { context: 128000, input: 120000, output: 8000 }, tool_call: true, reasoning: false, structured_output: true, modalities: { input: ["text", "image"], output: ["text"] } };
 const response = (data: unknown) => Response.json(data);
 
-test("matches canonical IDs and unique exact model IDs without guessing aliases", async () => {
+test("matches only explicit canonical IDs or provider-qualified IDs without guessing owners", async () => {
     const load = createModelsDevLoader(async () => response({ "lab/chat": entry, "other/chat": entry, "lab/unique": entry }));
     const specs = await load();
     assert.equal(findModelSpec(specs, "lab/chat")?.canonicalId, "lab/chat");
     assert.equal(findModelSpec(specs, "chat", "lab")?.canonicalId, "lab/chat");
-    assert.equal(findModelSpec(specs, "unique")?.canonicalId, "lab/unique");
+    assert.equal(findModelSpec(specs, "unique"), undefined);
+    assert.equal(findModelSpec(specs, "unique", "other"), undefined);
+    assert.equal(findModelSpec(specs, "unique", "lab")?.canonicalId, "lab/unique");
     assert.equal(findModelSpec(specs, "chat"), undefined);
     assert.equal(findModelSpec(specs, "chat-latest", "lab"), undefined);
     assert.equal(findModelSpec(specs, "other/unique"), undefined);
@@ -25,7 +27,7 @@ test("preserves token limits and false flags, strips unknown fields and skips ma
         "lab/image": { ...entry, limit: { context: 0, output: 0 } },
     }));
     const specs = await load();
-    const spec = findModelSpec(specs, "chat");
+    const spec = findModelSpec(specs, "lab/chat");
     assert.equal(spec?.source, "models.dev");
     assert.deepEqual(spec?.limit, entry.limit);
     assert.equal(spec?.reasoning, false);
@@ -34,7 +36,7 @@ test("preserves token limits and false flags, strips unknown fields and skips ma
     assert.equal(JSON.stringify(spec).includes("must-not-leak"), false);
     assert.equal(findModelSpec(specs, "broken"), undefined);
     assert.equal(findModelSpec(specs, "malformed"), undefined);
-    assert.equal(findModelSpec(specs, "image")?.limit.context, 0);
+    assert.equal(findModelSpec(specs, "lab/image")?.limit.context, 0);
 });
 
 test("shares in-flight requests and caches public data without sending account credentials", async () => {

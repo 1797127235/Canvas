@@ -2,15 +2,15 @@ import { isDeepStrictEqual } from "node:util";
 import type { RunAgentInput } from "@ag-ui/core";
 import { generateText } from "ai";
 
-import { chatModel } from "../../ai/generation.js";
-import type { CatalogModel } from "../../catalog/catalog.js";
+import { chatModel } from "../../gateway/index.js";
+import type { ModelBinding } from "../../gateway/contracts.js";
 import { safeBoundaries } from "../sessions/message-boundaries.js";
 import { AgentThreadError, type SessionStore } from "../sessions/store.js";
 import { compactContext, CompactionError, SUMMARY_INSTRUCTIONS, summaryMessage, type CompactionBudget } from "./context.js";
 
 export type PrepareOptions = {
     sessions: SessionStore; userId: string; projectId: string; input: RunAgentInput;
-    model: CatalogModel; apiKey: string; signal: AbortSignal; instructions: string;
+    model: ModelBinding; apiKey: string; signal: AbortSignal; instructions: string;
     budget?: CompactionBudget; summarize?: (prompt: string) => Promise<string>;
 };
 

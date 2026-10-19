@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { upstreamLogDetails } from "../src/generation.js";
+import { upstreamLogDetails } from "../src/generation/shared.js";
 
 test("上游错误详情提取状态码、URL 与响应体，并脱敏账号 Key", () => {
     const key = "sk-live-account-key-123";
