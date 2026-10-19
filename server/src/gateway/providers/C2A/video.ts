@@ -1,15 +1,16 @@
 import type { Experimental_VideoModelV4 } from "@ai-sdk/provider";
+import { APICallError } from "ai";
 import { z } from "zod";
 import type { ModelBinding, VideoCapability } from "../../contracts.js";
 import { gatewayFetch, gatewayJson } from "../../transport.js";
 
-const grokModels = new Set(["grok-imagine-video", "grok-imagine-video-1.5"]);
+const grokModels = new Set(["grok-imagine-video", "grok-imagine-video-1.5", "grok-imagine-video-1.5-preview"]);
 const operationSchema = z.strictObject({ requestId: z.string().min(1) });
 const startSchema = z.object({ request_id: z.string().min(1) });
 const statusSchema = z.object({ status: z.string(), video: z.object({ url: z.string().url() }).optional(), error: z.unknown().optional(), message: z.string().optional() });
 
-function videoUrl(binding: ModelBinding, requestId: string, content = false) {
-    return `${binding.baseUrl.replace(/\/+$/, "")}/videos/generations/${encodeURIComponent(requestId)}${content ? "/content" : ""}`;
+function videoUrl(binding: ModelBinding, requestId: string, content = false, shared = false) {
+    return `${binding.baseUrl.replace(/\/+$/, "")}/videos/${shared ? "" : "generations/"}${encodeURIComponent(requestId)}${content ? "/content" : ""}`;
 }
 
 export function createVideoModel(binding: ModelBinding, apiKey: string): Experimental_VideoModelV4 {
@@ -22,7 +23,6 @@ export function createVideoModel(binding: ModelBinding, apiKey: string): Experim
         async doStart(options) {
             if (options.n !== 1) throw new Error("Grok 视频接口一次只支持生成一个视频");
             if (options.inputReferences?.some(file => !file.mediaType?.startsWith("image/"))) throw new Error("当前 Grok 视频接口适配只支持图片参考");
-            if (options.frameImages?.some(frame => frame.frameType !== "first_frame")) throw new Error("当前 Grok 视频接口适配只支持首帧图片");
             const imageFiles = [
                 ...(options.image ? [options.image] : []),
                 ...(options.frameImages || []).map(frame => frame.image),
@@ -41,7 +41,8 @@ export function createVideoModel(binding: ModelBinding, apiKey: string): Experim
                 ...(options.duration === undefined ? {} : { duration: options.duration }),
                 ...(resolution ? { resolution } : {}),
                 ...(options.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
-                ...(imageUrls.length === 1 ? { image: imageUrls[0] } : imageUrls.length > 1 ? { reference_images: imageUrls } : {}),
+                ...(imageUrls.length ? { image: imageUrls[0] } : {}),
+                ...(imageUrls.length > 1 ? { reference_images: imageUrls.slice(1) } : {}),
             };
             const result = await gatewayJson(`${binding.baseUrl.replace(/\/+$/, "")}/videos/generations`, apiKey, body, options.abortSignal);
             return {
@@ -52,14 +53,21 @@ export function createVideoModel(binding: ModelBinding, apiKey: string): Experim
         },
         async doStatus({ operation, abortSignal }) {
             const { requestId } = operationSchema.parse(operation);
-            const url = videoUrl(binding, requestId);
-            const result = await gatewayJson(url, apiKey, undefined, abortSignal);
+            let result;
+            let sharedStatusEndpoint = false;
+            try {
+                result = await gatewayJson(videoUrl(binding, requestId), apiKey, undefined, abortSignal);
+            } catch (error) {
+                if (!APICallError.isInstance(error) || error.statusCode !== 404) throw error;
+                result = await gatewayJson(videoUrl(binding, requestId, false, true), apiKey, undefined, abortSignal);
+                sharedStatusEndpoint = true;
+            }
             const state = statusSchema.parse(result.value);
             const response = { timestamp: new Date(), modelId: binding.upstreamModel, headers: Object.fromEntries(result.headers) };
             if (["pending", "queued", "running", "processing"].includes(state.status)) return { status: "pending", response };
             if (["failed", "error", "expired"].includes(state.status)) return { status: "error", error: state.message || (typeof state.error === "string" ? state.error : "Grok 视频生成失败"), response };
             if (["done", "completed", "succeeded"].includes(state.status) && state.video?.url) {
-                return { status: "completed", videos: [{ type: "url", url: videoUrl(binding, requestId, true), mediaType: "video/mp4" }], warnings: [], response };
+                return { status: "completed", videos: [{ type: "url", url: videoUrl(binding, requestId, true, sharedStatusEndpoint), mediaType: "video/mp4" }], warnings: [], response };
             }
             return { status: "error", error: `无法识别的 Grok 视频任务状态：${state.status}`, response };
         },
@@ -95,9 +103,9 @@ export const c2aVideoCapability = {
         ...(resolution ? { resolution: resolution === "1920x1080" ? "1080p" : resolution === "1280x720" ? "720p" : resolution } : {}),
         ...(imageUrls ? { imageUrls } : {}),
     } }),
-    validateInput: ({ videos, audios, frameCount, unsupportedReferences }) => {
-        if (videos?.length || audios?.length || (frameCount || 0) > 1 || unsupportedReferences?.length) {
-            throw new Error("当前 Grok 视频接口适配仅支持文生视频和图片参考生成，不支持参考视频/音频或首尾帧");
+    validateInput: ({ videos, audios, unsupportedReferences }) => {
+        if (videos?.length || audios?.length || unsupportedReferences?.length) {
+            throw new Error("当前 Grok 视频接口适配仅支持文生视频和图片参考生成，不支持参考视频/音频");
         }
     },
 } satisfies VideoCapability;
