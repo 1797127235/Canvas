@@ -38,7 +38,7 @@ test("HTTP compaction retains full history, sends summary plus recent messages, 
     const origin = "http://localhost:3000";
     const headers = { origin, cookie: serializeSessionCookie(session.sid, false), "Content-Type": "application/json" };
     await database.query("INSERT INTO user_credentials (user_id, encrypted_api_key, base_url) VALUES ($1, $2, $3)", [user.id, encryptCredential("fake-test-key", encryptionKey), `${remote.baseUrl}/v1`]);
-    const api = await startTestServer(createApp({ appOrigin: origin, apiRouter: createAgentRouter({ database, catalog: { models: [] }, encryptionKey, compactionBudgets: { "test-model": { contextWindow: 8000, maxOutputTokens: 500, keepRecentTokens: 900, summaryTokens: 300, safetyTokens: 200 } } }) }));
+    const api = await startTestServer(createApp({ appOrigin: origin, apiRouter: createAgentRouter({ database, catalog: { discoveryProviderId: "C2A", models: [] }, encryptionKey, compactionBudgets: { "test-model": { contextWindow: 8000, maxOutputTokens: 500, keepRecentTokens: 900, summaryTokens: 300, safetyTokens: 200 } } }) }));
     try {
         const created = await fetch(`${api.baseUrl}/api/agent/threads/project`, { method: "POST", headers, body: "{}" });
         assert.equal(created.status, 201);
