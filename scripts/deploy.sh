@@ -1,24 +1,26 @@
 #!/usr/bin/env bash
-# 在生产 WSL 中执行；仅更新应用容器，不改 .env、catalog 或数据卷。
+# 在生产 WSL 中执行；只用本地已构建的镜像切换 api/web，不改 .env、catalog 或数据卷。
+# 用法：deploy.sh <40位提交> <api镜像> <web镜像> [部署目录] [源码目录]
 set -Eeuo pipefail
 umask 077
 
 revision=${1:-}
-project=${2:-/mnt/d/infinite-canvas-v2}
-repository=${3:-1797127235/Canvas}
-source_dir=${4:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}
+api_image=${2:-}
+web_image=${3:-}
+project=${4:-/mnt/d/infinite-canvas-v2}
+source_dir=${5:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}
 [[ $revision =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid commit SHA' >&2; exit 1; }
-[[ $repository =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || exit 1
+[[ $api_image =~ ^[A-Za-z0-9][A-Za-z0-9._/:@-]*$ && $web_image =~ ^[A-Za-z0-9][A-Za-z0-9._/:@-]*$ ]] || { echo 'Invalid image reference' >&2; exit 1; }
 [[ -f "$source_dir/docker-compose.yml" && -f "$source_dir/server/sql/001-identity.sql" && -f "$source_dir/server/sql/002-identity-rate-limits.sql" ]] || { echo 'Deployment source files are missing' >&2; exit 1; }
 cd -- "$project"
 [[ -f .env && -f docker-compose.yml && -f server/config/catalog.json ]]
 
-# GitHub 并发控制之外，阻止手工部署与自动部署同时修改同一栈。
+# 阻止手工部署与构建部署同时修改同一栈。
 mkdir -p "$HOME/.cache"
 exec 9>"$HOME/.cache/infinite-canvas-deploy.lock"
 flock -n 9 || { echo 'Another deployment is running' >&2; exit 1; }
 
-# 不继承 Windows wincred 配置；公开 GHCR 镜像使用匿名拉取。
+# 不继承 Windows wincred 配置：全程只用本地镜像，不访问任何镜像仓库。
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 export DOCKER_CONFIG="$work/docker"
@@ -32,24 +34,22 @@ db_id=$(compose ps -q db)
 [[ -n $api_id && -n $web_id && -n $db_id ]] || { echo 'Existing production stack is required' >&2; exit 1; }
 previous_api=$(docker inspect -f '{{.Image}}' "$api_id")
 previous_web=$(docker inspect -f '{{.Image}}' "$web_id")
-owner=${repository%%/*}
-owner=${owner,,}
-api_image="ghcr.io/$owner/infinite-canvas-api:sha-$revision"
-web_image="ghcr.io/$owner/infinite-canvas-web:sha-$revision"
 
-# CI 已经由 SSH 导入镜像；生产不访问 GHCR。全部核对身份后才触碰现有部署。
+# 两个镜像都必须已构建好，且提交标签与本次发布一致。
 for image in "$api_image" "$web_image"; do
     actual=$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")
-    [[ $actual == "$revision" ]] || { echo 'Image revision does not match commit' >&2; exit 1; }
+    [[ $actual == "$revision" ]] || { echo "Image revision does not match commit: $image" >&2; exit 1; }
 done
 
-# 结构迁移随 api 启动执行，先保存数据库快照和旧运行配置；不回收已有备份。
+# 只记录旧运行配置和旧镜像引用；数据库快照默认跳过，需要时设 DEPLOY_DB_BACKUP=1。
 backup="backups/deploy-$(date -u +%Y%m%dT%H%M%SZ)-${revision:0:7}"
 mkdir -p "$backup"
-compose exec -T db pg_dump -U infinite_canvas infinite_canvas > "$backup/db.sql"
 cp docker-compose.yml "$backup/docker-compose.yml"
 if [[ -f docker-compose.deploy.yml ]]; then cp docker-compose.deploy.yml "$backup/docker-compose.deploy.yml"; fi
 printf '%s\n%s\n' "$previous_api" "$previous_web" > "$backup/previous-images.txt"
+if [[ ${DEPLOY_DB_BACKUP:-} == 1 ]]; then
+    compose exec -T db pg_dump -U infinite_canvas infinite_canvas > "$backup/db.sql"
+fi
 
 write_images() {
     printf 'services:\n  api:\n    image: %s\n  web:\n    image: %s\n' "$1" "$2" > docker-compose.deploy.yml
@@ -74,7 +74,7 @@ rollback() {
     cp "$backup/docker-compose.yml" docker-compose.yml
     write_images "$previous_api" "$previous_web"
     if start_apps && health; then
-        echo 'Previous application images restored; database backup retained' >&2
+        echo 'Previous application images restored; backup retained' >&2
     else
         echo 'ROLLBACK FAILED: inspect production containers and retained backup' >&2
     fi
@@ -91,4 +91,4 @@ compose -f docker-compose.yml -f docker-compose.deploy.yml config --quiet
 start_apps
 health
 trap - ERR
-printf 'Deployed commit %s; database backup: %s\n' "$revision" "$backup"
+printf 'Deployed commit %s as %s; backup: %s\n' "$revision" "$api_image" "$backup"

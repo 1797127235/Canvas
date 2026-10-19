@@ -94,7 +94,7 @@
 - 账号模式统一使用当前账号的一把 API Key，服务端加密保存并代发四类生成；模型用这把 Key 从唯一上游发现，不得绑定特定视频模型或擅自改写原生视频参数。旧浏览器本地模式只在显式 `VITE_AUTH_BYPASS=true` 时开放，不迁移或删除旧数据。
 - 开发阶段不设单文件、账号容量和画布数量额度；不要恢复已取消的额度或用生产关卡拖延已授权的本地功能实现。
 - Docker 静态资源路径目前仍是待办项，文档中不要过度承诺生产部署已经完全验证。
-- 线上环境：生产站点 `http://openai2api.com:3015/`（健康检查 `/api/health`），Windows 管理 SSH 为 `miaoda@192.168.6.78:22`，公网部署 SSH 为 `miaoda@openai2api.com:2222`（同机 WSL），部署目录 `D:\infinite-canvas-v2` / `/mnt/d/infinite-canvas-v2`，不是 git 仓库。main 的 CI/CD 发布双镜像后执行 `scripts/deploy.sh`；手工 Compose 维护必须同时带 `docker-compose.yml` 和 `docker-compose.deploy.yml`，详情见 `docs/content/docs/development/deployment.mdx`。不得覆盖 `.env`、catalog 或删除既有备份/数据卷；catalog 格式变化才单独确认同步，否则 api 可能因 `Invalid catalog configuration` 崩溃循环。
+- 线上环境：生产站点 `http://openai2api.com:3015/`（健康检查 `/api/health`），Windows 管理 SSH 为 `miaoda@192.168.6.78:22`，公网部署 SSH 为 `miaoda@openai2api.com:2222`（同机 WSL），部署目录 `D:\infinite-canvas-v2` / `/mnt/d/infinite-canvas-v2`（不是 git 仓库），构建目录 `/mnt/d/infinite-canvas-build`。部署一律走 `scripts/deploy-local.sh`：rsync 源码到构建目录后由部署机本地构建镜像再切 `api`/`web`，main 的 CI deploy job 也是同一条路径；部署机到境外（GHCR/GitHub/Cloudflare 实测 20~30 KB/s）无法承受镜像传输，禁止恢复 `docker save | ssh docker load` 或让部署机拉 GHCR 的做法。手工 Compose 维护必须同时带 `docker-compose.yml` 和 `docker-compose.deploy.yml`，详情见 `docs/content/docs/development/deployment.mdx`。不得覆盖 `.env`、catalog 或删除既有备份/数据卷；catalog 格式变化才单独确认同步，否则 api 可能因 `Invalid catalog configuration` 崩溃循环。
 - Agent 对话消息必须同时按 `threadId`、`turnId` 和 `itemId` 归属；实时事件只用于补充未物化的 turn，历史快照成为权威后不得重复合并同一条消息。
 - Agent 通信协议版本与消息存储版本必须独立管理；消息存储格式升级时必须先备份再迁移，遇到未知版本、损坏清单或冲突备份时拒绝覆盖原文件，不得按记录数量或文件大小静默裁剪历史元数据。
 - 本地启动或浏览器验收时不要关闭用户已经打开的浏览器窗口或标签页；需要自动化验证时使用独立测试页面，避免打断用户当前页面和对话状态。

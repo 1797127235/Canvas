@@ -1,5 +1,5 @@
-# 多用户生产栈：PostgreSQL + 后端 + 前端。镜像由 GitHub Actions 构建后推到 GHCR，服务器只拉取不构建。
-# 首次使用复制 .env.example 为 .env 并填写密钥；本地需要自行构建时叠加 docker-compose.build.yml。
+# 多用户生产栈：PostgreSQL + 后端 + 前端。镜像默认在部署机本地构建（scripts/deploy-local.sh 或 docker-compose.build.yml）。
+# 首次使用复制 .env.example 为 .env 并填写密钥；改用 CI 归档镜像时才需要 GHCR 的 IMAGE_API/IMAGE_WEB/IMAGE_TAG。
 services:
   db:
     image: postgres:16-alpine

@@ -30,12 +30,10 @@ bun run dev
 
 ```bash
 cp .env.example .env   # 填写数据库密码、加密密钥等，见配置内注释
-docker login ghcr.io -u <GitHub 用户名> -p <带 read:packages 的 PAT>   # 首次拉取私有镜像
-docker compose pull
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
-镜像由 GitHub Actions 构建后推送到 GHCR，服务器只拉取不构建；需要本地自行构建时改用 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`。
+镜像默认在部署机本地构建，不需要镜像仓库凭据；CI 会把同一份代码构建的镜像归档到 GHCR（`.github/workflows/publish-images.yml`），需要时也可以 `docker compose pull` 拉取。线上发布用 `bash scripts/deploy-local.sh`：同步源码到部署机、本地构建后只切换容器。
 
 默认端口 3015，访问 `http://localhost:3015`。登录后在账号配置保存自己的上游 API Key。完整部署、备份与回滚说明见 [Docker 部署](docs/content/docs/overview/docker.mdx)。
 

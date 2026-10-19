@@ -1,4 +1,4 @@
-# 本地/服务器自行构建镜像的覆盖文件。日常发布走 GHCR 拉取，不需要本文件。
+# 本地/服务器自行构建镜像的覆盖文件。默认发布路径就是本地构建，配合 docker-compose.yml 使用。
 # 用法：docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 services:
   api:

@@ -1,4 +1,4 @@
-# 质量门禁 → GHCR 镜像 → main 自动部署到生产 WSL；PR 和版本 tag 不部署。
+# 质量门禁 → 部署机本地构建并切换容器（main），同时归档 GHCR 镜像；PR 和版本 tag 不部署。
 # 触发：推送到 main、打版本 tag（v*）、PR 到 main（只跑门禁）、或手动触发。
 name: Publish images
 
@@ -150,11 +150,12 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
+  # 不再传输镜像：同步源码后在部署机上本地构建，和 scripts/deploy-local.sh 完全同一条路径。
   deploy:
-    needs: publish
+    needs: verify
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || inputs.deploy_production == true)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     environment:
       name: production
       url: http://openai2api.com:3015
@@ -192,31 +193,10 @@ jobs:
           CONFIG
           chmod 600 ~/.ssh/config
 
-      - name: Transfer immutable images over SSH
+      - name: Sync source, build on the host and deploy
         run: |
           set -euo pipefail
-          owner=${GITHUB_REPOSITORY_OWNER,,}
-          images=("ghcr.io/$owner/infinite-canvas-api:sha-$GITHUB_SHA" "ghcr.io/$owner/infinite-canvas-web:sha-$GITHUB_SHA")
-          for image in "${images[@]}"; do timeout 180s docker pull "$image"; done
-          timeout 420s bash -o pipefail -c 'docker save "$@" | gzip -1 | ssh canvas-production "timeout 390s docker load"' _ "${images[@]}"
-
-      - name: Deploy immutable images and verify production
-        run: |
-          set -euo pipefail
-          manifest=$(mktemp -d)
-          trap 'rm -rf -- "$manifest"' EXIT
-          printf '%s\n' "$GITHUB_SHA" > "$manifest/revision"
-          printf '%s\n' "$GITHUB_REPOSITORY" > "$manifest/repository"
-          tar -czf - scripts/deploy.sh docker-compose.yml server/sql/001-identity.sql server/sql/002-identity-rate-limits.sql -C "$manifest" revision repository | ssh canvas-production '
-            set -eu
-            release=$(mktemp -d /tmp/canvas-deploy.XXXXXX)
-            trap '"'"'rm -rf -- "$release"'"'"' EXIT
-            tar -xzf - -C "$release"
-            read -r revision < "$release/revision"
-            read -r repository < "$release/repository"
-            bash "$release/scripts/deploy.sh" "$revision" /mnt/d/infinite-canvas-v2 "$repository" "$release"
-          '
-          curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-all-errors --max-time 20 http://openai2api.com:3015/api/health | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'
+          env DEPLOY_TARGET=canvas-production DEPLOY_PORT= bash scripts/deploy-local.sh
 
       - name: Remove deployment key
         if: always()
