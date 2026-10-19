@@ -1,3 +1,41 @@
 {
-    "models": []
+    "discoveryProviderId": "AgnesAI",
+    "models": [
+        {
+            "id": "agnes-2.5-flash",
+            "name": "Agnes 2.5 Flash",
+            "upstreamModel": "agnes-2.5-flash",
+            "providerId": "AgnesAI",
+            "capability": "text",
+            "enabled": true,
+            "baseUrl": "https://apihub.agnes-ai.com/v1"
+        },
+        {
+            "id": "agnes-image-2.5-flash",
+            "name": "Agnes Image 2.5 Flash",
+            "upstreamModel": "agnes-image-2.5-flash",
+            "providerId": "AgnesAI",
+            "capability": "image",
+            "enabled": true,
+            "baseUrl": "https://apihub.agnes-ai.com/v1"
+        },
+        {
+            "id": "agnes-video-2.5-flash",
+            "name": "Agnes Video 2.5 Flash",
+            "upstreamModel": "agnes-video-2.5-flash",
+            "providerId": "AgnesAI",
+            "capability": "video",
+            "enabled": true,
+            "baseUrl": "https://apihub.agnes-ai.com/v1"
+        },
+        {
+            "id": "agnes-video-2.5",
+            "name": "Agnes Video 2.5",
+            "upstreamModel": "agnes-video-2.5",
+            "providerId": "AgnesAI",
+            "capability": "video",
+            "enabled": true,
+            "baseUrl": "https://apihub.agnes-ai.com/v1"
+        }
+    ]
 }

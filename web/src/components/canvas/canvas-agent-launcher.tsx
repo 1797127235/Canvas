@@ -14,7 +14,7 @@ import { bindSessionPersistence } from "@/lib/agent/session-run";
 import { applyGraphInput, type AgentGraphResult, type ApplyGraphInput } from "@/lib/canvas/canvas-agent-graph";
 import { CanvasPromptLibrary } from "@/components/canvas/canvas-prompt-library";
 import { useApplyGraphTool } from "@/components/canvas/tools/use-apply-graph-tool";
-import { cn } from "@/lib/utils";
+import { cn, randomUuid } from "@/lib/utils";
 import { createAgentThread, deleteAgentThread, fetchAgentThread, fetchAgentThreads, saveAgentThread, AgentThreadApiError, type AgentThread } from "@/services/api/agent";
 import { fetchServerModels, type PublicModel } from "@/services/api/catalog";
 import { useAssetStore } from "@/stores/use-asset-store";
@@ -167,15 +167,18 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
         if (!text || !modelsReady || !selectedModelId || agent.isRunning || !threadReady || sendingRef.current || syncingRef.current || switchingRef.current) return;
         sendingRef.current = true;
         setSending(true);
-        setDraft("");
-        setError("");
-        const userMessage = { id: crypto.randomUUID(), role: "user", content: text } as Message;
-        agent.addMessage(userMessage);
         try {
+            // http 页面里 crypto.randomUUID 不存在（仅安全上下文暴露），这里必须用 crypto.getRandomValues 的实现。
+            // addMessage 之前不能清空草稿：抛错时原文要留在输入框，不能让用户白打一段。
+            const userMessage = { id: randomUuid(), role: "user", content: text } as Message;
+            agent.addMessage(userMessage);
+            setDraft("");
+            setError("");
             await copilotkit.runAgent({ agent, forwardedProps: { modelId: selectedModelId } });
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : t("canvas.agent.runFailed"));
         } finally {
+            // 发送锁必须在 finally 里放掉：任何抛错都不能让面板永久停在「发送中」。
             sendingRef.current = false;
             setSending(false);
         }

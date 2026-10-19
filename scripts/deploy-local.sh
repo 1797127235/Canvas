@@ -48,7 +48,8 @@ echo "镜像就绪：$api_image / $web_image"
 REMOTE
 
 echo "==> 切换 api/web 容器"
-remote bash -s -- "$revision" "$api_image" "$web_image" "$project" "$build_dir" < "$source_dir/scripts/deploy.sh"
+# DEPLOY_DB_BACKUP 要显式转发：ssh 不会传递本地环境变量，远端 deploy.sh 才能读到。
+remote env DEPLOY_DB_BACKUP="${DEPLOY_DB_BACKUP:-}" bash -s -- "$revision" "$api_image" "$web_image" "$project" "$build_dir" < "$source_dir/scripts/deploy.sh"
 
 echo "==> 检查公网健康接口"
 for _ in 1 2 3 4 5; do

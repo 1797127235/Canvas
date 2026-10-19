@@ -4,7 +4,7 @@ import { generateImage, generateText } from "ai";
 import { discoverOpenAICompatibleModels } from "../src/gateway/discovery.js";
 import type { ModelBinding } from "../src/gateway/contracts.js";
 import { c2aProvider } from "../src/gateway/providers/C2A/index.js";
-import { createVideoModel, downloadVideo } from "../src/gateway/providers/C2A/video.js";
+import { createVideoModel, downloadVideo } from "../src/gateway/providers/C2A/grok-video.js";
 
 const binding: ModelBinding = {
     providerId: "C2A",
@@ -128,10 +128,34 @@ test("C2A image-to-video accepts the app audio default and preserves signed imag
     assert.deepEqual(bodies.at(-1)?.image, { url: "https://canvas.example/first" });
     assert.deepEqual(bodies.at(-1)?.reference_images, [{ url: "https://canvas.example/second" }]);
     assert.doesNotThrow(() => capability.validateInput!({ generateAudio: true, frameCount: 1 }));
-    assert.doesNotThrow(() => capability.validateInput!({ frameCount: 2 }));
-    await model.doStart!({ prompt: "first and last", n: 1, aspectRatio: "9:16", resolution: undefined, duration: 6, fps: undefined, seed: undefined, image: undefined, frameImages: [{ image, frameType: "first_frame" }, { image, frameType: "last_frame" }], inputReferences: undefined, generateAudio: true, providerOptions: { C2A: { imageUrls: ["https://canvas.example/first", "https://canvas.example/last"] } }, abortSignal: undefined });
-    assert.deepEqual(bodies.at(-1)?.image, { url: "https://canvas.example/first" });
-    assert.deepEqual(bodies.at(-1)?.reference_images, [{ url: "https://canvas.example/last" }]);
+    assert.throws(() => capability.validateInput!({ frameCount: 2 }), /不支持首尾帧/);
+    await assert.rejects(Promise.resolve(model.doStart!({ prompt: "first and last", n: 1, aspectRatio: "9:16", resolution: undefined, duration: 6, fps: undefined, seed: undefined, image: undefined, frameImages: [{ image, frameType: "first_frame" }, { image, frameType: "last_frame" }], inputReferences: undefined, generateAudio: true, providerOptions: { C2A: { imageUrls: ["https://canvas.example/first", "https://canvas.example/last"] } }, abortSignal: undefined })), /不支持首尾帧/);
     assert.throws(() => capability.validateInput!({ videos: ["video"] }), /视频.*参考/);
     await assert.rejects(Promise.resolve(model.doStart!({ prompt: "missing URL", n: 1, aspectRatio: undefined, resolution: undefined, duration: undefined, fps: undefined, seed: undefined, image: undefined, frameImages: [{ image, frameType: "first_frame" }], inputReferences: undefined, generateAudio: undefined, providerOptions: {}, abortSignal: undefined })), /签名 URL/);
+});
+
+test("C2A completes when upstream returns a relative video path and surfaces object errors", async t => {
+    const responses: unknown[] = [];
+    t.mock.method(globalThis, "fetch", async () => Response.json(responses.shift()));
+    const model = createVideoModel(binding, "account-key");
+    const operation = { requestId: "req-relative" };
+
+    responses.push({ status: "done", progress: 100, video: { url: "/v1/videos/req-relative/content" } });
+    const completed = await model.doStatus!({ operation });
+    assert.equal(completed.status, "completed");
+    if (completed.status === "completed") assert.deepEqual(completed.videos, [{ type: "url", url: "https://gateway.example/v1/videos/generations/req-relative/content", mediaType: "video/mp4" }]);
+
+    responses.push({ status: "done" });
+    const doneWithoutUrl = await model.doStatus!({ operation });
+    assert.equal(doneWithoutUrl.status, "completed");
+
+    responses.push({ status: "failed", error: { code: "invalid_argument", message: "Fetching images over plain http:// is not supported. [WKE=invalid_image]" } });
+    const failed = await model.doStatus!({ operation });
+    assert.equal(failed.status, "error");
+    if (failed.status === "error") assert.match(String(failed.error), /plain http/);
+
+    responses.push({ status: "expired", error: { code: "expired" } });
+    const expired = await model.doStatus!({ operation });
+    assert.equal(expired.status, "error");
+    if (expired.status === "error") assert.match(String(expired.error), /Grok 视频生成失败/);
 });

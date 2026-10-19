@@ -9,6 +9,7 @@ export type ModelBinding = { providerId: ProviderId; capability: Capability; ups
 export type DiscoveredModel = { id: string; capability?: unknown; capabilities?: unknown; owned_by?: string };
 export type ImageCapability = {
     model(binding: ModelBinding, apiKey: string): ImageModelV4;
+    maxImagesPerCall?: number;
     options?(input: { size?: string; quality?: string; background?: string; outputFormat?: string }): Record<string, unknown>;
     aspectRatios?: readonly `${number}:${number}`[];
 };
@@ -16,7 +17,7 @@ export type VideoCapability = {
     model(binding: ModelBinding, apiKey: string): Experimental_VideoModelV4;
     download(url: string, binding: ModelBinding, apiKey: string, signal: AbortSignal): Promise<import("node:stream").Readable>;
     operationSchema: ZodType;
-    options?(input: { resolution?: string; watermark?: boolean; size?: string; imageUrls?: string[] }): Record<string, unknown>;
+    options?(input: { resolution?: string; watermark?: boolean; size?: string; imageUrls?: string[]; videoUrls?: string[]; audioUrls?: string[] }): Record<string, unknown>;
     aspectRatios?: readonly `${number}:${number}`[];
     validateInput?(input: { videos?: string[]; audios?: string[]; generateAudio?: boolean; frameCount?: number; unsupportedReferences?: string[] }): void;
 };

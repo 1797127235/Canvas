@@ -46,8 +46,9 @@ export function createGenerationRouter(database: Pool, options: GenerationOption
                 response.end("data: [DONE]\n\n");
                 return;
             }
+            const referenceRefs = [...(generation.input.images || []), ...(generation.input.videos || []), ...(generation.input.audios || [])];
             const referenceUrls = options.appOrigin && options.mediaLinkSecret
-                ? Object.fromEntries((generation.input.images || []).map(ref => [ref, signedMediaUrl(options.appOrigin!, options.mediaLinkSecret!, ref.slice("remote:".length))]))
+                ? Object.fromEntries(referenceRefs.map(ref => [ref, signedMediaUrl(options.appOrigin!, options.mediaLinkSecret!, ref.slice("remote:".length))]))
                 : undefined;
             const result = await createVideo(model, apiKey, generation.input, signal, media, referenceUrls);
             const id = generation.taskId ?? randomUUID();

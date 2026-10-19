@@ -18,7 +18,7 @@ server/src/gateway/
   transport.ts       # 通用、安全的 HTTP transport
 ```
 
-当前组合入口刻意不注册任何 provider。没有注册 provider 时，模型发现、Catalog providerId 校验和模型调用均明确失败；这不是兼容模式或默认协议。新数据库直接按目标任务结构建表，不对旧表或旧任务执行升级。
+组合入口只注册实际部署的 provider 包；当前包含 C2A 与 AgnesAI。没有注册的 provider 仍会让模型发现、Catalog providerId 校验和模型调用明确失败；这不是兼容模式或默认协议。新数据库直接按目标任务结构建表，不对旧表或旧任务执行升级。
 
 ## 契约
 
@@ -32,4 +32,4 @@ Catalog 的 providerId 及发现 provider 校验都由运行时 registry 派生�
 
 ## 扩展验收
 
-新增 provider 包后只需在 `providers.ts` 注册一次。测试应使用虚构 provider definition 验证注册后可用于 Catalog 校验、发现、能力分发和 operation 恢复；未知 provider、缺失能力及不合 schema 的 operation 必须拒绝。生产组合入口不得包含测试 provider 或默认厂商实现。
+新增 provider 包后只需在 `providers.ts` 注册一次，并同步 `catalog.example.json`、待测试记录和变更日志。测试应使用虚构 provider definition 验证注册后可用于 Catalog 校验、发现、能力分发和 operation 恢复；未知 provider、缺失能力及不合 schema 的 operation 必须拒绝。生产组合入口不得包含测试 provider 或默认厂商实现。

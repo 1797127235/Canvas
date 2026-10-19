@@ -2,7 +2,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { ProviderDefinition } from "../../contracts.js";
 import { gatewayFetch } from "../../transport.js";
 import { discoverOpenAICompatibleModels } from "../../discovery.js";
-import { c2aVideoCapability } from "./video.js";
+import { c2aVideoCapability } from "./grok-video.js";
 
 export const c2aProvider = {
     id: "C2A",

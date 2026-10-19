@@ -13,7 +13,7 @@ description: Planned follow-up work
 - 未知模型分类已落地：无有效能力元数据时按模型名关键词兜底（与前端本地模式 `guessCapability` 一致），显式元数据与静态目录覆盖仍优先；后续仅需根据真实上游返回的能力元数据完善参数支持范围。账号模式生成通过服务端 provider binding 路由；本地渠道脚本仅用于显式开发豁免模式，旧 IndexedDB 不迁移。
 - Agent 架构迁移：旧本地 Agent 面板、Store、Canvas Bridge、工作台命令总线和自定义消息协议已移除；目标架构与文件组织见 `docs/specs/agent-copilotkit.md`。第一轮已落地：能对话、能看到画布、能操作画布（`apply_graph`）、会话持久化（`user_agent_threads`）。服务端按 AG-UI 契约自实现 `/api/copilotkit` 与 `/api/agent/threads`，不装 `@copilotkit/runtime`（保持 `ai` 单份），工具在浏览器执行；旧 Agent 遗留的 `chatSessions` / `activeChatId` 已删除；媒体回收已补上会话引用检查。实测与待验收项见 Pending Tests。
 - 模型身份规格已从 Models.dev 补充到账号目录，具体变更与验收移入 Pending Tests；后续如接入自动压缩预算，仍须先统一字节/token 估算单位、验证中转实际窗口与输出限制，不能直接把基础模型规格当作中转能力。
-- Gateway 当前是无内置提供商的扩展底座，新增上游仅新增 provider 包并在唯一组合入口注册；具体 provider 由用户后续实现。
+- Gateway provider 扩展底座已注册 C2A 与 AgnesAI；后续新增上游仍只新增自包含 provider 包并在唯一组合入口注册，按 `docs/specs/gateway-provider-boundaries.md` 补齐测试、目录示例和待验收记录。
 - Agent 上下文压缩首版已实现，方案与验收边界见 `docs/specs/agent-context-compaction.md`；实施顺序见 `docs/specs/agent-context-compaction-plan.md`。仍待：按真实上游模型 ID 配置可信预算、登录浏览器验收会话切换/刷新/工具续跑/多标签冲突，以及使用真实账号 Key 验证摘要生成与用量。完成后再确认是否调整 400 条/2 MiB 的会话存储上限；压缩不解除该上限。
 - Agent 后续（按此顺序）：① 补齐画布工具 `update_node` / `delete_nodes` / `connect_nodes` / `get_node_detail`；② 生成类工具 `generate_node`（异步返回 taskId + `confirm: true` 先确认再花钱，复用现有 `/api/generations`）；③ 能力目录接口（把 `gateway-video.ts` / `input.ts` 里的参数约束提成数据，让规划出的图参数合法）；④ 模板检索（`web/public/templates/templates.json` 作为配方库）；⑤ 意图 → 方案 → 确认 → 建图；⑥ 多模态（`mediaReader` 已能把 `remote:<id>` 转 data URL）。未做：`/agent/:id/connect`、`/agent/:id/stop` 两个路由（当前每次都是新 run，不需要续连）。
 

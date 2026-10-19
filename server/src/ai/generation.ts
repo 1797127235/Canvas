@@ -41,7 +41,7 @@ export async function createImages(model: ModelBinding, apiKey: string, input: I
         const result = await generateImage({
             model: imageModel(model, apiKey),
             prompt: images.length ? { text: input.prompt, images } : input.prompt,
-            n: input.n, maxImagesPerCall: input.n || 1,
+            n: input.n, maxImagesPerCall: imageCapability.maxImagesPerCall || 1,
             ...(imageCapability?.aspectRatios ? { aspectRatio: mediaAspectRatio(input.size, imageCapability.aspectRatios) } : { size: input.size as `${number}x${number}` | undefined }),
             providerOptions: imageCapability.options?.({ size: input.size, quality, background, outputFormat: output_format }) as never,
             maxRetries: 0, abortSignal: signal,
@@ -123,6 +123,8 @@ export async function createText(model: ModelBinding, apiKey: string, input: Tex
 export async function createVideo(model: ModelBinding, apiKey: string, input: VideoInput, signal: AbortSignal, media: MediaReader, referenceUrls?: Record<string, string>) {
     const videoCapability = videoCapabilityFor(model.providerId);
     const imageUrls = (input.images || []).map(ref => referenceUrls?.[ref]).filter((url): url is string => Boolean(url));
+    const videoUrls = (input.videos || []).map(ref => referenceUrls?.[ref]).filter((url): url is string => Boolean(url));
+    const audioUrls = (input.audios || []).map(ref => referenceUrls?.[ref]).filter((url): url is string => Boolean(url));
     const [images, videos, audios] = await Promise.all([
         normalizeVideoImages(await Promise.all((input.images || []).map(media.image))),
         Promise.all((input.videos || []).map(media.video)),
@@ -145,7 +147,7 @@ export async function createVideo(model: ModelBinding, apiKey: string, input: Vi
         duration: input.seconds ? Number(input.seconds) : undefined,
         aspectRatio: mediaAspectRatio(input.size, videoCapability?.aspectRatios), frameImages, inputReferences,
         generateAudio: input.generate_audio,
-        providerOptions: videoCapability.options?.({ resolution: input.resolution_name, watermark: input.watermark, size: input.size, imageUrls }) as never,
+        providerOptions: videoCapability.options?.({ resolution: input.resolution_name, watermark: input.watermark, size: input.size, imageUrls, videoUrls, audioUrls }) as never,
         maxRetries: 0, abortSignal: signal,
     });
     return { operation: { version: 2, binding: { providerId: model.providerId, capability: "video", upstreamModel: model.upstreamModel, baseUrl: model.baseUrl }, operation: result.operation } satisfies VideoOperation, warnings: result.warnings };

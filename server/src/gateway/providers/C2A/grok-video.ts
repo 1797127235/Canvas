@@ -7,7 +7,18 @@ import { gatewayFetch, gatewayJson } from "../../transport.js";
 const grokModels = new Set(["grok-imagine-video", "grok-imagine-video-1.5", "grok-imagine-video-1.5-preview"]);
 const operationSchema = z.strictObject({ requestId: z.string().min(1) });
 const startSchema = z.object({ request_id: z.string().min(1) });
-const statusSchema = z.object({ status: z.string(), video: z.object({ url: z.string().url() }).optional(), error: z.unknown().optional(), message: z.string().optional() });
+// 上游完成态给的是相对路径（如 /v1/videos/<id>/content），不能按绝对 URL 校验；下载地址一律由本端拼出。
+const statusSchema = z.object({
+    status: z.string(),
+    error: z.union([z.string(), z.object({ code: z.string().optional(), message: z.string().optional() })]).optional(),
+    message: z.string().optional(),
+});
+
+function failureMessage(state: z.infer<typeof statusSchema>) {
+    if (state.message) return state.message;
+    if (typeof state.error === "string") return state.error;
+    return state.error?.message || "Grok 视频生成失败";
+}
 
 function videoUrl(binding: ModelBinding, requestId: string, content = false, shared = false) {
     return `${binding.baseUrl.replace(/\/+$/, "")}/videos/${shared ? "" : "generations/"}${encodeURIComponent(requestId)}${content ? "/content" : ""}`;
@@ -23,6 +34,8 @@ export function createVideoModel(binding: ModelBinding, apiKey: string): Experim
         async doStart(options) {
             if (options.n !== 1) throw new Error("Grok 视频接口一次只支持生成一个视频");
             if (options.inputReferences?.some(file => !file.mediaType?.startsWith("image/"))) throw new Error("当前 Grok 视频接口适配只支持图片参考");
+            // Grok 只有首帧和参考图，没有尾帧字段；两张图当参考图提交才不会把尾帧悄悄变成参考图。
+            if ((options.frameImages?.length || 0) > 1) throw new Error("Grok 视频接口不支持首尾帧，请改用参考图模式");
             const imageFiles = [
                 ...(options.image ? [options.image] : []),
                 ...(options.frameImages || []).map(frame => frame.image),
@@ -65,8 +78,8 @@ export function createVideoModel(binding: ModelBinding, apiKey: string): Experim
             const state = statusSchema.parse(result.value);
             const response = { timestamp: new Date(), modelId: binding.upstreamModel, headers: Object.fromEntries(result.headers) };
             if (["pending", "queued", "running", "processing"].includes(state.status)) return { status: "pending", response };
-            if (["failed", "error", "expired"].includes(state.status)) return { status: "error", error: state.message || (typeof state.error === "string" ? state.error : "Grok 视频生成失败"), response };
-            if (["done", "completed", "succeeded"].includes(state.status) && state.video?.url) {
+            if (["failed", "error", "expired"].includes(state.status)) return { status: "error", error: failureMessage(state), response };
+            if (["done", "completed", "succeeded"].includes(state.status)) {
                 return { status: "completed", videos: [{ type: "url", url: videoUrl(binding, requestId, true, sharedStatusEndpoint), mediaType: "video/mp4" }], warnings: [], response };
             }
             return { status: "error", error: `无法识别的 Grok 视频任务状态：${state.status}`, response };
@@ -103,9 +116,10 @@ export const c2aVideoCapability = {
         ...(resolution ? { resolution: resolution === "1920x1080" ? "1080p" : resolution === "1280x720" ? "720p" : resolution } : {}),
         ...(imageUrls ? { imageUrls } : {}),
     } }),
-    validateInput: ({ videos, audios, unsupportedReferences }) => {
+    validateInput: ({ videos, audios, frameCount, unsupportedReferences }) => {
         if (videos?.length || audios?.length || unsupportedReferences?.length) {
             throw new Error("当前 Grok 视频接口适配仅支持文生视频和图片参考生成，不支持参考视频/音频");
         }
+        if ((frameCount || 0) > 1) throw new Error("Grok 视频接口不支持首尾帧，请改用参考图模式");
     },
 } satisfies VideoCapability;
