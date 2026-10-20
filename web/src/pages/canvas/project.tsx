@@ -51,7 +51,7 @@ import { buildNodeMentionReferences, getGroupResourceNodes, isCanvasReferenceNod
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 import { applyNodeConfigPatch, audioMetadata, buildAudioGenerationMetadata, buildImageGenerationMetadata, createCanvasNode, imageMetadata, videoMetadata } from "@/lib/canvas/canvas-node-factory";
 import { buildAgentGraph, type AgentGraphResult, type ApplyGraphInput } from "@/lib/canvas/canvas-agent-graph";
-import type { UpdateCanvasNodeInput } from "@/components/canvas/tools/use-canvas-tools";
+import type { CanvasToolResult, UpdateCanvasNodeInput } from "@/components/canvas/tools/use-canvas-tools";
 import { applyGroupSelection, applyUngroupSelection, canGroupSelectedNodes, canUngroupSelectedNodes, collectGroupMemberNodes, findContainingGroupId, findGroupDropTarget, getConnectionTargetAnchor, getGroupWrapRect, nodeRenderBounds, normalizeConnection, snapNodesIntoGroup } from "@/lib/canvas/canvas-node-geometry";
 import {
     audioExtension,
@@ -3040,10 +3040,10 @@ function InfiniteCanvasPage() {
         return result;
     }, [getCanvasCenter]);
 
-    const handleUpdateAgentNode = useCallback((input: UpdateCanvasNodeInput) => {
+    const handleUpdateAgentNode = useCallback((input: UpdateCanvasNodeInput): CanvasToolResult => {
         const node = nodesRef.current.find((item) => item.id === input.nodeId);
-        if (!node) return `未找到节点 ${input.nodeId}`;
-        if (input.content !== undefined && node.type !== CanvasNodeType.Text) return "目前仅支持修改文本节点内容";
+        if (!node) return { ok: false, message: `未找到节点 ${input.nodeId}` };
+        if (input.content !== undefined && node.type !== CanvasNodeType.Text) return { ok: false, message: "目前仅支持修改文本节点内容" };
         setNodes((prev) => prev.map((item) => item.id !== input.nodeId ? item : {
             ...item,
             ...(input.title !== undefined ? { title: input.title } : {}),
@@ -3051,7 +3051,7 @@ function InfiniteCanvasPage() {
             ...(input.prompt !== undefined ? { metadata: { ...item.metadata, prompt: input.prompt } } : {}),
             ...(input.content !== undefined ? { metadata: { ...item.metadata, content: input.content } } : {}),
         }));
-        return `已更新节点「${input.title ?? node.title}」`;
+        return { ok: true, message: `已更新节点「${input.title ?? node.title}」` };
     }, []);
 
     const handleDeleteAgentNodes = useCallback((ids: string[]) => {
@@ -3061,19 +3061,19 @@ function InfiniteCanvasPage() {
         return deleted;
     }, [deleteNodes]);
 
-    const handleConnectAgentNodes = useCallback((fromNodeId: string, toNodeId: string) => {
+    const handleConnectAgentNodes = useCallback((fromNodeId: string, toNodeId: string): CanvasToolResult => {
         const normalized = normalizeConnection(fromNodeId, toNodeId, nodesRef.current, "source");
-        if (!normalized) return "无法连接：节点不存在、目标是分组节点、或连接类型不兼容";
-        if (connectionsRef.current.some((item) => item.fromNodeId === normalized.fromNodeId && item.toNodeId === normalized.toNodeId)) return "这条连线已经存在";
+        if (!normalized) return { ok: false, message: "无法连接：节点不存在、目标是分组节点、或连接类型不兼容" };
+        if (connectionsRef.current.some((item) => item.fromNodeId === normalized.fromNodeId && item.toNodeId === normalized.toNodeId)) return { ok: false, message: "这条连线已经存在" };
         setConnections((prev) => [...prev, { id: nanoid(), ...normalized }]);
-        return `已连接 ${normalized.fromNodeId} → ${normalized.toNodeId}`;
+        return { ok: true, message: `已连接 ${normalized.fromNodeId} → ${normalized.toNodeId}` };
     }, []);
 
-    const handleDisconnectAgentNodes = useCallback((fromNodeId: string, toNodeId: string) => {
+    const handleDisconnectAgentNodes = useCallback((fromNodeId: string, toNodeId: string): CanvasToolResult => {
         const exists = connectionsRef.current.some((item) => item.fromNodeId === fromNodeId && item.toNodeId === toNodeId);
-        if (!exists) return "未找到这条连线";
+        if (!exists) return { ok: false, message: "未找到这条连线" };
         setConnections((prev) => prev.filter((item) => item.fromNodeId !== fromNodeId || item.toNodeId !== toNodeId));
-        return `已断开 ${fromNodeId} → ${toNodeId}`;
+        return { ok: true, message: `已断开 ${fromNodeId} → ${toNodeId}` };
     }, []);
 
     // 拖助手面板左边界改宽度：指针捕获后 pointermove 都落在手柄上，离开手柄也不丢事件。

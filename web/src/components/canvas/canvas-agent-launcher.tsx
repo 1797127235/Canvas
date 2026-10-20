@@ -14,7 +14,7 @@ import { bindSessionPersistence } from "@/lib/agent/session-run";
 import { applyGraphInput, type AgentGraphResult, type ApplyGraphInput } from "@/lib/canvas/canvas-agent-graph";
 import { CanvasPromptLibrary } from "@/components/canvas/canvas-prompt-library";
 import { useApplyGraphTool } from "@/components/canvas/tools/use-apply-graph-tool";
-import { useCanvasTools, type UpdateCanvasNodeInput } from "@/components/canvas/tools/use-canvas-tools";
+import { useCanvasTools, type CanvasToolResult, type UpdateCanvasNodeInput } from "@/components/canvas/tools/use-canvas-tools";
 import type { ApprovalMode } from "@/lib/agent/tool-approval";
 import { cancelPendingApprovals, useAgentApprovalStore, type ApprovalDecision, type PendingApproval } from "@/stores/use-agent-approval-store";
 import { useAgentPermissionStore } from "@/stores/use-agent-permission-store";
@@ -45,10 +45,10 @@ export type CanvasAgentProps = {
     selectedNodeIds: Set<string>;
     onClose: () => void;
     onApplyGraph: (input: ApplyGraphInput) => AgentGraphResult;
-    onUpdateNode: (input: UpdateCanvasNodeInput) => string;
+    onUpdateNode: (input: UpdateCanvasNodeInput) => CanvasToolResult;
     onDeleteNodes: (ids: string[]) => string[];
-    onConnectNodes: (fromNodeId: string, toNodeId: string) => string;
-    onDisconnectNodes: (fromNodeId: string, toNodeId: string) => string;
+    onConnectNodes: (fromNodeId: string, toNodeId: string) => CanvasToolResult;
+    onDisconnectNodes: (fromNodeId: string, toNodeId: string) => CanvasToolResult;
 };
 
 export default function CanvasAgentPanel(props: CanvasAgentProps) {
@@ -495,6 +495,12 @@ function ApprovalCard({ item, pending, onDecide, theme }: { item: PendingApprova
     const secondary: { decision: ApprovalDecision; label: string } = item.risk === "spend"
         ? { decision: "session", label: t("canvas.agent.approvalSession") }
         : { decision: "always", label: t("canvas.agent.approvalAlways") };
+    // 拒绝分两种：点主体只拒这一次，下拉里才能永久禁用。
+    // 永久拒绝会把这个工具从模型工具列表移除（available: false），所以只能藏在二级菜单。
+    const denyMenu: MenuProps = {
+        items: [{ key: "never", label: t("canvas.agent.approvalNever") }],
+        onClick: ({ key }) => onDecide(item.id, key as ApprovalDecision),
+    };
     return (
         <div className="mb-1.5 rounded-[18px] border px-3 py-2.5" style={{ background: theme.node.panel, borderColor: theme.toolbar.border }}>
             <div className="flex items-center gap-1.5 text-[11px] font-medium">
@@ -510,9 +516,12 @@ function ApprovalCard({ item, pending, onDecide, theme }: { item: PendingApprova
                 <button type="button" onClick={() => onDecide(item.id, secondary.decision)} className="rounded-full border px-3 py-1.5 text-xs transition hover:bg-black/5 dark:hover:bg-white/10" style={{ borderColor: theme.toolbar.border }}>
                     {secondary.label}
                 </button>
-                <button type="button" onClick={() => onDecide(item.id, "deny")} className="rounded-full px-3 py-1.5 text-xs opacity-60 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10">
-                    {t("canvas.agent.approvalDeny")}
-                </button>
+                <Dropdown trigger={["click"]} placement="topRight" menu={denyMenu}>
+                    <button type="button" className="flex items-center gap-0.5 rounded-full px-3 py-1.5 text-xs opacity-60 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10">
+                        {t("canvas.agent.approvalDeny")}
+                        <ChevronDown className="size-3 shrink-0" />
+                    </button>
+                </Dropdown>
             </div>
         </div>
     );

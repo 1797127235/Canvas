@@ -22,7 +22,8 @@ export function useApplyGraphTool(onApplyGraph: (input: ApplyGraphInput) => Agen
         parameters: applyGraphInput,
         handler: applyGraph,
         summarize: (input) => {
-            const nodes = input.nodes.map((node) => `${typeLabel[node.type]}「${node.title ?? node.key}」`).join("、");
+            // node.type 是开放字符串，未知类型（会被 buildAgentGraph 拒掉）不能渲染成 undefined。
+            const nodes = input.nodes.map((node) => `${typeLabel[node.type] ?? node.type}「${node.title ?? node.key}」`).join("、");
             const links = input.connections?.length ? `，${input.connections.length} 条连线` : "";
             return `新建 ${input.nodes.length} 个节点：${nodes}${links}`;
         },

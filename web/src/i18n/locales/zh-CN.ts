@@ -473,6 +473,7 @@ export default {
             approvalSession: "本次会话都允许",
             approvalAlways: "始终允许",
             approvalDeny: "拒绝",
+            approvalNever: "以后都拒绝这个操作",
             permissionReset: "重置为默认",
         },
         sidePanel: {

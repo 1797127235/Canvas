@@ -41,8 +41,11 @@ test("an always override skips the prompt and a never override wins over everyth
 test("no combination of mode, risk and policy leaves a gap", () => {
     const policies: Array<ToolPolicy | undefined> = [undefined, "always", "never"];
     const gates = new Set<string>();
-    for (const mode of MODES) for (const risk of RISKS) for (const override of policies) for (const sessionAllowed of [false, true]) {
-        gates.add(resolveToolGate({ risk, mode, override, sessionAllowed }));
-    }
+    for (const mode of MODES)
+        for (const risk of RISKS)
+            for (const override of policies)
+                for (const sessionAllowed of [false, true]) {
+                    gates.add(resolveToolGate({ risk, mode, override, sessionAllowed }));
+                }
     expect([...gates].sort()).toEqual(["allow", "ask", "deny", "deny-readonly"]);
 });

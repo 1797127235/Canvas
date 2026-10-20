@@ -2,8 +2,7 @@ import { useCallback, useRef } from "react";
 import { useFrontendTool } from "@copilotkit/react-core/v2";
 import type { z } from "zod";
 
-import type { ToolRisk } from "@/lib/agent/tool-approval";
-import { resolveToolGate } from "@/lib/agent/tool-approval";
+import { resolveToolGate, type ToolRisk } from "@/lib/agent/tool-approval";
 import { requestApproval } from "@/stores/use-agent-approval-store";
 import { useAgentPermissionStore } from "@/stores/use-agent-permission-store";
 
@@ -51,8 +50,14 @@ export function useGatedTool<T extends Record<string, unknown>>(options: GatedTo
                 const decision = await requestApproval({ tool: name, risk, summary: latest.current.summarize?.(parsed.data) ?? name }, context?.signal);
                 if (decision === "cancel") return { status: "cancelled", reason: "用户取消了这次操作，没有执行，也不要当作已完成。" };
                 if (decision === "deny") return { status: "denied", reason: "用户拒绝了这次操作，不要重试，先问用户下一步怎么办。" };
+                if (decision === "never") {
+                    // 写入后 available 变 false，下一轮这个工具就不在工具列表里了。
+                    store.setOverride(name, "never");
+                    return { status: "denied", reason: "用户已禁用这个操作，以后不要再尝试，也不要换别的工具绕过。" };
+                }
+                // once 不需要记录，直接往下执行；另外两种是记住选择，后续同类调用不再询问。
                 if (decision === "session") store.allowForSession(name);
-                if (decision === "always") store.setOverride(name, "always");
+                else if (decision === "always") store.setOverride(name, "always");
             }
 
             return latest.current.handler(parsed.data);
