@@ -11,6 +11,7 @@ import { createCatalogRouter } from "../src/catalog/router.js";
 import { accountModels, loadCatalog, publicModels, resolveModel } from "../src/catalog/catalog.js";
 import { encryptCredential } from "../src/credential-crypto.js";
 import { gateway } from "../src/gateway/index.js";
+import "../src/gateway/providers.js";
 import { registerTestProvider } from "./support/test-provider.js";
 
 registerTestProvider(gateway);
@@ -20,7 +21,7 @@ import { startTestServer } from "./support/http.js";
 const directory = await mkdtemp(join(tmpdir(), "catalog-test-"));
 const write = async (name: string, content: unknown) => {
     const path = join(directory, name);
-    if (typeof content === "object" && content && "models" in content && Array.isArray(content.models)) Object.assign(content, { discoveryProviderId: "test-provider" });
+    if (typeof content === "object" && content && "models" in content && Array.isArray(content.models) && !("discoveryProviderId" in content)) Object.assign(content, { discoveryProviderId: "test-provider" });
     await writeFile(path, typeof content === "string" ? content : JSON.stringify(content));
     return path;
 };
@@ -152,6 +153,25 @@ test("uses valid capability metadata before model name keyword rules", async t =
     const discovered = await accountModels(catalog, "key");
     assert.deepEqual(discovered.map(item => item.capability), ["text", "audio", "video", "video", "video", "video", "video", "audio", "audio", "image", "image", "image", "text", "video", "text"]);
     assert.ok(discovered.every(item => item.providerId === "test-provider"));
+});
+
+test("assigns discovered Agnes models to AgnesAI and leaves other models with the discovery provider", async t => {
+    const catalog = await loadCatalog(await write("provider-ownership.json", { discoveryProviderId: "C2A", models: [model({ providerId: "C2A", baseUrl: "https://api.example.com/v1" })] }));
+    t.mock.method(globalThis, "fetch", async () => Response.json({ data: [
+        { id: "agnes-video-2.5-flash" },
+        { id: "agnes-image-2.5-flash" },
+        { id: "agnes-3.0-flash" },
+        { id: "grok-imagine-video-1.5" },
+        { id: "unclaimed-model" },
+    ] }));
+    const discovered = await accountModels(catalog, "key");
+    assert.deepEqual(discovered.map(({ upstreamModel, providerId }) => [upstreamModel, providerId]), [
+        ["agnes-video-2.5-flash", "AgnesAI"],
+        ["agnes-image-2.5-flash", "AgnesAI"],
+        ["agnes-3.0-flash", "AgnesAI"],
+        ["grok-imagine-video-1.5", "C2A"],
+        ["unclaimed-model", "C2A"],
+    ]);
 });
 
 test("applies only configured overrides for models present upstream", async t => {

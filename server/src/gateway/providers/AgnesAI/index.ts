@@ -24,6 +24,10 @@ import { agnesVideoCapability } from "./video.js";
 
 export const agnesProvider = {
     id: "AgnesAI",
+    supportsModel: (modelId: string, capability: "image" | "video" | "text" | "audio") =>
+        (capability === "text" && ["agnes-2.5-flash", "agnes-3.0-flash"].includes(modelId))
+        || (capability === "image" && ["agnes-image-2.1-flash", "agnes-image-2.5-flash"].includes(modelId))
+        || (capability === "video" && ["agnes-video-2.5", "agnes-video-2.5-flash"].includes(modelId)),
     discoverModels: discoverOpenAICompatibleModels,
     capabilities: {
         text: {

@@ -4,7 +4,7 @@
 
 Gateway 是提供商扩展底座，不内置任何具体提供商。新增提供商时，只新增自包含 provider 包，并在 `server/src/gateway/providers.ts` 注册一次；不修改 Catalog schema、生成业务逻辑、任务恢复流程或其他 provider。
 
-provider 包自带唯一 ID、模型发现解析器和能力实现。每项能力实现负责创建 AI SDK 模型、映射该能力的 provider options；视频能力额外负责 operation schema、下载器与必要的输入校验。包不得依赖 Express、账号仓储、任务仓储或媒体表。
+provider 包自带唯一 ID、模型发现解析器、可选的模型归属判定和能力实现。每项能力实现负责创建 AI SDK 模型、映射该能力的 provider options；视频能力额外负责 operation schema、下载器与必要的输入校验。共享上游目录中，provider 可在包内声明其负责的上游模型 ID；Catalog 显式 providerId 覆盖优先，其次由 provider 自我认领，最后才回退到 discoveryProviderId。provider 不得引用或硬编码其他 provider 的 ID。包不得依赖 Express、账号仓储、任务仓储或媒体表。
 
 ## 结构
 
@@ -26,7 +26,7 @@ server/src/gateway/
 
 业务调用只使用 `ModelBinding`：`providerId`、`capability`、`upstreamModel` 和 `baseUrl`。provider-specific 参数由对应能力的 options hook 生成；通用生成模块不得比较具体 provider ID。
 
-Catalog 的 providerId 及发现 provider 校验都由运行时 registry 派生。模型发现通过目录中的显式 `discoveryProviderId` 选择 provider；模型生成仍按每个模型自身的 providerId 分发。未配置或未注册时明确失败，不猜测 provider。
+Catalog 的 providerId 及发现 provider 校验都由运行时 registry 派生。模型发现通过目录中的显式 `discoveryProviderId` 选择 provider；共享目录的模型生成先使用显式模型覆盖，再由注册 provider 自己认领模型，仍无人认领时使用发现 provider。最终生成仍按每个模型自身的 providerId 分发。
 
 视频任务保存统一版本化 envelope：版本、binding 和 opaque operation。恢复时先校验通用 binding，再由对应 provider 包校验其 operation schema 并提供状态查询模型及结果下载器。运行时代码只接受目标 envelope；不转换或兼容任何旧任务记录。
 

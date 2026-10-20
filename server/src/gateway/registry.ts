@@ -20,6 +20,9 @@ export function createRegistry() {
         registerProvider,
         capabilities: ["image", "video", "text", "audio"] as const,
         provider: (id: string) => providers.get(id),
+        providerForModel(modelId: string, capability: Capability) {
+            return [...providers.values()].find(definition => definition.supportsModel?.(modelId, capability))?.id;
+        },
         discoverModels: async (baseUrl: string, apiKey: string, providerId: string) => {
             const discover = providers.get(providerId)?.discoverModels;
             if (!discover) throw new Error(`提供商不支持模型发现：${providerId}`);

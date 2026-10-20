@@ -32,6 +32,7 @@ export type ProviderCapabilities = {
 };
 export type ProviderDefinition = {
     id: string;
+    supportsModel?(modelId: string, capability: Capability): boolean;
     discoverModels: (baseUrl: string, apiKey: string) => Promise<DiscoveredModel[]>;
     capabilities: ProviderCapabilities;
 };

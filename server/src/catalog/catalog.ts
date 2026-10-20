@@ -50,9 +50,10 @@ export async function accountModels(catalog: Catalog, apiKey: string, accountBas
         return upstream.flatMap(model => {
             const override = catalog.models.find(configured => configured.upstreamModel === model.id || configured.id === model.id);
             const capability = override?.capability || capabilitySchema.safeParse(model.capability).data || z.array(capabilitySchema).nonempty().safeParse(model.capabilities).data?.[0] || inferCapability(model.id);
+            const providerId = override?.providerId || gateway.providerForModel(model.id, capability) || discoveryProviderId;
             return [{
                 id: override?.id || model.id, name: override?.name || model.id, upstreamModel: model.id,
-                providerId: override?.providerId || discoveryProviderId, capability,
+                providerId, capability,
                 enabled: override?.enabled ?? true, baseUrl,
                 ...(model.owned_by ? { specProviderId: model.owned_by } : {}),
             }];
