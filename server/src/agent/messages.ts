@@ -107,7 +107,7 @@ function userContent(content: string | ContentPart[]): UserContent {
         if (part.type !== "image") continue;
         const source = part.source;
         if (source.type === "data") parts.push({ type: "image", image: source.value, mediaType: source.mimeType } satisfies ImagePart);
-        else if (source.type === "url") {
+        else if (source.type === "url" && !source.value.startsWith("remote:")) {
             try {
                 parts.push({ type: "image", image: new URL(source.value), ...(source.mimeType ? { mediaType: source.mimeType } : {}) } satisfies ImagePart);
             } catch {

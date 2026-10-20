@@ -320,5 +320,5 @@ apply_graph({ nodes: [{ key, type, title, prompt?, content?, storageKey? }], con
 2. **能力目录**：把 `gateway-video.ts` / `input.ts` 里的参数约束提成数据接口，让模型规划出的参数合法，减少「第一跑就报错」。
 3. **模板检索**：把 `web/public/templates/templates.json` 暴露成可检索能力，作为人工调通的「配方库」。
 4. **意图 → 方案 → 确认 → 建图**：真正降低创作门槛的那一步，依赖能力目录与模板检索。
-6. **多模态**：让模型「看到」画布图片与生成结果——`mediaReader` 已能把 `remote:<id>` 转 data URL，`messages.ts` 预留了注入位。
-7. **多会话 / 跨端续聊**：`user_agent_threads` 主键改为 `(user_id, project_id, thread_id)`，加会话列表。
+5. **多模态**：让模型「看到」画布图片与生成结果——`mediaReader` 已能把 `remote:<id>` 转 data URL，`messages.ts` 预留了注入位。助手输入框的图片附件已按这条路径落地（见 `agent-attachments.md`）；画布节点图片仍待接入。
+6. **多会话 / 跨端续聊**：`user_agent_threads` 主键改为 `(user_id, project_id, thread_id)`，加会话列表。

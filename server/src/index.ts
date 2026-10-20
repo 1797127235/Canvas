@@ -59,7 +59,7 @@ async function start() {
         apiRouter.use(createWorkspaceRouter(database.pool));
         apiRouter.use(createMediaRouter(database.pool, minio, config.mediaLinkSecret));
         apiRouter.use(createGenerationRouter(database.pool, { catalog, encryptionKey: config.credentialsEncryptionKey, media: minio, appOrigin: config.appOrigin, mediaLinkSecret: config.mediaLinkSecret }));
-        apiRouter.use(createAgentRouter({ database: database.pool, catalog, compactionBudgets: config.agentCompactionBudgets, encryptionKey: config.credentialsEncryptionKey, limiter: createRateLimiter(database.pool, "agent", secret), rateLimitSecret: secret }));
+        apiRouter.use(createAgentRouter({ database: database.pool, catalog, compactionBudgets: config.agentCompactionBudgets, encryptionKey: config.credentialsEncryptionKey, limiter: createRateLimiter(database.pool, "agent", secret), rateLimitSecret: secret, media: minio }));
         const server = createApp({ appOrigin: config.appOrigin, apiRouter }).listen(config.port, config.host);
         let closing = false;
         const close = () => {

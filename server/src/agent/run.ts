@@ -6,6 +6,7 @@ import { stepCountIs, streamText, type ModelMessage } from "ai";
 import { chatModel } from "../gateway/index.js";
 import type { ModelBinding } from "../gateway/contracts.js";
 import { createEventMapper, runFailed, runFinished, runStarted, sseFrame } from "./events.js";
+import { inlineRemoteImages, type AgentMediaReader } from "./attachments.js";
 import { buildSystemPrompt, toModelMessages, toToolSet } from "./messages.js";
 import { prepareAgentContext } from "./compaction/prepare.js";
 import type { CompactionBudget } from "./compaction/context.js";
@@ -19,6 +20,7 @@ const INSTRUCTIONS = [
     "先依据当前画布摘要回答概览；需要全文或相邻连线时调用 get_node_detail。用户要求操作时只调用对应画布工具，并以工具结果为准，不声称未成功的操作已完成。",
     "update_node 目前只支持改标题、提示词、文本节点内容和位置；delete_nodes 会同时移除相关连线；连线前确认方向符合画布数据流。",
     "新增一组节点时用 apply_graph 一次提交节点及它们之间的连线；不需要改动画布时正常对话，不要为了显得有用而强行建节点。",
+    "用户上传的附件会在消息文本里标注 remote:<id>；要把附件放到画布时直接用这个 id 作为 apply_graph 的 storageKey，不要臆造资源地址。你只能看到图片内容，其它类型的附件只有 id。",
     "回答和操作都使用简体中文，简洁直接，不要复述已经说过的话。"
 ].join("\n");
 
@@ -36,6 +38,7 @@ export type AgentRunOptions = {
     userId: string;
     projectId: string;
     budget?: CompactionBudget;
+    readMedia?: AgentMediaReader;
 };
 
 // 一次 run：把 AG-UI 输入换成 AI SDK 调用，把 fullStream 逐块写成 SSE。
@@ -61,7 +64,7 @@ export async function streamAgentRun(options: AgentRunOptions) {
         const prepared = await prepareAgentContext({ ...options, instructions: buildSystemPrompt(INSTRUCTIONS, input.context) });
         write({ type: "CUSTOM", name: "session_version", value: { threadId: input.threadId, runId: input.runId, version: prepared.version } });
         const instructions = prepared.instructions;
-        const messages: ModelMessage[] = toModelMessages(prepared.messages);
+        const messages: ModelMessage[] = toModelMessages(await inlineRemoteImages(prepared.messages, options.readMedia));
         const tools = toToolSet(input.tools);
         const result = streamText({
             model: chatModel(model, apiKey),

@@ -17,7 +17,7 @@ description: Planned follow-up work
 - Agent 上下文压缩首版已实现，方案与验收边界见 `docs/specs/agent-context-compaction.md`；实施顺序见 `docs/specs/agent-context-compaction-plan.md`。仍待：按真实上游模型 ID 配置可信预算、登录浏览器验收会话切换/刷新/工具续跑/多标签冲突，以及使用真实账号 Key 验证摘要生成与用量。完成后再确认是否调整 400 条/2 MiB 的会话存储上限；压缩不解除该上限。
 - Agent 工具执行许可已实现（规格 `docs/specs/agent-tool-approval.md`）：工具按 `read`/`write`/`spend` 分级，三档模式控制画布写入，花钱类工具恒走确认，单工具可选「始终允许」并记住，「拒绝」下拉里的「以后都拒绝这个操作」会把该工具从模型工具列表移除（`available: false`）。后续生成类工具接入时只需声明 `risk: "spend"` 即可复用这套闸门，不再单独做确认弹窗。验收项见 Pending Tests。
 - Agent 写画布回调已从 `project.tsx` 抽到 `pages/canvas/hooks/use-canvas-agent-actions.ts`（`project.tsx` 3443 行），面板宽度拖拽抽到 `use-agent-sidebar-width.ts`，为生成类工具留出位置。
-- Agent 后续：① 生成类工具 `generate_image` / `generate_video`（设计见 `docs/specs/agent-canvas-generation-tools.md`）；② 能力目录接口（让规划出的节点参数符合实际模型能力）；③ 模板检索与意图 → 方案 → 确认 → 建图；④ 多模态素材理解。未做：`/agent/:id/connect`、`/agent/:id/stop` 两个路由（当前每次都是新 run，不需要续连）。
+- Agent 后续：① 生成类工具 `generate_image` / `generate_video`（设计见 `docs/specs/agent-canvas-generation-tools.md`）；② 能力目录接口（让规划出的节点参数符合实际模型能力）；③ 模板检索与意图 → 方案 → 确认 → 建图；④ 多模态素材理解（输入框图片附件已落地，见 `docs/specs/agent-attachments.md`；画布节点图片与生成结果进入对话仍待做）。未做：`/agent/:id/connect`、`/agent/:id/stop` 两个路由（当前每次都是新 run，不需要续连）。
 
 ## 统一模板库
 

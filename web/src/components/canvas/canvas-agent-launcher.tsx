@@ -9,6 +9,9 @@ import remarkGfm from "remark-gfm";
 
 import { canvasThemes, type CanvasTheme } from "@/lib/canvas-theme";
 import { buildAssetsContext, buildCanvasContext } from "@/lib/canvas/canvas-agent-context";
+import { AGENT_ATTACHMENT_LIMIT, AGENT_ATTACHMENT_MAX_BYTES, buildUserMessageContent, buildUserMessageMetadata, readMessageAttachments, rejectAttachment, type AgentAttachment } from "@/lib/agent/attachments";
+import { previewUrlFor } from "@/services/image-storage";
+import { uploadMediaFile } from "@/services/file-storage";
 import { createSessionSaveQueue } from "@/lib/agent/session-save-queue";
 import { bindSessionPersistence } from "@/lib/agent/session-run";
 import { applyGraphInput, type AgentGraphResult, type ApplyGraphInput } from "@/lib/canvas/canvas-agent-graph";
@@ -70,6 +73,9 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
     const { copilotkit } = useCopilotKit();
     const userName = useUserStore((state) => state.user?.email.split("@")[0]) || "创作者";
     const [draft, setDraft] = useState("");
+    const [attachments, setAttachments] = useState<AgentAttachment[]>([]);
+    const [uploading, setUploading] = useState(0);
+    const fileRef = useRef<HTMLInputElement>(null);
     const [ideaPage, setIdeaPage] = useState(0);
     const [error, setError] = useState("");
     const [threadReady, setThreadReady] = useState(false);
@@ -182,17 +188,66 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
         listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
     }, [agent.messages]);
 
+    const removeAttachment = useCallback((storageKey: string) => {
+        setAttachments((current) => current.filter((attachment) => attachment.storageKey !== storageKey));
+    }, []);
+
+    // 选中即上传：发送时只带身份，不等上传把整条消息卡住。
+    const addAttachments = useCallback(async (files: FileList | null) => {
+        if (!files?.length) return;
+        setError("");
+        const accepted: File[] = [];
+        let count = attachments.length;
+        for (const file of Array.from(files)) {
+            const rejection = rejectAttachment(file, count);
+            if (rejection === "count") {
+                setError(t("canvas.agent.attachLimit", { count: AGENT_ATTACHMENT_LIMIT }));
+                break;
+            }
+            if (rejection === "type") {
+                setError(t("canvas.agent.attachType"));
+                continue;
+            }
+            if (rejection === "size") {
+                setError(t("canvas.agent.attachTooLarge", { size: AGENT_ATTACHMENT_MAX_BYTES / 1024 / 1024 }));
+                continue;
+            }
+            accepted.push(file);
+            count += 1;
+        }
+        await Promise.all(
+            accepted.map(async (file) => {
+                setUploading((value) => value + 1);
+                try {
+                    const uploaded = await uploadMediaFile(file, "agent");
+                    // 助手只在账号模式下可用，本地存储的身份服务端读不到，别让用户以为传上去了。
+                    if (!uploaded.storageKey.startsWith("remote:")) {
+                        setError(t("canvas.agent.loginRequired"));
+                        return;
+                    }
+                    setAttachments((current) => (current.length >= AGENT_ATTACHMENT_LIMIT ? current : [...current, { storageKey: uploaded.storageKey, name: file.name, mimeType: uploaded.mimeType, bytes: uploaded.bytes }]));
+                } catch (cause) {
+                    setError(cause instanceof Error ? cause.message : t("canvas.agent.attachFailed"));
+                } finally {
+                    setUploading((value) => value - 1);
+                }
+            }),
+        );
+    }, [attachments.length, t]);
+
     const send = useCallback(async () => {
         const text = draft.trim();
-        if (!text || !modelsReady || !selectedModelId || agent.isRunning || !threadReady || sendingRef.current || syncingRef.current || switchingRef.current) return;
+        if ((!text && !attachments.length) || uploading > 0 || !modelsReady || !selectedModelId || agent.isRunning || !threadReady || sendingRef.current || syncingRef.current || switchingRef.current) return;
         sendingRef.current = true;
         setSending(true);
         try {
             // http 页面里 crypto.randomUUID 不存在（仅安全上下文暴露），这里必须用 crypto.getRandomValues 的实现。
             // addMessage 之前不能清空草稿：抛错时原文要留在输入框，不能让用户白打一段。
-            const userMessage = { id: randomUuid(), role: "user", content: text } as Message;
+            const metadata = buildUserMessageMetadata(attachments);
+            const userMessage = { id: randomUuid(), role: "user", content: buildUserMessageContent(text, attachments), ...(metadata ? { metadata } : {}) } as Message;
             agent.addMessage(userMessage);
             setDraft("");
+            setAttachments([]);
             setError("");
             await copilotkit.runAgent({ agent, forwardedProps: { modelId: selectedModelId } });
         } catch (cause) {
@@ -202,7 +257,7 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
             sendingRef.current = false;
             setSending(false);
         }
-    }, [agent, copilotkit, draft, modelsReady, selectedModelId, t, threadReady]);
+    }, [agent, attachments, copilotkit, draft, modelsReady, selectedModelId, t, threadReady, uploading]);
 
     const switchThread = useCallback(async (threadId: string) => {
         if (!threadId || threadId === activeThreadId || agent.isRunning || sendingRef.current || syncingRef.current || switchingRef.current) return;
@@ -385,6 +440,22 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
                 {approvals.length ? <ApprovalCard item={approvals[0]} pending={approvals.length - 1} onDecide={decideApproval} theme={theme} /> : null}
                 {error ? <div className="mb-1.5 px-1 text-xs leading-snug text-red-500">{error}</div> : null}
                 <div className="rounded-[22px] border p-2" style={{ background: theme.node.panel, borderColor: theme.toolbar.border }}>
+                    <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => { void addAttachments(event.target.files); event.target.value = ""; }} />
+                    {attachments.length ? (
+                        <div className="flex flex-wrap gap-1.5 px-1 pb-1.5">
+                            {attachments.map((attachment) => {
+                                const preview = previewUrlFor(attachment.storageKey);
+                                return (
+                                    <div key={attachment.storageKey} className="relative size-12 overflow-hidden rounded-lg border" style={{ borderColor: theme.toolbar.border }}>
+                                        {preview ? <img src={preview} alt={attachment.name} className="size-full object-cover" /> : <div className="grid size-full place-items-center text-[10px] opacity-50">{t("canvas.agent.attachImage")}</div>}
+                                        <button type="button" onClick={() => removeAttachment(attachment.storageKey)} className="absolute right-0.5 top-0.5 grid size-4 place-items-center rounded-full bg-black/60 text-white transition hover:bg-black/80" aria-label={t("canvas.agent.attachRemove")} title={t("canvas.agent.attachRemove")}>
+                                            <X className="size-2.5" />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : null}
                     <textarea
                         value={draft}
                         onChange={(event) => setDraft(event.target.value)}
@@ -401,8 +472,8 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
                     />
                     <div className="flex items-center justify-between gap-1">
                         <div className="flex min-w-0 items-center gap-0.5">
-                            <button type="button" onClick={() => void startNewThread()} disabled={!threadReady || busy} className="grid size-8 shrink-0 place-items-center rounded-full transition hover:bg-black/10 disabled:opacity-30 dark:hover:bg-white/10" aria-label={t("canvas.agent.newThread")} title={t("canvas.agent.newThread")}>
-                                <Plus className="size-[18px]" />
+                            <button type="button" onClick={() => fileRef.current?.click()} disabled={!threadReady || busy || uploading > 0 || attachments.length >= AGENT_ATTACHMENT_LIMIT} className="grid size-8 shrink-0 place-items-center rounded-full transition hover:bg-black/10 disabled:opacity-30 dark:hover:bg-white/10" aria-label={t("canvas.agent.attach")} title={t("canvas.agent.attach")}>
+                                {uploading ? <Loader2 className="size-[18px] animate-spin" /> : <Plus className="size-[18px]" />}
                             </button>
                             <Dropdown trigger={["click"]} placement="bottomLeft" disabled={!textModels.length} menu={{ items: modelMenuItems, selectedKeys: [selectedModelId], onClick: selectModel }}>
                                 <button type="button" disabled={!textModels.length} className="flex min-w-0 items-center gap-1 rounded-full px-2 py-1.5 text-xs font-medium transition hover:bg-black/10 disabled:opacity-40 dark:hover:bg-white/10" aria-label={t("canvas.agent.model")} title={t("canvas.agent.model")}>
@@ -422,7 +493,7 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
                             <button
                                 type="button"
                                 onClick={() => void send()}
-                                disabled={!draft.trim() || busy || !threadReady || !modelsReady || !selectedModelId}
+                                disabled={(!draft.trim() && !attachments.length) || uploading > 0 || busy || !threadReady || !modelsReady || !selectedModelId}
                                 className="grid size-9 shrink-0 place-items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-30"
                                 style={{ background: theme.node.text, color: theme.canvas.background }}
                                 aria-label={t("canvas.agent.send")}
@@ -440,10 +511,24 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
 
 function MessageRow({ message, theme }: { message: Message; theme: CanvasTheme }) {
     if (message.role === "user") {
+        const text = textOf(message);
+        const attachments = readMessageAttachments(message);
         return (
             <div className="flex justify-end">
-                <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-sm leading-relaxed" style={{ background: theme.toolbar.activeBg, color: theme.node.text }}>
-                    {textOf(message)}
+                <div className="max-w-[85%] space-y-1.5">
+                    {text ? (
+                        <div className="whitespace-pre-wrap break-words rounded-xl px-2.5 py-1.5 text-sm leading-relaxed" style={{ background: theme.toolbar.activeBg, color: theme.node.text }}>
+                            {text}
+                        </div>
+                    ) : null}
+                    {attachments.length ? (
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                            {attachments.map((attachment) => {
+                                const preview = previewUrlFor(attachment.storageKey);
+                                return preview ? <img key={attachment.storageKey} src={preview} alt={attachment.name} className="size-24 rounded-xl object-cover" /> : null;
+                            })}
+                        </div>
+                    ) : null}
                 </div>
             </div>
         );

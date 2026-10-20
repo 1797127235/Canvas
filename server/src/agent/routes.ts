@@ -10,6 +10,7 @@ import { readUserCredential } from "../credentials.js";
 import { requireUser } from "../identity/auth-middleware.js";
 import { consumeUserRateLimit } from "../identity/rate-limit.js";
 import { logError } from "../log.js";
+import { readAccountMediaBytes, type MediaOptions } from "../media.js";
 import { streamAgentRun } from "./run.js";
 import type { CompactionBudget } from "./compaction/context.js";
 import { AgentThreadError, createSessionStore, validateMessages } from "./sessions/store.js";
@@ -27,6 +28,7 @@ export type AgentOptions = {
     limiter?: RateLimiterPostgres;
     rateLimitSecret?: string;
     compactionBudgets?: Record<string, CompactionBudget>;
+    media?: MediaOptions;
 };
 
 export function createAgentRouter(options: AgentOptions) {
@@ -79,8 +81,13 @@ export function createAgentRouter(options: AgentOptions) {
 
             const controller = new AbortController();
             response.once("close", () => controller.abort());
+            // 附件按身份读取，归属校验在 readAccountMediaBytes 里做，避免客户端伪造别人的 remote id。
+            const readMedia = async (mediaId: string) => {
+                if (!options.media) throw new Error("媒体存储尚未配置");
+                return readAccountMediaBytes(options.database, options.media, userId, mediaId);
+            };
             try {
-                await streamAgentRun({ model, apiKey: credential.apiKey, input, signal: controller.signal, response, sessions: threads, userId, projectId, budget: options.compactionBudgets?.[model.upstreamModel] });
+                await streamAgentRun({ model, apiKey: credential.apiKey, input, signal: controller.signal, response, sessions: threads, userId, projectId, budget: options.compactionBudgets?.[model.upstreamModel], readMedia });
             } catch (error) {
                 logError("agent", error, { userId });
                 if (!response.headersSent) return response.status(500).json({ error: { code: "INTERNAL_ERROR", message: "助手响应失败，请重试" } });
