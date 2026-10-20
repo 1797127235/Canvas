@@ -14,6 +14,7 @@ import { bindSessionPersistence } from "@/lib/agent/session-run";
 import { applyGraphInput, type AgentGraphResult, type ApplyGraphInput } from "@/lib/canvas/canvas-agent-graph";
 import { CanvasPromptLibrary } from "@/components/canvas/canvas-prompt-library";
 import { useApplyGraphTool } from "@/components/canvas/tools/use-apply-graph-tool";
+import { useCanvasTools, type UpdateCanvasNodeInput } from "@/components/canvas/tools/use-canvas-tools";
 import { cn, randomUuid } from "@/lib/utils";
 import { createAgentThread, deleteAgentThread, fetchAgentThread, fetchAgentThreads, saveAgentThread, AgentThreadApiError, type AgentThread } from "@/services/api/agent";
 import { fetchServerModels, type PublicModel } from "@/services/api/catalog";
@@ -38,6 +39,10 @@ export type CanvasAgentProps = {
     selectedNodeIds: Set<string>;
     onClose: () => void;
     onApplyGraph: (input: ApplyGraphInput) => AgentGraphResult;
+    onUpdateNode: (input: UpdateCanvasNodeInput) => string;
+    onDeleteNodes: (ids: string[]) => string[];
+    onConnectNodes: (fromNodeId: string, toNodeId: string) => string;
+    onDisconnectNodes: (fromNodeId: string, toNodeId: string) => string;
 };
 
 export default function CanvasAgentPanel(props: CanvasAgentProps) {
@@ -51,7 +56,7 @@ export default function CanvasAgentPanel(props: CanvasAgentProps) {
     );
 }
 
-function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, onApplyGraph }: CanvasAgentProps) {
+function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, onApplyGraph, onUpdateNode, onDeleteNodes, onConnectNodes, onDisconnectNodes }: CanvasAgentProps) {
     const { t } = useTranslation();
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const assets = useAssetStore((state) => state.assets);
@@ -109,8 +114,9 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
     const assetsContext = useMemo(() => buildAssetsContext(assets), [assets]);
     useAgentContext(canvasContext);
     useAgentContext(assetsContext);
+    useCanvasTools({ nodes, connections, onUpdateNode, onDeleteNodes, onConnectNodes, onDisconnectNodes });
 
-    // 工具在浏览器执行：模型只决定「加什么节点、什么关系」，坐标与 id 由 buildAgentGraph 算。
+    // 工具在浏览器执行，直接操作当前画布状态。
     useApplyGraphTool(onApplyGraph);
 
     // 会话由服务端签发：先取到 threadId 才能 run，服务端据此校验「这个对话属于这个画布」。

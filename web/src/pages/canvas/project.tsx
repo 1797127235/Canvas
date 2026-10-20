@@ -51,6 +51,7 @@ import { buildNodeMentionReferences, getGroupResourceNodes, isCanvasReferenceNod
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 import { applyNodeConfigPatch, audioMetadata, buildAudioGenerationMetadata, buildImageGenerationMetadata, createCanvasNode, imageMetadata, videoMetadata } from "@/lib/canvas/canvas-node-factory";
 import { buildAgentGraph, type AgentGraphResult, type ApplyGraphInput } from "@/lib/canvas/canvas-agent-graph";
+import type { UpdateCanvasNodeInput } from "@/components/canvas/tools/use-canvas-tools";
 import { applyGroupSelection, applyUngroupSelection, canGroupSelectedNodes, canUngroupSelectedNodes, collectGroupMemberNodes, findContainingGroupId, findGroupDropTarget, getConnectionTargetAnchor, getGroupWrapRect, nodeRenderBounds, normalizeConnection, snapNodesIntoGroup } from "@/lib/canvas/canvas-node-geometry";
 import {
     audioExtension,
@@ -3033,6 +3034,42 @@ function InfiniteCanvasPage() {
         return result;
     }, [getCanvasCenter]);
 
+    const handleUpdateAgentNode = useCallback((input: UpdateCanvasNodeInput) => {
+        const node = nodesRef.current.find((item) => item.id === input.nodeId);
+        if (!node) return `未找到节点 ${input.nodeId}`;
+        if (input.content !== undefined && node.type !== CanvasNodeType.Text) return "目前仅支持修改文本节点内容";
+        setNodes((prev) => prev.map((item) => item.id !== input.nodeId ? item : {
+            ...item,
+            ...(input.title !== undefined ? { title: input.title } : {}),
+            ...(input.position ? { position: input.position } : {}),
+            ...(input.prompt !== undefined ? { metadata: { ...item.metadata, prompt: input.prompt } } : {}),
+            ...(input.content !== undefined ? { metadata: { ...item.metadata, content: input.content } } : {}),
+        }));
+        return `已更新节点「${input.title ?? node.title}」`;
+    }, []);
+
+    const handleDeleteAgentNodes = useCallback((ids: string[]) => {
+        const existing = new Set(nodesRef.current.map((node) => node.id));
+        const deleted = [...new Set(ids)].filter((id) => existing.has(id));
+        if (deleted.length) deleteNodes(new Set(deleted));
+        return deleted;
+    }, [deleteNodes]);
+
+    const handleConnectAgentNodes = useCallback((fromNodeId: string, toNodeId: string) => {
+        const normalized = normalizeConnection(fromNodeId, toNodeId, nodesRef.current, "source");
+        if (!normalized) return "无法连接：节点不存在、目标是分组节点、或连接类型不兼容";
+        if (connectionsRef.current.some((item) => item.fromNodeId === normalized.fromNodeId && item.toNodeId === normalized.toNodeId)) return "这条连线已经存在";
+        setConnections((prev) => [...prev, { id: nanoid(), ...normalized }]);
+        return `已连接 ${normalized.fromNodeId} → ${normalized.toNodeId}`;
+    }, []);
+
+    const handleDisconnectAgentNodes = useCallback((fromNodeId: string, toNodeId: string) => {
+        const exists = connectionsRef.current.some((item) => item.fromNodeId === fromNodeId && item.toNodeId === toNodeId);
+        if (!exists) return "未找到这条连线";
+        setConnections((prev) => prev.filter((item) => item.fromNodeId !== fromNodeId || item.toNodeId !== toNodeId));
+        return `已断开 ${fromNodeId} → ${toNodeId}`;
+    }, []);
+
     // Memoize every callback and render function passed to CanvasNode.
     // CanvasNode uses React.memo, but new prop references would invalidate it on every render and rerender every node
     // during click, hover, or viewport changes, which is especially expensive for Markdown. These useCallback values
@@ -3426,7 +3463,7 @@ function InfiniteCanvasPage() {
             {agentOpen ? (
                 <aside className="flex h-full w-[420px] max-w-[92vw] shrink-0 border-l" style={{ borderColor: theme.toolbar.border }}>
                     <Suspense fallback={null}>
-                        <CanvasAgentLauncher projectId={projectId} nodes={nodes} connections={connections} selectedNodeIds={selectedNodeIds} onClose={() => setAgentOpen(false)} onApplyGraph={handleApplyAgentGraph} />
+                        <CanvasAgentLauncher projectId={projectId} nodes={nodes} connections={connections} selectedNodeIds={selectedNodeIds} onClose={() => setAgentOpen(false)} onApplyGraph={handleApplyAgentGraph} onUpdateNode={handleUpdateAgentNode} onDeleteNodes={handleDeleteAgentNodes} onConnectNodes={handleConnectAgentNodes} onDisconnectNodes={handleDisconnectAgentNodes} />
                     </Suspense>
                 </aside>
             ) : null}

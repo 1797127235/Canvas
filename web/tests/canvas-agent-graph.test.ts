@@ -2,6 +2,7 @@ import { beforeAll, expect, test } from "bun:test";
 
 import { buildAssetsContext, buildCanvasContext } from "../src/lib/canvas/canvas-agent-context";
 import { applyGraphInput, buildAgentGraph } from "../src/lib/canvas/canvas-agent-graph";
+import { updateCanvasNodeInput } from "../src/components/canvas/tools/use-canvas-tools";
 import { registerNodeDefinitions } from "../src/lib/canvas/node-registry";
 import { CanvasNodeType, type CanvasNodeData } from "../src/types/canvas";
 
@@ -67,6 +68,13 @@ test("rejects malformed tool input before it reaches the canvas", () => {
     expect(applyGraphInput.safeParse({ nodes: [] }).success).toBe(false);
     expect(applyGraphInput.safeParse({ nodes: [{ key: "a", type: "text", position: { x: 0, y: 0 } }] }).success).toBe(false);
     expect(applyGraphInput.safeParse({ nodes: Array.from({ length: 21 }, (_, index) => ({ key: `n${index}`, type: "text" })) }).success).toBe(false);
+});
+
+test("validates canvas node edits and bounds text size", () => {
+    expect(updateCanvasNodeInput.safeParse({ nodeId: "text-1", content: "新的文本" }).success).toBe(true);
+    expect(updateCanvasNodeInput.safeParse({ nodeId: "text-1" }).success).toBe(false);
+    expect(updateCanvasNodeInput.safeParse({ nodeId: "text-1", content: "x".repeat(4001) }).success).toBe(false);
+    expect(updateCanvasNodeInput.safeParse({ nodeId: "text-1", url: "https://example.com" }).success).toBe(false);
 });
 
 test("summarizes the canvas without leaking content bodies", () => {

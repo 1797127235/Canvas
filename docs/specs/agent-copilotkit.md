@@ -232,7 +232,7 @@ server/src/agent/run.ts     RunAgentInput → ModelMessage[] → streamText(ai@7
 资产库（建节点时可用 storageKey）→ assets[]（最多 40 条，只给 kind/title/storageKey）、total
 ```
 
-不给：`content` 全文、base64、`images` 数组、`references` 明细。理由是上下文预算——二十个节点的全量元数据会吃掉大半窗口，而模型此刻只需要知道「有什么、在哪、什么状态」。要看全文时再给 `get_node_detail`（本轮不做，见第八节）。
+摘要不给 `content` 全文、base64、`images` 数组、`references` 明细，以控制上下文预算；需要详情时由 `get_node_detail` 按需读取文本节点内容，不返回媒体正文。
 
 资产单独成一段是因为 `apply_graph` 的 `storageKey` 要能用：模型得知道有哪些现成素材可以引用。
 
@@ -254,7 +254,7 @@ const handleApplyAgentGraph = (input: ApplyGraphInput): AgentGraphResult => {
 
 - 由 `project.tsx` 实现，内部走 `setNodes` / `setConnections`，与手工操作同一条路径。
 - 撤销：历史 effect 已经在监听 `nodes` / `connections`，一次工具调用写入后自动形成一个撤销单元，不需要额外接线。
-- 加新工具时不新开写入通道：在 `project.tsx` 加一个同类回调、在 launcher 里 `useFrontendTool` 注册即可（本轮 `apply_graph` 就是在 launcher 里直接注册的，没有单独抽注册表文件——只有一个工具时抽表是多余抽象）。
+- 加新写工具时不新开写入通道：在 `project.tsx` 增加对应回调，在 `components/canvas/tools/` 注册前端工具；所有写入仍进入画布现有 state 与撤销/保存路径。
 
 ### 7.4 `apply_graph`
 
@@ -280,7 +280,7 @@ apply_graph({ nodes: [{ key, type, title, prompt?, content?, storageKey? }], con
 
 - 多会话列表 / 会话标题自动生成（一个项目一条会话）。
 - `STATE_SNAPSHOT` 双向同步（画布摘要单向传给模型足够）。
-- `update_node` / `delete_nodes` / `connect_nodes` / `get_node_detail` / 生成类工具。
+- 生成类工具（`generate_node` 及执行前确认）；基础节点读取、修改、删除和连线工具已实现。
 - 意图理解、模板检索、能力目录、参数归一（长期目标，见第十节）。
 - 服务端 `AgentRunner`／断点续跑（客户端每次全量重传，不需要）。
 - 不引入 `@copilotkit/runtime`、`@ag-ui/encoder`、`@copilotkit/react-ui`；不恢复旧 Agent 面板、Store、Canvas Bridge、命令总线。
@@ -308,10 +308,9 @@ apply_graph({ nodes: [{ key, type, title, prompt?, content?, storageKey? }], con
 
 ## 十、后续阶段（不在本轮，但架构已为其留位）
 
-1. **补齐画布工具**：`update_node` / `delete_nodes` / `connect_nodes` / `get_node_detail`——在注册表加条目、在 `agentWrite` 加方法，不动其他层。
-2. **生成资产**：`generate_node` 走 `/api/generations`（复用账号 Key 与现有四类链路），异步返回 `taskId`，用 7.5 的回灌队列把结果告诉模型；`confirm: true` 让用户先确认再花钱。
-3. **能力目录**：把 `gateway-video.ts` / `input.ts` 里的参数约束提成数据接口，让模型规划出的参数合法，减少「第一跑就报错」。
-4. **模板检索**：把 `web/public/templates/templates.json` 暴露成可检索能力，作为人工调通的「配方库」。
-5. **意图 → 方案 → 确认 → 建图**：真正降低创作门槛的那一步，依赖 3 + 4。
+1. **生成资产**：`generate_node` 走 `/api/generations`（复用账号 Key 与现有四类链路），异步返回 `taskId`，用 7.5 的回灌队列把结果告诉模型；`confirm: true` 让用户先确认再花钱。
+2. **能力目录**：把 `gateway-video.ts` / `input.ts` 里的参数约束提成数据接口，让模型规划出的参数合法，减少「第一跑就报错」。
+3. **模板检索**：把 `web/public/templates/templates.json` 暴露成可检索能力，作为人工调通的「配方库」。
+4. **意图 → 方案 → 确认 → 建图**：真正降低创作门槛的那一步，依赖能力目录与模板检索。
 6. **多模态**：让模型「看到」画布图片与生成结果——`mediaReader` 已能把 `remote:<id>` 转 data URL，`messages.ts` 预留了注入位。
 7. **多会话 / 跨端续聊**：`user_agent_threads` 主键改为 `(user_id, project_id, thread_id)`，加会话列表。
