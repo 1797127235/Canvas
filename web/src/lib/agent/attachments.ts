@@ -10,8 +10,9 @@ export type AgentAttachment = {
 };
 
 export const AGENT_ATTACHMENT_LIMIT = 4;
-// 与 nginx /api/ 的 8 MiB 请求体上限对齐，前端先拦，避免传到一半被代理拒绝。
-export const AGENT_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
+// 单张 10 MB 是产品口径，不是代理上限：上传走 /api/media（nginx client_max_body_size 0），
+// 不受 /api/ 的 8 MiB JSON 上限约束，这里只是提前拦住离谱大图。服务端 MAX_IMAGE_BYTES 必须同步。
+export const AGENT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 export type AttachmentRejection = "type" | "size" | "count";
 
