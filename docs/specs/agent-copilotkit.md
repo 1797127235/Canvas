@@ -271,10 +271,11 @@ apply_graph({ nodes: [{ key, type, title, prompt?, content?, storageKey? }], con
 
 `ai@7` 的类型里，**没有 `execute` 的工具必须声明 `outputSchema`**（`ToolOutputProperties` 的第二个分支）。少写这个字段 `tsc` 直接报错。工具的实际输出形状对我们没有意义（结果由下一轮消息带回），所以统一给宽松对象 `{ type: "object", additionalProperties: true }`。`@copilotkit/runtime` 用 `ai@6` 时才不需要这个字段——这是不装 runtime 的连带成本，已记在 `messages.ts` 注释里。
 
-### 7.6 为「生成资产」预留的两个 seam（本轮只留接口，不实现）
+### 7.6 已实现的执行许可（原「为生成资产预留的 seam」）
 
-1. **异步回灌队列**：生成类工具立即返回 `{ taskId, nodeId }`，不阻塞对话。任务完成由现有轮询发现，完成事件推入 `agentEvents`，面板把它作为一条 developer 消息注入下一轮（可选自动续跑）。本轮在 launcher 里留一个 `useRef<AgentEvent[]>` + 注入函数，不接任何产生方。
-2. **确认闸门**：工具注册表的 `confirm: true` 表示执行前必须用户确认；面板渲染确认卡片，确认后才 `run`。生成类工具将来必须走这条——花的是用户自己的钱，不能由模型单方面决定。本轮 `apply_graph` 是 `confirm: false`（可撤销，代价低）。
+工具不再「注册即执行」：全部经 `use-gated-tool.ts` 注册，按 `read` / `write` / `spend` 分级，三档模式（只读 / 每次询问 / 自动执行）决定直接执行、弹审批卡片或拒绝；`spend` 不受模式影响，最宽只到本次会话放行。完整规则见 [agent-tool-approval.md](./agent-tool-approval.md)。生成类工具接入时只需声明 `risk: "spend"`，不再单独实现确认弹窗。
+
+仍未实现的 seam：**异步回灌队列**——生成类工具立即返回 `{ taskId, nodeId }`，不阻塞对话；任务完成由现有轮询发现，完成事件推入队列，面板把它作为一条消息注入下一轮。本轮仍未接入任何产生方。
 
 ## 八、本轮不做
 

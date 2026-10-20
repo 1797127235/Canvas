@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Message } from "@ag-ui/client";
 import { CopilotKitProvider, UseAgentUpdate, useAgent, useAgentContext, useCopilotKit } from "@copilotkit/react-core/v2";
 import { Dropdown, type MenuProps } from "antd";
-import { ArrowUp, Check, ChevronDown, Loader2, MessageSquarePlus, Plus, RotateCw, Trash2, X } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, Eye, Loader2, MessageSquarePlus, Plus, RotateCw, ShieldQuestion, Trash2, X, Zap } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -15,6 +15,9 @@ import { applyGraphInput, type AgentGraphResult, type ApplyGraphInput } from "@/
 import { CanvasPromptLibrary } from "@/components/canvas/canvas-prompt-library";
 import { useApplyGraphTool } from "@/components/canvas/tools/use-apply-graph-tool";
 import { useCanvasTools, type UpdateCanvasNodeInput } from "@/components/canvas/tools/use-canvas-tools";
+import type { ApprovalMode } from "@/lib/agent/tool-approval";
+import { cancelPendingApprovals, useAgentApprovalStore, type ApprovalDecision, type PendingApproval } from "@/stores/use-agent-approval-store";
+import { useAgentPermissionStore } from "@/stores/use-agent-permission-store";
 import { cn, randomUuid } from "@/lib/utils";
 import { createAgentThread, deleteAgentThread, fetchAgentThread, fetchAgentThreads, saveAgentThread, AgentThreadApiError, type AgentThread } from "@/services/api/agent";
 import { fetchServerModels, type PublicModel } from "@/services/api/catalog";
@@ -31,6 +34,9 @@ const IDEA_SETS = [
     ["巨物奇幻电影", "东方巨物幻想", "复古胶片 POV 漫游", "咖啡馆胶片人像"],
     ["赛博夜景街拍", "水墨山水长卷", "产品棚拍封面", "复古油画肖像"],
 ];
+
+// 三档执行权限的图标。花钱类工具不受模式影响，永远走询问，见 tool-approval.ts。
+const MODE_ICON = { "read-only": Eye, ask: ShieldQuestion, auto: Zap };
 
 export type CanvasAgentProps = {
     projectId: string;
@@ -80,6 +86,11 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
     const [sending, setSending] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const busy = sending || syncing || agent.isRunning;
+    const mode = useAgentPermissionStore((state) => state.mode);
+    const setMode = useAgentPermissionStore((state) => state.setMode);
+    const resetPermissions = useAgentPermissionStore((state) => state.reset);
+    const approvals = useAgentApprovalStore((state) => state.queue);
+    const decideApproval = useAgentApprovalStore((state) => state.decide);
     const saveQueueRef = useRef<ReturnType<typeof createSessionSaveQueue> | null>(null);
     if (!saveQueueRef.current) {
         saveQueueRef.current = createSessionSaveQueue(
@@ -90,6 +101,9 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
     }
     const saveQueue = saveQueueRef.current;
     const listRef = useRef<HTMLDivElement>(null);
+
+    // 面板卸载时把挂起的审批全部按取消收尾：handler 不返回，run 会一直等在那里。
+    useEffect(() => cancelPendingApprovals, []);
 
     useEffect(() => {
         let active = true;
@@ -308,6 +322,18 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
     const selectModel: MenuProps["onClick"] = ({ key }) => {
         if (textModels.some((model) => model.id === key)) setSelectedModelId(key);
     };
+    const modeMenuItems: MenuProps["items"] = [
+        { key: "read-only", icon: <Eye className="size-4" />, label: t("canvas.agent.modeReadOnly") },
+        { key: "ask", icon: <ShieldQuestion className="size-4" />, label: t("canvas.agent.modeAsk") },
+        { key: "auto", icon: <Zap className="size-4" />, label: t("canvas.agent.modeAuto") },
+        { type: "divider" },
+        { key: "reset", label: t("canvas.agent.permissionReset") },
+    ];
+    const selectMode: MenuProps["onClick"] = ({ key }) => {
+        if (key === "reset") resetPermissions();
+        else if (key === "read-only" || key === "ask" || key === "auto") setMode(key as ApprovalMode);
+    };
+    const ModeIcon = MODE_ICON[mode];
 
     return (
         <div className="pointer-events-auto flex h-full w-full flex-col overflow-hidden" style={{ background: theme.toolbar.panel, color: theme.node.text }}>
@@ -356,6 +382,7 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
 
             {/* 底部输入卡片：输入框与工具栏同处一张卡片，替代原来的两块布局 */}
             <div className="shrink-0 px-3 pb-3">
+                {approvals.length ? <ApprovalCard item={approvals[0]} pending={approvals.length - 1} onDecide={decideApproval} theme={theme} /> : null}
                 {error ? <div className="mb-1.5 px-1 text-xs leading-snug text-red-500">{error}</div> : null}
                 <div className="rounded-[22px] border p-2" style={{ background: theme.node.panel, borderColor: theme.toolbar.border }}>
                     <textarea
@@ -385,16 +412,24 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
                             </Dropdown>
                             <CanvasPromptLibrary onSelect={(prompt) => setDraft(prompt)} />
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => void send()}
-                            disabled={!draft.trim() || busy || !threadReady || !modelsReady || !selectedModelId}
-                            className="grid size-9 shrink-0 place-items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-30"
-                            style={{ background: theme.node.text, color: theme.canvas.background }}
-                            aria-label={t("canvas.agent.send")}
-                        >
-                            <ArrowUp className="size-[18px]" />
-                        </button>
+                        <div className="flex shrink-0 items-center gap-1">
+                            <Dropdown trigger={["click"]} placement="bottomRight" menu={{ items: modeMenuItems, selectedKeys: [mode], onClick: selectMode }}>
+                                <button type="button" className="flex items-center gap-1 rounded-full px-2 py-1.5 text-xs font-medium transition hover:bg-black/10 dark:hover:bg-white/10" aria-label={t("canvas.agent.mode")} title={t("canvas.agent.modeHint")}>
+                                    <ModeIcon className="size-3.5 shrink-0 opacity-70" />
+                                    <span className="max-w-20 truncate">{t(mode === "read-only" ? "canvas.agent.modeReadOnly" : mode === "auto" ? "canvas.agent.modeAuto" : "canvas.agent.modeAsk")}</span>
+                                </button>
+                            </Dropdown>
+                            <button
+                                type="button"
+                                onClick={() => void send()}
+                                disabled={!draft.trim() || busy || !threadReady || !modelsReady || !selectedModelId}
+                                className="grid size-9 shrink-0 place-items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-30"
+                                style={{ background: theme.node.text, color: theme.canvas.background }}
+                                aria-label={t("canvas.agent.send")}
+                            >
+                                <ArrowUp className="size-[18px]" />
+                            </button>
+                        </div>
                     </div>
                 </div>
                 {modelError ? <div className="mt-1.5 px-1 text-[10px] text-red-500">{modelError}</div> : null}
@@ -450,4 +485,35 @@ function textOf(message: Message) {
         .filter((part): part is { type: "text"; text: string } => Boolean(part) && typeof part === "object" && (part as { type?: string }).type === "text")
         .map((part) => part.text)
         .join("");
+}
+
+// 工具执行前的审批卡片。面板是自绘消息列表，不经过 CopilotChat，
+// 所以 useHumanInTheLoop 的 render 不会显示，审批 UI 只能自己做。
+function ApprovalCard({ item, pending, onDecide, theme }: { item: PendingApproval; pending: number; onDecide: (id: string, decision: ApprovalDecision) => void; theme: CanvasTheme }) {
+    const { t } = useTranslation();
+    // 花钱的工具不提供「始终允许」：最宽只到本次会话放行，避免永久自动扣费。
+    const secondary: { decision: ApprovalDecision; label: string } = item.risk === "spend"
+        ? { decision: "session", label: t("canvas.agent.approvalSession") }
+        : { decision: "always", label: t("canvas.agent.approvalAlways") };
+    return (
+        <div className="mb-1.5 rounded-[18px] border px-3 py-2.5" style={{ background: theme.node.panel, borderColor: theme.toolbar.border }}>
+            <div className="flex items-center gap-1.5 text-[11px] font-medium">
+                <ShieldQuestion className="size-3.5 shrink-0 opacity-70" />
+                <span>{t("canvas.agent.approvalTitle")}</span>
+                {pending ? <span className="ml-auto font-normal opacity-50">{t("canvas.agent.approvalPending", { count: pending })}</span> : null}
+            </div>
+            <div className="mt-1.5 break-words text-sm leading-snug">{item.summary}</div>
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                <button type="button" onClick={() => onDecide(item.id, "once")} className="rounded-full px-3 py-1.5 text-xs font-medium transition" style={{ background: theme.node.text, color: theme.canvas.background }}>
+                    {t("canvas.agent.approvalOnce")}
+                </button>
+                <button type="button" onClick={() => onDecide(item.id, secondary.decision)} className="rounded-full border px-3 py-1.5 text-xs transition hover:bg-black/5 dark:hover:bg-white/10" style={{ borderColor: theme.toolbar.border }}>
+                    {secondary.label}
+                </button>
+                <button type="button" onClick={() => onDecide(item.id, "deny")} className="rounded-full px-3 py-1.5 text-xs opacity-60 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/10">
+                    {t("canvas.agent.approvalDeny")}
+                </button>
+            </div>
+        </div>
+    );
 }

@@ -15,7 +15,8 @@ description: Planned follow-up work
 - 模型身份规格已从 Models.dev 补充到账号目录，具体变更与验收移入 Pending Tests；后续如接入自动压缩预算，仍须先统一字节/token 估算单位、验证中转实际窗口与输出限制，不能直接把基础模型规格当作中转能力。
 - Gateway provider 扩展底座已注册 C2A 与 AgnesAI；后续新增上游仍只新增自包含 provider 包并在唯一组合入口注册，按 `docs/specs/gateway-provider-boundaries.md` 补齐测试、目录示例和待验收记录。
 - Agent 上下文压缩首版已实现，方案与验收边界见 `docs/specs/agent-context-compaction.md`；实施顺序见 `docs/specs/agent-context-compaction-plan.md`。仍待：按真实上游模型 ID 配置可信预算、登录浏览器验收会话切换/刷新/工具续跑/多标签冲突，以及使用真实账号 Key 验证摘要生成与用量。完成后再确认是否调整 400 条/2 MiB 的会话存储上限；压缩不解除该上限。
-- Agent 后续：① 生成类工具 `generate_node`（异步返回 taskId，执行前需用户确认，复用现有生成任务）；② 能力目录接口（让规划出的节点参数符合实际模型能力）；③ 模板检索与意图 → 方案 → 确认 → 建图；④ 多模态素材理解。未做：`/agent/:id/connect`、`/agent/:id/stop` 两个路由（当前每次都是新 run，不需要续连）。
+- Agent 工具执行许可已实现（规格 `docs/specs/agent-tool-approval.md`）：工具按 `read`/`write`/`spend` 分级，三档模式控制画布写入，花钱类工具恒走确认，单工具可设为「始终拒绝」（`available: false` 直接移除）。后续生成类工具接入时只需声明 `risk: "spend"` 即可复用这套闸门，不再单独做确认弹窗。验收项见 Pending Tests。
+- Agent 后续：① 生成类工具 `generate_image` / `generate_video`（设计见 `docs/specs/agent-canvas-generation-tools.md`）；② 能力目录接口（让规划出的节点参数符合实际模型能力）；③ 模板检索与意图 → 方案 → 确认 → 建图；④ 多模态素材理解。未做：`/agent/:id/connect`、`/agent/:id/stop` 两个路由（当前每次都是新 run，不需要续连）。
 
 ## 统一模板库
 

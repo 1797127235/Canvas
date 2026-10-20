@@ -102,6 +102,11 @@ registerBuiltinNodes();
 // 没用过助手的用户不该在打开画布时就下载它们。
 const CanvasAgentLauncher = lazy(() => import("@/components/canvas/canvas-agent-launcher"));
 
+// 助手面板宽度：默认比旧版宽，可拖左侧边界调整。上限同时受视口限制，避免窄屏把画布挤没。
+const AGENT_PANEL_DEFAULT_WIDTH = 480;
+const AGENT_PANEL_MIN_WIDTH = 360;
+const AGENT_PANEL_MAX_WIDTH = 860;
+
 type CanvasClipboard = {
     nodes: CanvasNodeData[];
     connections: CanvasConnection[];
@@ -216,6 +221,7 @@ function InfiniteCanvasPage() {
     const [nodes, setNodes] = useState<CanvasNodeData[]>([]);
     const [connections, setConnections] = useState<CanvasConnection[]>([]);
     const [agentOpen, setAgentOpen] = useState(false);
+    const [agentWidth, setAgentWidth] = useState(AGENT_PANEL_DEFAULT_WIDTH);
     const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, k: 1 });
     const [canvasTool, setCanvasTool] = useState<"select" | "pan">("pan");
     const [size, setSize] = useState({ width: 1200, height: 720 });
@@ -3070,6 +3076,27 @@ function InfiniteCanvasPage() {
         return `已断开 ${fromNodeId} → ${toNodeId}`;
     }, []);
 
+    // 拖助手面板左边界改宽度：指针捕获后 pointermove 都落在手柄上，离开手柄也不丢事件。
+    const startAgentResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        const handle = event.currentTarget;
+        const startX = event.clientX;
+        const startWidth = agentWidth;
+        const maxWidth = Math.min(AGENT_PANEL_MAX_WIDTH, window.innerWidth * 0.92);
+        handle.setPointerCapture(event.pointerId);
+        const onMove = (moveEvent: PointerEvent) => setAgentWidth(Math.min(maxWidth, Math.max(AGENT_PANEL_MIN_WIDTH, startWidth + startX - moveEvent.clientX)));
+        const onEnd = () => {
+            if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+            handle.removeEventListener("pointermove", onMove);
+            handle.removeEventListener("pointerup", onEnd);
+            handle.removeEventListener("pointercancel", onEnd);
+        };
+        handle.addEventListener("pointermove", onMove);
+        handle.addEventListener("pointerup", onEnd);
+        handle.addEventListener("pointercancel", onEnd);
+    }, [agentWidth]);
+
     // Memoize every callback and render function passed to CanvasNode.
     // CanvasNode uses React.memo, but new prop references would invalidate it on every render and rerender every node
     // during click, hover, or viewport changes, which is especially expensive for Markdown. These useCallback values
@@ -3461,7 +3488,15 @@ function InfiniteCanvasPage() {
 
             {/* 右侧助手侧边栏：与画布并列占位，不遮挡画布内容 */}
             {agentOpen ? (
-                <aside className="flex h-full w-[420px] max-w-[92vw] shrink-0 border-l" style={{ borderColor: theme.toolbar.border }}>
+                <aside className="relative flex h-full shrink-0 border-l" style={{ width: agentWidth, maxWidth: "92vw", borderColor: theme.toolbar.border }}>
+                    {/* 宽度拖拽手柄：悬停变列宽光标，透明叠在左边框上，不额外占位 */}
+                    <div
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-label={t("canvas.agent.resizeWidth")}
+                        onPointerDown={startAgentResize}
+                        className="absolute inset-y-0 -left-1 z-20 w-2 cursor-col-resize touch-none transition-colors hover:bg-black/10 dark:hover:bg-white/20"
+                    />
                     <Suspense fallback={null}>
                         <CanvasAgentLauncher projectId={projectId} nodes={nodes} connections={connections} selectedNodeIds={selectedNodeIds} onClose={() => setAgentOpen(false)} onApplyGraph={handleApplyAgentGraph} onUpdateNode={handleUpdateAgentNode} onDeleteNodes={handleDeleteAgentNodes} onConnectNodes={handleConnectAgentNodes} onDisconnectNodes={handleDisconnectAgentNodes} />
                     </Suspense>
