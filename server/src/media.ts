@@ -176,15 +176,43 @@ export async function storeAccountMediaStream(database: Pool, options: MediaOpti
     return { id, mimeType, bytes: size };
 }
 
-// 素材字节的唯一读取入口：生成流程按 remote:<uuid> 取字节，与 /api/media 的读取共用同一套归属校验。
-// 查不到统一报错，不区分「不存在」与「不属于当前账号」，避免探测他人素材。
-export async function readAccountMediaBytes(database: Pool, options: MediaOptions, userId: string, mediaId: string) {
-    const store = mediaStore(options);
-    if (!store) throw new Error("媒体存储尚未配置");
+// 归属校验只此一份：查不到统一报错，不区分「不存在」与「不属于当前账号」，避免探测他人素材。
+async function findAccountMedia(database: Pool, userId: string, mediaId: string) {
     const result = await database.query<{ object_key: string; mime_type: string }>("SELECT object_key, mime_type FROM user_media WHERE id = $1 AND user_id = $2", [mediaId, userId]);
     const row = result.rows[0];
     if (!row) throw new Error("参考素材不存在或不属于当前账号");
+    return row;
+}
+
+// 素材字节的完整读取入口：生成流程按 remote:<uuid> 取原图字节，与 /api/media 的读取共用同一套归属校验。
+export async function readAccountMediaBytes(database: Pool, options: MediaOptions, userId: string, mediaId: string) {
+    const store = mediaStore(options);
+    if (!store) throw new Error("媒体存储尚未配置");
+    const row = await findAccountMedia(database, userId, mediaId);
     return { bytes: await readStreamBytes(await store.get(row.object_key)), mimeType: row.mime_type };
+}
+
+// 给模型看的图片字节：走画布预览分档（调用方指定档位，助手用 2048），不把原图整块读进进程内存。
+// 原图存下 6000×4000 时，直读原图等于每轮每张几十 MB Buffer 加更大的 base64，而上游本来就会把长边
+// 压到 ~1568，预览档不丢它要用的细节。预览首次生成后落盘可复用，不会每轮重算。
+export async function readAccountMediaImageBytes(database: Pool, options: MediaOptions, userId: string, mediaId: string, tier: number) {
+    const store = mediaStore(options);
+    if (!store) throw new Error("媒体存储尚未配置");
+    const row = await findAccountMedia(database, userId, mediaId);
+    // 视频/音频不进模型；为了不把整段视频读进内存，这里直接按类型拒绝。
+    if (!row.mime_type.startsWith("image/")) throw new Error("该素材不是图片");
+    const previewKey = previewObjectKey(row.object_key, tier);
+    try {
+        return { bytes: await readStreamBytes(await store.get(previewKey)), mimeType: "image/webp" };
+    } catch {
+        // 这一档还没生成过，下面现生成。
+    }
+    try {
+        return { bytes: await createStoredPreview(store, row.object_key, tier, () => store.get(row.object_key)), mimeType: "image/webp" };
+    } catch {
+        // 预览生成失败（格式古怪、sharp 不支持）退回原图：解析不了的大图也比让助手看不到强。
+        return { bytes: await readStreamBytes(await store.get(row.object_key)), mimeType: row.mime_type };
+    }
 }
 
 const MEDIA_LINK_TTL_SECONDS = 10 * 60;

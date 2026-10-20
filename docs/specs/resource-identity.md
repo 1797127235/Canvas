@@ -64,6 +64,8 @@ export async function readAccountMediaBytes(database: Pool, options: MediaOption
 
 按 `id + user_id` 查 `user_media`，从存储读回。查不到即 404 语义（跨账号或不存在，不区分）。
 
+配套的 `readAccountMediaImageBytes(database, options, userId, mediaId, tier)` 给「送进模型」的场景用：同样按 `id + user_id` 校验，但取的是画布预览的指定档位（webp），不把原图整块读进内存；预览生成失败才退回原图。助手附件走这条路径，见 `agent-attachments.md`。
+
 `server/src/ai/generation.ts` 增加解析器，把 `mediaRef` 换成 AI SDK 的素材：
 
 ```ts

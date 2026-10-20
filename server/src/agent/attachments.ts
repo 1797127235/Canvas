@@ -5,10 +5,10 @@ import type { ContentPart, Message } from "@ag-ui/core";
 export type AgentMediaReader = (mediaId: string) => Promise<{ bytes: Buffer; mimeType: string }>;
 
 const REMOTE_PREFIX = "remote:";
-// 必须与前端 AGENT_ATTACHMENT_MAX_BYTES 一致；超过就只保留身份、不送字节。
+// 必须与前端 AGENT_ATTACHMENT_MAX_BYTES 一致。正常路径走 2048 预览档只有几百 KB，
+// 这个上限只在预览生成失败、退回原图时起作用。
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-// 一次 run 最多内联 16 MB 原始字节（base64 后约 21 MB），避免上游请求体过大；
-// 4 张满额图会超预算，按时间顺序保留最近的几张。
+// 一次 run 最多内联 16 MB 原始字节（base64 后约 21 MB）。走预览档时远达不到，留作兜底。
 const MAX_INLINE_TOTAL_BYTES = 16 * 1024 * 1024;
 // 只内联最近 4 张：历史附件每轮重新 base64 会持续放大请求体和上游计费。
 const MAX_INLINE_IMAGES = 4;

@@ -10,7 +10,7 @@ import { readUserCredential } from "../credentials.js";
 import { requireUser } from "../identity/auth-middleware.js";
 import { consumeUserRateLimit } from "../identity/rate-limit.js";
 import { logError } from "../log.js";
-import { readAccountMediaBytes, type MediaOptions } from "../media.js";
+import { readAccountMediaImageBytes, type MediaOptions } from "../media.js";
 import { streamAgentRun } from "./run.js";
 import type { CompactionBudget } from "./compaction/context.js";
 import { AgentThreadError, createSessionStore, validateMessages } from "./sessions/store.js";
@@ -18,6 +18,9 @@ import { AgentThreadError, createSessionStore, validateMessages } from "./sessio
 const AGENT_ID = "default";
 const AGENT_INFO = { name: "画布助手", description: "理解当前画布并协助搭建生成流程" };
 const PROJECT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+// 附件交给模型的图片走画布预览的 2048 档。手机原图动辄几千万像素，直读原图既占内存又白烧 token，
+// 而上游本就会把长边压到 ~1568，2048 档不丢它要用的细节。要更高保真就改这一处。
+const AGENT_IMAGE_TIER = 2048;
 
 const saveSchema = z.strictObject({ messages: z.array(z.unknown()) });
 
@@ -81,10 +84,10 @@ export function createAgentRouter(options: AgentOptions) {
 
             const controller = new AbortController();
             response.once("close", () => controller.abort());
-            // 附件按身份读取，归属校验在 readAccountMediaBytes 里做，避免客户端伪造别人的 remote id。
+            // 附件按身份读取，归属校验在 readAccountMediaImageBytes 里做，避免客户端伪造别人的 remote id。
             const readMedia = async (mediaId: string) => {
                 if (!options.media) throw new Error("媒体存储尚未配置");
-                return readAccountMediaBytes(options.database, options.media, userId, mediaId);
+                return readAccountMediaImageBytes(options.database, options.media, userId, mediaId, AGENT_IMAGE_TIER);
             };
             try {
                 await streamAgentRun({ model, apiKey: credential.apiKey, input, signal: controller.signal, response, sessions: threads, userId, projectId, budget: options.compactionBudgets?.[model.upstreamModel], readMedia });
