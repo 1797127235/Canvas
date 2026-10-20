@@ -180,7 +180,7 @@ export function checkGenerationTarget(input: {...}): { ok: true; config: AiConfi
 | --- | --- |
 | 1 | `checkGenerationTarget` 纯函数 + 单测；`handleGenerateNode` 接入该函数（行为不变） |
 | 2 | `handleGenerateNode` 增加 `overrides` 参数（一行合并） |
-| 3 | `project.tsx` 新增 `startAgentGeneration` 回调，串预检 → 确认 → 不 await 地启动 |
+| 3 | 新增 `startAgentGeneration` 回调，串预检 → 确认 → 不 await 地启动。它需要 `handleGenerateNode` 与 `modal`，所以放 `project.tsx`（与 `use-canvas-agent-actions.ts` 的分工：那个文件只放纯粹的画布 state 写入，不碰生成与确认弹窗） |
 | 4 | `tools/use-canvas-generation-tools.ts` 注册两个工具；launcher 传入新回调 |
 | 5 | 系统提示词更新；`use-canvas-tools.ts` 补 `parse` |
 | 6 | 文档：`agent-copilotkit.md` 第八/十节、`pending-test.mdx`、`CHANGELOG.md` |

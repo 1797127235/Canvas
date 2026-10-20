@@ -217,7 +217,9 @@ server/src/agent/run.ts     RunAgentInput → ModelMessage[] → streamText(ai@7
 | `lib/canvas/canvas-agent-context.ts` | 新建 | 纯函数：`canvas` / `assets` 两段摘要（见 7.1）。 |
 | `lib/canvas/canvas-agent-graph.ts` | 新建 | `apply_graph` 的入参 schema（zod）与实现：节点生成（复用 `createCanvasNode`）、连线校验、布局计算、警告收集。纯函数。 |
 | `services/api/agent.ts` | 新建 | thread 的 GET/PUT/DELETE 封装：`X-Account-Id`、`If-Match-Version`、账号切换 abort、409/413 映射成可读错误。 |
-| `pages/canvas/project.tsx` | 改动 | 渲染右下角浮动按钮 + `lazy()` 加载 launcher；提供 `handleApplyAgentGraph`（唯一写入出口）；移除 `chatSessions` / `activeChatId` 相关 state、历史快照与保存逻辑。 |
+| `pages/canvas/project.tsx` | 改动 | 渲染右下角浮动按钮 + `lazy()` 加载 launcher；移除 `chatSessions` / `activeChatId` 相关 state、历史快照与保存逻辑。 |
+| `pages/canvas/hooks/use-canvas-agent-actions.ts` | 新建 | agent 写画布的回调集合（`applyGraph` / `updateNode` / `removeNodes` / `connectNodes` / `disconnectNodes`），唯一写入出口。 |
+| `pages/canvas/hooks/use-agent-sidebar-width.ts` | 新建 | 助手面板宽度 state 与左边界拖拽。 |
 | `stores/canvas/use-canvas-store.ts`、`types/canvas.ts` | 改动 | 移除 `chatSessions` / `activeChatId` / `CanvasAssistantSession` / `CanvasAssistantMessage` 等死字段与类型。 |
 | `i18n/locales/zh-CN.ts` | 改动 | 面板与错误文案。 |
 
@@ -242,19 +244,24 @@ server/src/agent/run.ts     RunAgentInput → ModelMessage[] → streamText(ai@7
 
 规则：从当前视口中心起算，沿已有节点包围盒右边缘向右排布，间距固定；同批节点按声明顺序横向排列。模型只决定「加什么节点、什么关系」。
 
-### 7.3 写入出口 `handleApplyAgentGraph`：所有 agent 写操作的唯一通道
+### 7.3 写入出口 `useCanvasAgentActions`：所有 agent 写操作的唯一通道
 
 ```ts
-const handleApplyAgentGraph = (input: ApplyGraphInput): AgentGraphResult => {
-    const result = buildAgentGraph(input, nodesRef.current, getCanvasCenter());
-    if (result.nodes.length) { setNodes(...); setConnections(...); setSelectedNodeIds(...); }
-    return result;
-};
+// pages/canvas/hooks/use-canvas-agent-actions.ts
+export function useCanvasAgentActions({ nodesRef, connectionsRef, setNodes, setConnections, setSelectedNodeIds, getCanvasCenter, deleteNodes }) {
+    const applyGraph = useCallback((input: ApplyGraphInput): AgentGraphResult => {
+        const result = buildAgentGraph(input, nodesRef.current, getCanvasCenter());
+        if (result.nodes.length) { setNodes(...); setConnections(...); setSelectedNodeIds(...); }
+        return result;
+    }, [...]);
+    return { applyGraph, updateNode, removeNodes, connectNodes, disconnectNodes };
+}
 ```
 
-- 由 `project.tsx` 实现，内部走 `setNodes` / `setConnections`，与手工操作同一条路径。
+- 由 `pages/canvas/hooks/use-canvas-agent-actions.ts` 实现，内部走 `setNodes` / `setConnections`，与手工操作同一条路径。
+- 读当前节点与连线一律走 `nodesRef` / `connectionsRef`，不用 state：这些回调是前端工具注册的依赖，引用一变就会重新注册工具，走 ref 才能保持引用稳定。
 - 撤销：历史 effect 已经在监听 `nodes` / `connections`，一次工具调用写入后自动形成一个撤销单元，不需要额外接线。
-- 加新写工具时不新开写入通道：在 `project.tsx` 增加对应回调，在 `components/canvas/tools/` 注册前端工具；所有写入仍进入画布现有 state 与撤销/保存路径。
+- 加新写工具时不新开写入通道：在 `use-canvas-agent-actions.ts` 增加方法，在 `components/canvas/tools/` 注册前端工具；所有写入仍进入画布现有 state 与撤销/保存路径。
 
 ### 7.4 `apply_graph`
 

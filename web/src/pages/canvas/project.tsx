@@ -50,8 +50,8 @@ import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { buildNodeMentionReferences, getGroupResourceNodes, isCanvasReferenceNode, type CanvasResourceReference } from "@/lib/canvas/canvas-resource-references";
 import { exportCanvasProjects } from "@/lib/canvas/canvas-export";
 import { applyNodeConfigPatch, audioMetadata, buildAudioGenerationMetadata, buildImageGenerationMetadata, createCanvasNode, imageMetadata, videoMetadata } from "@/lib/canvas/canvas-node-factory";
-import { buildAgentGraph, type AgentGraphResult, type ApplyGraphInput } from "@/lib/canvas/canvas-agent-graph";
-import type { CanvasToolResult, UpdateCanvasNodeInput } from "@/components/canvas/tools/use-canvas-tools";
+import { useAgentSidebarWidth } from "@/pages/canvas/hooks/use-agent-sidebar-width";
+import { useCanvasAgentActions } from "@/pages/canvas/hooks/use-canvas-agent-actions";
 import { applyGroupSelection, applyUngroupSelection, canGroupSelectedNodes, canUngroupSelectedNodes, collectGroupMemberNodes, findContainingGroupId, findGroupDropTarget, getConnectionTargetAnchor, getGroupWrapRect, nodeRenderBounds, normalizeConnection, snapNodesIntoGroup } from "@/lib/canvas/canvas-node-geometry";
 import {
     audioExtension,
@@ -101,11 +101,6 @@ registerBuiltinNodes();
 // 画布助手整块懒加载：CopilotKit 的 Provider 会牵进 markdown 渲染、代码高亮等一堆东西，
 // 没用过助手的用户不该在打开画布时就下载它们。
 const CanvasAgentLauncher = lazy(() => import("@/components/canvas/canvas-agent-launcher"));
-
-// 助手面板宽度：默认比旧版宽，可拖左侧边界调整。上限同时受视口限制，避免窄屏把画布挤没。
-const AGENT_PANEL_DEFAULT_WIDTH = 480;
-const AGENT_PANEL_MIN_WIDTH = 360;
-const AGENT_PANEL_MAX_WIDTH = 860;
 
 type CanvasClipboard = {
     nodes: CanvasNodeData[];
@@ -221,7 +216,7 @@ function InfiniteCanvasPage() {
     const [nodes, setNodes] = useState<CanvasNodeData[]>([]);
     const [connections, setConnections] = useState<CanvasConnection[]>([]);
     const [agentOpen, setAgentOpen] = useState(false);
-    const [agentWidth, setAgentWidth] = useState(AGENT_PANEL_DEFAULT_WIDTH);
+    const { width: agentWidth, startResize: startAgentResize } = useAgentSidebarWidth();
     const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, k: 1 });
     const [canvasTool, setCanvasTool] = useState<"select" | "pan">("pan");
     const [size, setSize] = useState({ width: 1200, height: 720 });
@@ -3028,74 +3023,15 @@ function InfiniteCanvasPage() {
         [insertAssistantImage, insertAssistantText, screenToCanvas, size.height, size.width],
     );
 
-    // 助手写画布的唯一入口：与手工操作走同一套 setNodes/setConnections 与撤销历史。
-    // 后续加 update/delete/generate 工具时，在这里加方法而不是新开写入通道。
-    const handleApplyAgentGraph = useCallback((input: ApplyGraphInput): AgentGraphResult => {
-        const result = buildAgentGraph(input, nodesRef.current, getCanvasCenter());
-        if (result.nodes.length) {
-            setNodes((prev) => [...prev, ...result.nodes]);
-            setConnections((prev) => [...prev, ...result.connections]);
-            setSelectedNodeIds(new Set(result.created.map((item) => item.nodeId)));
-        }
-        return result;
-    }, [getCanvasCenter]);
-
-    const handleUpdateAgentNode = useCallback((input: UpdateCanvasNodeInput): CanvasToolResult => {
-        const node = nodesRef.current.find((item) => item.id === input.nodeId);
-        if (!node) return { ok: false, message: `未找到节点 ${input.nodeId}` };
-        if (input.content !== undefined && node.type !== CanvasNodeType.Text) return { ok: false, message: "目前仅支持修改文本节点内容" };
-        setNodes((prev) => prev.map((item) => item.id !== input.nodeId ? item : {
-            ...item,
-            ...(input.title !== undefined ? { title: input.title } : {}),
-            ...(input.position ? { position: input.position } : {}),
-            ...(input.prompt !== undefined ? { metadata: { ...item.metadata, prompt: input.prompt } } : {}),
-            ...(input.content !== undefined ? { metadata: { ...item.metadata, content: input.content } } : {}),
-        }));
-        return { ok: true, message: `已更新节点「${input.title ?? node.title}」` };
-    }, []);
-
-    const handleDeleteAgentNodes = useCallback((ids: string[]) => {
-        const existing = new Set(nodesRef.current.map((node) => node.id));
-        const deleted = [...new Set(ids)].filter((id) => existing.has(id));
-        if (deleted.length) deleteNodes(new Set(deleted));
-        return deleted;
-    }, [deleteNodes]);
-
-    const handleConnectAgentNodes = useCallback((fromNodeId: string, toNodeId: string): CanvasToolResult => {
-        const normalized = normalizeConnection(fromNodeId, toNodeId, nodesRef.current, "source");
-        if (!normalized) return { ok: false, message: "无法连接：节点不存在、目标是分组节点、或连接类型不兼容" };
-        if (connectionsRef.current.some((item) => item.fromNodeId === normalized.fromNodeId && item.toNodeId === normalized.toNodeId)) return { ok: false, message: "这条连线已经存在" };
-        setConnections((prev) => [...prev, { id: nanoid(), ...normalized }]);
-        return { ok: true, message: `已连接 ${normalized.fromNodeId} → ${normalized.toNodeId}` };
-    }, []);
-
-    const handleDisconnectAgentNodes = useCallback((fromNodeId: string, toNodeId: string): CanvasToolResult => {
-        const exists = connectionsRef.current.some((item) => item.fromNodeId === fromNodeId && item.toNodeId === toNodeId);
-        if (!exists) return { ok: false, message: "未找到这条连线" };
-        setConnections((prev) => prev.filter((item) => item.fromNodeId !== fromNodeId || item.toNodeId !== toNodeId));
-        return { ok: true, message: `已断开 ${fromNodeId} → ${toNodeId}` };
-    }, []);
-
-    // 拖助手面板左边界改宽度：指针捕获后 pointermove 都落在手柄上，离开手柄也不丢事件。
-    const startAgentResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-        if (event.button !== 0) return;
-        event.preventDefault();
-        const handle = event.currentTarget;
-        const startX = event.clientX;
-        const startWidth = agentWidth;
-        const maxWidth = Math.min(AGENT_PANEL_MAX_WIDTH, window.innerWidth * 0.92);
-        handle.setPointerCapture(event.pointerId);
-        const onMove = (moveEvent: PointerEvent) => setAgentWidth(Math.min(maxWidth, Math.max(AGENT_PANEL_MIN_WIDTH, startWidth + startX - moveEvent.clientX)));
-        const onEnd = () => {
-            if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
-            handle.removeEventListener("pointermove", onMove);
-            handle.removeEventListener("pointerup", onEnd);
-            handle.removeEventListener("pointercancel", onEnd);
-        };
-        handle.addEventListener("pointermove", onMove);
-        handle.addEventListener("pointerup", onEnd);
-        handle.addEventListener("pointercancel", onEnd);
-    }, [agentWidth]);
+    const { applyGraph: handleApplyAgentGraph, updateNode: handleUpdateAgentNode, removeNodes: handleDeleteAgentNodes, connectNodes: handleConnectAgentNodes, disconnectNodes: handleDisconnectAgentNodes } = useCanvasAgentActions({
+        nodesRef,
+        connectionsRef,
+        setNodes,
+        setConnections,
+        setSelectedNodeIds,
+        getCanvasCenter,
+        deleteNodes,
+    });
 
     // Memoize every callback and render function passed to CanvasNode.
     // CanvasNode uses React.memo, but new prop references would invalidate it on every render and rerender every node
