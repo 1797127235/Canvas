@@ -483,6 +483,15 @@ export default {
             approvalNever: "以后都拒绝这个操作",
             permissionReset: "重置为默认",
         },
+        generationPreference: {
+            title: "生成偏好",
+            image: "图片",
+            video: "视频",
+            ratio: "选择比例",
+            clarity: "清晰度",
+            duration: "时长",
+            model: "模型选择",
+        },
         sidePanel: {
             canvas: "画布",
             assets: "资产",

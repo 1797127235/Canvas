@@ -16,6 +16,7 @@ import { createSessionSaveQueue } from "@/lib/agent/session-save-queue";
 import { bindSessionPersistence } from "@/lib/agent/session-run";
 import { applyGraphInput, type AgentGraphResult, type ApplyGraphInput } from "@/lib/canvas/canvas-agent-graph";
 import { CanvasPromptLibrary } from "@/components/canvas/canvas-prompt-library";
+import { CanvasGenerationPreference } from "@/components/canvas/canvas-generation-preference";
 import { useApplyGraphTool } from "@/components/canvas/tools/use-apply-graph-tool";
 import { useCanvasTools, type CanvasToolResult, type UpdateCanvasNodeInput } from "@/components/canvas/tools/use-canvas-tools";
 import type { ApprovalMode } from "@/lib/agent/tool-approval";
@@ -482,6 +483,7 @@ function AgentChat({ projectId, nodes, connections, selectedNodeIds, onClose, on
                                 </button>
                             </Dropdown>
                             <CanvasPromptLibrary onSelect={(prompt) => setDraft(prompt)} />
+                            <CanvasGenerationPreference />
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                             <Dropdown trigger={["click"]} placement="bottomRight" menu={{ items: modeMenuItems, selectedKeys: [mode], onClick: selectMode }}>
